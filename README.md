@@ -1,1 +1,1 @@
-# accounting
+# Accounting proxy

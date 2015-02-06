@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 05 February 2015
+ * Last edit: 06 February 2015
  */
 
 /* Requires */
@@ -10,16 +10,29 @@ var express = require('express');
 /* Init app with express framework */
 var app = express();
 
-app.use(function(request, respond, next) {
-	var data='';
-	request.setEncoding('utf8');
-	// Save data
-	request.on('data', function(chunk) {
-		data += chunk;
+app.set('port', 9000);
+
+app.use(function(request, response, next) {
+	var data = '';
+	// Receive data
+	request.on('data', function(d) {
+		data += d;
 	});
-	// Finish recieving data
-	resquest.on('end', function() {
+	// Finish receiving data
+	request.on('end', function() {
 		request.body = data;
 		next();
 	});
 });
+
+app.use(function(request, response) {
+	// Debugging: Show request's headers
+	console.log("method: " + request.method);
+	for (item in request.headers) {
+		console.log(item + ': ' + request.headers[item]);
+	}
+	response.send("RECIEVED!!\n"); // END
+});
+
+/* Listening at port 9000*/
+app.listen(app.get('port'));

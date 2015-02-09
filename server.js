@@ -10,6 +10,23 @@ var express = require('express');
 /* Init app with express framework */
 var app = express();
 
+/* Map for saving info */
+var map = {};
+
+// Show information
+var print = function() {
+	for(var item in map)
+		console.log("user: " + item +  "\tnum: " + map[item]);
+};
+
+// Add a new request to the user
+var count = function(user) {
+	if (map[user] === undefined)
+		map[user] = 1;
+	else
+		map[user] += 1;
+};
+
 app.set('port', 9000);
 
 app.use(function(request, response, next) {
@@ -27,11 +44,18 @@ app.use(function(request, response, next) {
 
 app.use(function(request, response) {
 	// Debugging: Show request's headers
-	console.log("method: " + request.method);
-	for (item in request.headers) {
-		console.log(item + ': ' + request.headers[item]);
-	}
-	response.send("RECIEVED!!\n"); // END
+	console.log(request.headers);
+
+	// Save information
+	var user = request.get('X-Nick-Name');
+	if (user !== undefined)
+		count(user);
+	else
+		console.log("Undefined username");
+	print();
+
+	// End
+	response.send("RECIEVED!!\n"); 
 });
 
 /* Listening at port 9000*/

@@ -1,0 +1,6 @@
+var config = {};
+
+config.app_host = 'google.com';
+config.app_port = '80';
+
+module.exports = config;

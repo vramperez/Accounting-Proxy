@@ -6,6 +6,8 @@
 /* Requires */
 var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
+var config = require('./config');
+var proxy = require('./lib/HTTPClient.js');
 
 /* Init app with express framework */
 var app = express();
@@ -44,18 +46,28 @@ app.use(function(request, response, next) {
 
 app.use(function(request, response) {
 	// Debugging: Show request's headers
-	console.log(request.headers);
-
+	// console.log(request.headers);
+	// console.log(request.url);
+	// 
 	// Save information
 	var user = request.get('X-Nick-Name');
-	if (user !== undefined)
+	if (user !== undefined) {
 		count(user);
+		// Redirect request
+		var options = {
+			host: config.app_host,
+			port: config.app_port,
+			path: request.url,
+			method: request.method,
+			headers: proxy.getClientIp(request, request.headers)
+		}
+		proxy.sendData('http', options, request.body, response);
+	}
 	else
 		console.log("Undefined username");
-	print();
 
-	// End
-	response.send("RECIEVED!!\n"); 
+	// Debugging: Print number of request
+	// print();
 });
 
 /* Listening at port 9000*/

@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 06 February 2015
+ * Last edit: 12 February 2015
  */
 
 /* Requires */
@@ -8,6 +8,7 @@ var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
+var backup = require('./backup/backup.js');
 
 /* Init app with express framework */
 var app = express();
@@ -32,6 +33,8 @@ var count = function(user) {
 app.set('port', 9000);
 
 app.use(function(request, response, next) {
+	// Define a time stamp for the request
+	request.timeStamp = Date.now();
 	var data = '';
 	// Receive data
 	request.on('data', function(d) {
@@ -61,6 +64,8 @@ app.use(function(request, response) {
 			method: request.method,
 			headers: proxy.getClientIp(request, request.headers)
 		}
+		// console.log(request.timeStamp);
+		// backup.saveRequest(user, options, request.body, request.timeStamp);
 		proxy.sendData('http', options, request.body, response);
 	}
 	else

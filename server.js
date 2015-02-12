@@ -51,7 +51,7 @@ app.use(function(request, response) {
 	// Debugging: Show request's headers
 	// console.log(request.headers);
 	// console.log(request.url);
-	// 
+
 	// Save information
 	var user = request.get('X-Nick-Name');
 	if (user !== undefined) {
@@ -64,9 +64,13 @@ app.use(function(request, response) {
 			method: request.method,
 			headers: proxy.getClientIp(request, request.headers)
 		}
-		// console.log(request.timeStamp);
-		// backup.saveRequest(user, options, request.body, request.timeStamp);
+		// console.log('Time Stamp: ' + request.timeStamp);
+		// Save request before sending it
+		var r = backup.saveRequest(user, options, request.body, request.timeStamp);
+		// Redirect the request
 		proxy.sendData('http', options, request.body, response);
+		// Delete request after sending it
+		backup.deleteReq(r);
 	}
 	else
 		console.log("Undefined username");

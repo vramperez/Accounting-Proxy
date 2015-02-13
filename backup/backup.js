@@ -15,10 +15,17 @@ var backupFileName = 'requests.backup';
  * Load data 'requests.backup'
  */
 exports.init = function(){
-    data = fs.readFileSync(backupFileName, {encoding: 'utf-8'});
-    data = JSON.parse(data);
-    requests = data.requests;
-    counts = data.counts;
+    fs.readFile(backupFileName, {encoding: 'utf-8'}, function(err, data) {
+        if (err) {
+            requests = [];
+            counts = {};
+        }
+        else {
+            data = JSON.parse(data);
+            requests = data.requests;
+            counts = data.counts;
+        }
+    });
 }
 
 /**
@@ -43,7 +50,7 @@ exports.saveRequest = function(user, options, body, timeStamp) {
         counts[user] = 0;
     counts[user] += 1;
     // Truncate file
-    fs.truncate(backupFileName)
+    fs.truncate(backupFileName, function(err) {});
     // Re-write file
     fs.writeFile(backupFileName, JSON.stringify({
         requests: requests,
@@ -62,7 +69,7 @@ exports.deleteReq = function(req) {
     if (index != -1) {
         requests.splice(index, 1);
         // Truncate file
-        fs.truncate(backupFileName)
+        fs.truncate(backupFileName, function(err) {})
         // Re-write file
         fs.writeFile(backupFileName, JSON.stringify({
             requests: requests,

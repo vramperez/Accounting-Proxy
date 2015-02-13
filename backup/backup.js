@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 12 February 2015
+ * Last edit: 13 February 2015
  */
 
 /* Requieres */
@@ -10,6 +10,16 @@ var fs = require('fs');
 var requests = [];
 var counts = {};
 var backupFileName = 'requests.backup';
+
+/**
+ * Load data 'requests.backup'
+ */
+exports.init = function(){
+    data = fs.readFileSync(backupFileName, {encoding: 'utf-8'});
+    data = JSON.parse(data);
+    requests = data.requests;
+    counts = data.counts;
+}
 
 /**
  * Save a request in the requests' list

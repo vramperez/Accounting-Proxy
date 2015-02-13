@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 12 February 2015
+ * Last edit: 13 February 2015
  */
 
 /* Requires */
@@ -79,5 +79,6 @@ app.use(function(request, response) {
 	// print();
 });
 
+backup.init();
 /* Listening at port 9000*/
 app.listen(app.get('port'));

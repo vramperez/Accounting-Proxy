@@ -8,14 +8,15 @@ var fs = require('fs');
 
 /* Variables */
 var requests = [];
+var counts = {};
 var backupFileName = 'requests.backup';
 
 /**
  * Save a request in the requests' list
- * @param user          [description]
- * @param options       [description]
- * @param body          [description]
- * @param timeStamp     [description]
+ * @param user          []
+ * @param options       []
+ * @param body          []
+ * @param timeStamp     []
  * @return {request}    [Request object generated]
  */
 exports.saveRequest = function(user, options, body, timeStamp) {
@@ -27,10 +28,17 @@ exports.saveRequest = function(user, options, body, timeStamp) {
     req.timeStamp = timeStamp;
     // Add request to requests' list
     requests.push(req);
+    // Count
+    if (counts[user] === undefined)
+        counts[user] = 0;
+    counts[user] += 1;
     // Truncate file
     fs.truncate(backupFileName)
     // Re-write file
-    fs.writeFile(backupFileName, JSON.stringify(requests));
+    fs.writeFile(backupFileName, JSON.stringify({
+        requests: requests,
+        counts: counts
+    }));
     // console.log('[LOG] Request saved');
     return req;
 }
@@ -46,7 +54,10 @@ exports.deleteReq = function(req) {
         // Truncate file
         fs.truncate(backupFileName)
         // Re-write file
-        fs.writeFile(backupFileName, JSON.stringify(requests));
+        fs.writeFile(backupFileName, JSON.stringify({
+            requests: requests,
+            counts: counts
+        }));
     }
     else
         // TODO: Manage error

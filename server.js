@@ -9,8 +9,6 @@ var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
 
-require('./backup/cycle.js');
-
 /* Init app with express framework */
 var app = express();
 
@@ -61,8 +59,14 @@ app.use(function(request, response) {
 			headers: proxy.getClientIp(request, request.headers)
 		}
 		// Redirect the request
-		proxy.sendData('http', options, request.body, response);
-		// Delete request after sending it
+		proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+			response.statusCode = status;
+			for(var idx in headers)
+				response.setHeader(idx, headers[idx]);
+			response.send(resp);
+			// Counter ++
+			count(user);
+		});
 	}
 	else
 		console.log("Undefined username");

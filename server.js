@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 13 February 2015
+ * Last edit: 17 February 2015
  */
 
 /* Requires */
@@ -8,7 +8,8 @@ var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
-var backup = require('./backup/backup.js');
+
+require('./backup/cycle.js');
 
 /* Init app with express framework */
 var app = express();
@@ -48,14 +49,9 @@ app.use(function(request, response, next) {
 });
 
 app.use(function(request, response) {
-	// Debugging: Show request's headers
-	// console.log(request.headers);
-	// console.log(request.url);
-
 	// Save information
 	var user = request.get('X-Nick-Name');
 	if (user !== undefined) {
-		count(user);
 		// Redirect request
 		var options = {
 			host: config.app_host,
@@ -64,21 +60,13 @@ app.use(function(request, response) {
 			method: request.method,
 			headers: proxy.getClientIp(request, request.headers)
 		}
-		// console.log('Time Stamp: ' + request.timeStamp);
-		// Save request before sending it
-		var r = backup.saveRequest(user, options, request.body, request.timeStamp);
 		// Redirect the request
 		proxy.sendData('http', options, request.body, response);
 		// Delete request after sending it
-		backup.deleteReq(r);
 	}
 	else
 		console.log("Undefined username");
-
-	// Debugging: Print number of request
-	// print();
 });
 
-backup.init();
 /* Listening at port 9000*/
 app.listen(app.get('port'));

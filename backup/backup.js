@@ -5,7 +5,7 @@
 
 /* Requieres */
 var fs = require('fs');
-
+require('./cycle.js');
 /* Variables */
 var requests = [];
 var counts = {};
@@ -36,7 +36,7 @@ exports.init = function(){
  * @param timeStamp     []
  * @return {request}    [Request object generated]
  */
-exports.saveRequest = function(user, options, body, timeStamp) {
+exports.saveRequest = function(user, options, body, timeStamp, response) {
     // Create request object
     var req = {};
     req.user = user;
@@ -44,6 +44,7 @@ exports.saveRequest = function(user, options, body, timeStamp) {
     req.body = body;
     req.timeStamp = timeStamp;
     // Add request to requests' list
+    console.log(req.options.headers);
     requests.push(req);
     // Count
     if (counts[user] === undefined)

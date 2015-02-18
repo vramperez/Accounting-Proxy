@@ -8,6 +8,7 @@ var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
+var sql = require('./backup/sql.backup.js');
 
 /* Init app with express framework */
 var app = express();
@@ -66,10 +67,21 @@ app.use(function(request, response) {
 			response.send(resp);
 			// Counter ++
 			count(user);
+			// Update in DB
+			sql.save(map[user], user);
 		});
 	}
 	else
-		console.log("Undefined username");
+		console.log("[LOG] Undefined username");
+});
+
+/* Establish connection with DB */
+sql.init();
+
+/* Get data from DB if it is avaliable */
+sql.loadFromDB(function(m) {
+	map = m;
+	console.log('[LOG] Data loaded.');
 });
 
 /* Listening at port 9000*/

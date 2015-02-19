@@ -3,4 +3,11 @@ var config = {};
 config.app_host = 'google.com';
 config.app_port = '80';
 
+config.sql = {
+    user: 'jesus',
+    password: 'conwet',
+    host: 'localhost',
+    port: '3306'
+};
+
 module.exports = config;

@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 17 February 2015
+ * Last edit: 19 February 2015
  */
 
 /* Requires */
@@ -8,21 +8,18 @@ var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
-var sql = require('./backup/sql.backup.js');
+var sql = require('./sql.backup.js');
 
-/* Init app with express framework */
+/* Create app with Express Framework */
 var app = express();
 
-/* Map for saving info */
+/* Map for saving users' requests */
 var map = {};
 
-// Show information
-var print = function() {
-	for(var item in map)
-		console.log("user: " + item +  "\tnum: " + map[item]);
-};
-
-// Add a new request to the user
+/**
+ * Add a new request to the user
+ * @param  {STRING} user [user's nickname]
+ */
 var count = function(user) {
 	if (map[user] === undefined)
 		map[user] = 1;
@@ -82,7 +79,6 @@ sql.init();
 sql.loadFromDB(function(m) {
 	map = m;
 	console.log('[LOG] Data loaded.');
+	// Listening at port 9000
+	app.listen(app.get('port'));
 });
-
-/* Listening at port 9000*/
-app.listen(app.get('port'));

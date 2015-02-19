@@ -1,16 +1,7 @@
 var mysql = require('mysql');
+var config = require('../config')
 
-var HOST = 'localhost';
-var PORT ='3306';
-var MYSQL_USER = 'jesus';
-var MYSQL_PASS = 'conwet';
-
-var connection = mysql.createConnection({
-    host: HOST,
-    port: PORT,
-    user: MYSQL_USER,
-    password: MYSQL_PASS,
-});
+var connection = mysql.createConnection(config.sql);
 
 /**
  * Load accounting info from DB

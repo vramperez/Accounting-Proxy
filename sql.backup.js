@@ -11,6 +11,19 @@ var config = require('./config')
 var connection = mysql.createConnection(config.sql);
 
 /**
+ * Handle errors. Exist if it is a fatal error.
+ * @param  {OBJECT} err  [error objet]
+ * @param  {STRING} type [describe error's type]
+ */
+var errorHandler = function(err, type) {
+    if (err) {
+        console.log('[LOG] SQL ' + type + ' Query Error: ' + err.code);
+        if (err.fatal)
+            process.exit(1);
+    }
+}
+
+/**
  * Load accounting info from DB
  * @param  {FUNCTION} setMap [Callback function to send the information loaded]
  */
@@ -32,8 +45,7 @@ exports.loadFromDB = function(setMap) {
  */
 exports.init = function() {
     connection.connect(function(err) {
-        console.log('[LOG] SQL Connection Error: ' + err.code);
-        process.exit(1);
+        errorHandler(err, 'Connection');
     });
     // Create Database if not exists
     connection.query('CREATE SCHEMA IF NOT EXISTS AccountingDDBB CHARACTER SET utf8 COLLATE utf8_general_ci');
@@ -53,12 +65,14 @@ exports.init = function() {
  * @param  {STRING}     user   [user name]
  */
 exports.save = function(numReq, user) {
-    if (numReq == 1) {
-        connection.query("INSERT INTO counts VALUE (?,?)", [user,numReq]);
-    }
-    else {
-        connection.query("UPDATE counts SET requests=? WHERE nickname=?",[numReq, user]);
-    }
+    if (numReq == 1)
+        connection.query("INSERT INTO counts VALUE (?,?)", [user,numReq], function(err) {
+            errorHandler(err, 'Query');
+        });
+    else
+        connection.query("UPDATE counts SET requests=? WHERE nickname=?",[numReq, user],function(err) {
+            errorHandler(err, 'Query');
+        });
 }
 
 /**

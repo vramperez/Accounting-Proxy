@@ -1,0 +1,20 @@
+{
+    "name": "accounting-proxy",
+    "version": "0.1.0",
+    "description": "Accounting proxy for FI-ware GE services",
+    "author": "FI-WARE",
+    "dependencies": {
+        "express": "4.x",
+        "mysql": "2.5.x"
+    },
+    "repository": {
+        "type": "git",
+        "url": ""
+    },
+    "contributors": [
+        {
+            "name": "Jesús Martínez-Barquero Herrada",
+            "email": "jmartinez@conwet.com"
+        }
+    ]
+}

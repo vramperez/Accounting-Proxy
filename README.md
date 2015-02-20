@@ -7,6 +7,11 @@
 - MySQL server.
 
 #### Configuration:
+To install NodeJS dependencies, execute in the accounting-proxy folder:
+```
+npm install
+```
+
 To configure it, open 'config' and complete the fields with your configuration:
 ```
 config.app_host = 'google.com'; // Hostname to forward request

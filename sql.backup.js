@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 19 February 2015
+ * Last updated: 20 February 2015
  */
 
 /* Requires */
@@ -31,7 +31,10 @@ exports.loadFromDB = function(setMap) {
  * Connect to database server and create everything if it is necessary.
  */
 exports.init = function() {
-    connection.connect();
+    connection.connect(function(err) {
+        console.log('[LOG] SQL Connection Error: ' + err.code);
+        process.exit(1);
+    });
     // Create Database if not exists
     connection.query('CREATE SCHEMA IF NOT EXISTS AccountingDDBB CHARACTER SET utf8 COLLATE utf8_general_ci');
     // Stablish the database to be used

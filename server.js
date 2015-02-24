@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 19 February 2015
+ * Last edit: 24 February 2015
  */
 
 /* Requires */
@@ -9,6 +9,7 @@ var express = require('express');
 var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
 var sql = require('./sql.backup.js');
+var s2 = require('./server2.js');
 
 /* Create app with Express Framework */
 var app = express();
@@ -81,4 +82,6 @@ sql.loadFromDB(function(m) {
 	console.log('[LOG] Data loaded.');
 	// Listening at port 9000
 	app.listen(app.get('port'));
+	// Start second server
+	s2.run();
 });

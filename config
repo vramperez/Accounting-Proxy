@@ -10,4 +10,11 @@ config.sql = {
     port: '3306'
 };
 
+config.resource = {
+    name: 'resource1',
+    version: '1.0',
+    content_type: '',
+    url: 'http://www.resource1.org/'
+}
+
 module.exports = config;

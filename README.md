@@ -23,6 +23,13 @@ config.sql = {
     host: 'localhost',          // SQL Database server hostname
     port: '1234'                // SQL Database server pot
 };
+
+config.resource = {
+    name: 'resource',           // Resource name
+    version: '1.0',             // Resource version
+    content_type: '',           // Resource content-type
+    url: 'http://example.org'   // Resource URL
+};
 ```
 
 #### Running proxy server:
@@ -31,4 +38,4 @@ node server
 ```
 
 ---
-Last updated: _19/02/2015_
+Last updated: _25/02/2015_

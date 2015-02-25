@@ -29,7 +29,7 @@ var errorHandler = function(err, type) {
  */
 exports.loadFromDB = function(setMap) {
     var toReturn = {};
-    connection.query('SELECT * FROM counts', function(err, results) {
+    connection.query('SELECT * FROM users', function(err, results) {
         if (results !== undefined && results.length !== 0)
             for (i in results)
                 toReturn[results[i].nickname] = results[i].requests;
@@ -51,11 +51,18 @@ exports.init = function() {
     connection.query('CREATE SCHEMA IF NOT EXISTS AccountingDDBB CHARACTER SET utf8 COLLATE utf8_general_ci');
     // Stablish the database to be used
     connection.query('USE AccountingDDBB');
-    // Add a new table
+    // Add a new table: DEPRECATED
     connection.query('CREATE TABLE IF NOT EXISTS counts ( \
                      nickname    VARCHAR(20), \
                      requests    INTEGER, \
                      PRIMARY KEY (nickname) \
+                     ) ENGINE=InnoDB');
+    // Add new table of users that can use the service.
+    connection.query('CREATE TABLE IF NOT EXISTS users ( \
+                     userID     VARCHAR(30), \
+                     nickname   VARCHAR(20), \
+                     requests    INTEGER, \
+                     PRIMARY KEY (userID) \
                      ) ENGINE=InnoDB');
 }
 

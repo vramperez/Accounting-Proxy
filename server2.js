@@ -1,12 +1,12 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 25 February 2015
+ * Last edit: 26 February 2015
  */
 
 /* Requires */
 var express = require('express');
-var backup = require('sql.backup');
-var config = require('config');
+var backup = require('./sql.backup');
+var config = require('./config');
 
 /* Create app with Express Framework */
 var app = express();

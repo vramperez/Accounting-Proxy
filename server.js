@@ -87,8 +87,11 @@ exports.newUser = function(userID, user) {
 			userID: userID
 		}
 		// Update DB
-		sql.newUser(userID, user, 0);
+		sql.newUser(userID, user);
+		console.log('[LOG] New user ' + user + ' added.');
 	}
+	else
+		console.log('[LOG] User ' + user + ' already exists')
 }
 
 /* Establish connection with DB */

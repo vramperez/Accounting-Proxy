@@ -6,6 +6,7 @@
 /* Requires */
 var express = require('express');
 var mainSrv = require('./server');
+var resource = require('./config').resource;
 
 /* Create app with Express Framework */
 var app = express();
@@ -30,7 +31,18 @@ app.use(function(request, response, next) {
 
         request.on('end', function() {
             body = JSON.parse(body);
-            mainSrv.newUser(body.customer, body.customer_name);
+            var r = body.resources;
+            // Checks proxy's resource in the request resources list
+            for (i in r) {
+                if (r[i].name === resource.name
+                    && r[i].version === resource.version
+                    && r[i].url === resource.url) {
+                    console.log("[LOG] Resource OK!");
+                    mainSrv.newUser(body.customer, body.customer_name);
+                    return;
+                }
+            }
+            console.log("[LOG] Resource FAIL!");
         });
     }
     response.send('Server 2');

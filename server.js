@@ -73,6 +73,24 @@ app.use(function(request, response) {
 		console.log("[LOG] Undefined username");
 });
 
+/**
+ * Update users list with new user
+ * @param  {STRING} userID [user ID]
+ * @param  {STRING} user   [user's nickname]
+ */
+exports.newUser = function(userID, user) {
+	// Add user only if he isn't exists already.
+	if (map[user] === undefined) {
+		// Update local list
+		map[user] = {
+			requests: 0,
+			userID: userID
+		}
+		// Update DB
+		sql.newUser(userID, user, 0);
+	}
+}
+
 /* Establish connection with DB */
 sql.init();
 

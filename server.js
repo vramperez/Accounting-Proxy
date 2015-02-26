@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 24 February 2015
+ * Last edit: 26 February 2015
  */
 
 /* Requires */
@@ -23,9 +23,11 @@ var map = {};
  */
 var count = function(user) {
 	if (map[user] === undefined)
-		map[user] = 1;
-	else
-		map[user] += 1;
+		console.log('[LOG] Unauthorized user: ' + user);
+	else {
+		map[user].requests += 1;
+		sql.save(map[user], user);
+	}
 };
 
 app.set('port', 9000);
@@ -63,10 +65,8 @@ app.use(function(request, response) {
 			for(var idx in headers)
 				response.setHeader(idx, headers[idx]);
 			response.send(resp);
-			// Counter ++
+			// Counter ++ and update DB
 			count(user);
-			// Update in DB
-			sql.save(map[user], user);
 		});
 	}
 	else

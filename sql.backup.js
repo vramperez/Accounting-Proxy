@@ -75,8 +75,13 @@ exports.save = function(userData, user) {
     });
 }
 
-exports.newUser = function(userID, user, numReq) {
-    connection.query("INSERT INTO users VALUE (?,?,?)", [userID,user,numReq], function(err) {
+/**
+ * Insert new user in DB.
+ * @param  {STRING} userID [user ID]
+ * @param  {STRING} user   [user's nickname]
+ */
+exports.newUser = function(userID, user) {
+    connection.query("INSERT INTO users VALUE (?,?,?)", [userID,user,0], function(err) {
         errorHandler(err, 'Query');
     });
 }

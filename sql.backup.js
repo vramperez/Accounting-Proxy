@@ -54,12 +54,6 @@ exports.init = function() {
     connection.query('CREATE SCHEMA IF NOT EXISTS AccountingDDBB CHARACTER SET utf8 COLLATE utf8_general_ci');
     // Stablish the database to be used
     connection.query('USE AccountingDDBB');
-    // Add a new table: DEPRECATED
-    /*connection.query('CREATE TABLE IF NOT EXISTS counts ( \
-                     nickname    VARCHAR(20), \
-                     requests    INTEGER, \
-                     PRIMARY KEY (nickname) \
-                     ) ENGINE=InnoDB');*/
     // Add new table of users that can use the service.
     connection.query('CREATE TABLE IF NOT EXISTS users ( \
                      userID     VARCHAR(30), \
@@ -71,18 +65,16 @@ exports.init = function() {
 
 /**
  * Add/Update number of request of a user.
- * @param  {INTEGER}    numReq [number of requests]
- * @param  {STRING}     user   [user name]
+ * @param  {OBJECT} userData   [user data]
+ * @param  {STRING} user       [user name]
  */
-exports.save = function(numReq, user) {
-    if (numReq == 1)
-        connection.query("INSERT INTO users VALUE (?,?)", [user,numReq], function(err) {
-            errorHandler(err, 'Query');
-        });
-    else
-        connection.query("UPDATE users SET requests=? WHERE nickname=?",[numReq, user],function(err) {
-            errorHandler(err, 'Query');
-        });
+exports.save = function(userData, user) {
+    console.log('User: ' + user);
+    console.log('Data: ' + userData);
+    connection.query("UPDATE users SET requests=? WHERE nickname=? AND userID=?",
+                     [userData.requests, user, userData.userID],function(err) {
+        errorHandler(err, 'Query 1');
+    });
 }
 
 /**

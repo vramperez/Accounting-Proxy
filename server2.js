@@ -5,8 +5,7 @@
 
 /* Requires */
 var express = require('express');
-var backup = require('./sql.backup');
-var config = require('./config');
+var mainSrv = require('./server');
 
 /* Create app with Express Framework */
 var app = express();
@@ -22,6 +21,17 @@ exports.run = function(){
 }
 
 app.use(function(request, response, next) {
-    // TODO: Treat request from WStore
+    request.setEncoding('utf-8');
+    var body = '';
+    if (request.get('Content-Type') === 'application/json') {
+        request.on('data', function(data) {
+            body += data;
+        });
+
+        request.on('end', function() {
+            body = JSON.parse(body);
+            mainSrv.newUser(body.customer, body.customer_name);
+        });
+    }
     response.send('Server 2');
 });

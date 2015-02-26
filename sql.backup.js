@@ -69,11 +69,15 @@ exports.init = function() {
  * @param  {STRING} user       [user name]
  */
 exports.save = function(userData, user) {
-    console.log('User: ' + user);
-    console.log('Data: ' + userData);
     connection.query("UPDATE users SET requests=? WHERE nickname=? AND userID=?",
                      [userData.requests, user, userData.userID],function(err) {
         errorHandler(err, 'Query 1');
+    });
+}
+
+exports.newUser = function(userID, user, numReq) {
+    connection.query("INSERT INTO users VALUE (?,?,?)", [userID,user,numReq], function(err) {
+        errorHandler(err, 'Query');
     });
 }
 

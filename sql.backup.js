@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last updated: 20 February 2015
+ * Last updated: 26 February 2015
  */
 
 /* Requires */
@@ -32,7 +32,10 @@ exports.loadFromDB = function(setMap) {
     connection.query('SELECT * FROM users', function(err, results) {
         if (results !== undefined && results.length !== 0)
             for (i in results)
-                toReturn[results[i].nickname] = results[i].requests;
+                toReturn[results[i].nickname] = {
+                    requests:results[i].requests,
+                    userID: results[i].userID
+                }
         else
             console.log('[LOG] No data avaliable.');
         setMap(toReturn);
@@ -52,11 +55,11 @@ exports.init = function() {
     // Stablish the database to be used
     connection.query('USE AccountingDDBB');
     // Add a new table: DEPRECATED
-    connection.query('CREATE TABLE IF NOT EXISTS counts ( \
+    /*connection.query('CREATE TABLE IF NOT EXISTS counts ( \
                      nickname    VARCHAR(20), \
                      requests    INTEGER, \
                      PRIMARY KEY (nickname) \
-                     ) ENGINE=InnoDB');
+                     ) ENGINE=InnoDB');*/
     // Add new table of users that can use the service.
     connection.query('CREATE TABLE IF NOT EXISTS users ( \
                      userID     VARCHAR(30), \
@@ -73,11 +76,11 @@ exports.init = function() {
  */
 exports.save = function(numReq, user) {
     if (numReq == 1)
-        connection.query("INSERT INTO counts VALUE (?,?)", [user,numReq], function(err) {
+        connection.query("INSERT INTO users VALUE (?,?)", [user,numReq], function(err) {
             errorHandler(err, 'Query');
         });
     else
-        connection.query("UPDATE counts SET requests=? WHERE nickname=?",[numReq, user],function(err) {
+        connection.query("UPDATE users SET requests=? WHERE nickname=?",[numReq, user],function(err) {
             errorHandler(err, 'Query');
         });
 }

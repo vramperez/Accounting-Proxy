@@ -35,7 +35,7 @@ exports.loadFromDB = function(setMap) {
                 toReturn[results[i].nickname] = {
                     requests:results[i].requests,
                     userID: results[i].userID,
-                    reference: results[i].reference1
+                    reference: results[i].reference
                 }
         else
             console.log('[LOG] No data avaliable.');
@@ -73,7 +73,7 @@ exports.init = function() {
 exports.save = function(userData, user) {
     connection.query("UPDATE users SET requests=? WHERE nickname=? AND userID=?",
                      [userData.requests, user, userData.userID],function(err) {
-        errorHandler(err, 'Query 1');
+        errorHandler(err, 'Query');
     });
 }
 
@@ -85,6 +85,27 @@ exports.save = function(userData, user) {
 exports.newUser = function(userID, user, reference) {
     connection.query("INSERT INTO users VALUE (?,?,?,?)", [userID,user,reference,0], function(err) {
         errorHandler(err, 'Query');
+    });
+}
+
+/**
+ * Update purchase reference in DB and set to 0 the number of requests.
+ * @param  {STRING} userID       [user ID]
+ * @param  {STRING} newReference [purchase reference]
+ */
+exports.updateReference = function(userID, newReference) {
+    connection.query("UPDATE users SET requests=?, reference=? WHERE userID=?",
+                     [0, newReference, userID],function(err) {
+        errorHandler(err, 'Query');
+    });
+}
+
+exports.getUserInfo = function(userID, retrieveInfo) {
+    connection.query("SELECT * FROM users WHERE userID=?", [userID],function(err, data) {
+        if (err)
+            errorHandler(err, 'Query');
+        else
+            retrieveInfo(data);
     });
 }
 

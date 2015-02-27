@@ -92,8 +92,21 @@ exports.newUser = function(userID, user, reference) {
 		sql.newUser(userID, user, reference);
 		console.log('[LOG] New user ' + user + ' added.');
 	}
-	else // TODO: If user exists, check purchase reference
-		console.log('[LOG] User ' + user + ' already exists')
+	else {
+		console.log('[LOG] User ' + user + ' already exists');
+		console.log('[LOG] Checking purchase reference...');
+		if (map[user].reference !== reference) {
+			// TODO: Send old user information to WStores
+			sql.getUserInfo(userID, function(data) {
+				// Debugging:
+				// console.log(data);
+			});
+			console.log('[LOG] New purchase reference. Updating...');
+			sql.updateReference(userID, reference);
+		}
+		else
+			console.log('[LOG] Reference is already up to date');
+	}
 }
 
 /* Establish connection with DB */

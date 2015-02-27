@@ -34,7 +34,8 @@ exports.loadFromDB = function(setMap) {
             for (i in results)
                 toReturn[results[i].nickname] = {
                     requests:results[i].requests,
-                    userID: results[i].userID
+                    userID: results[i].userID,
+                    reference: results[i].reference1
                 }
         else
             console.log('[LOG] No data avaliable.');
@@ -58,7 +59,8 @@ exports.init = function() {
     connection.query('CREATE TABLE IF NOT EXISTS users ( \
                      userID     VARCHAR(30), \
                      nickname   VARCHAR(20), \
-                     requests    INTEGER, \
+                     reference  VARCHAR(50), \
+                     requests   INTEGER, \
                      PRIMARY KEY (userID) \
                      ) ENGINE=InnoDB');
 }
@@ -80,8 +82,8 @@ exports.save = function(userData, user) {
  * @param  {STRING} userID [user ID]
  * @param  {STRING} user   [user's nickname]
  */
-exports.newUser = function(userID, user) {
-    connection.query("INSERT INTO users VALUE (?,?,?)", [userID,user,0], function(err) {
+exports.newUser = function(userID, user, reference) {
+    connection.query("INSERT INTO users VALUE (?,?,?,?)", [userID,user,reference,0], function(err) {
         errorHandler(err, 'Query');
     });
 }

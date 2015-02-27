@@ -30,6 +30,7 @@ app.use(function(request, response, next) {
         });
 
         request.on('end', function() {
+            // TODO: JSON.parse err
             body = JSON.parse(body);
             var r = body.resources;
             // Checks proxy's resource in the request resources list
@@ -38,7 +39,7 @@ app.use(function(request, response, next) {
                     && r[i].version === resource.version
                     && r[i].url === resource.url) {
                     console.log("[LOG] Resource OK!");
-                    mainSrv.newUser(body.customer, body.customer_name);
+                    mainSrv.newUser(body.customer, body.customer_name, body.reference);
                     return;
                 }
             }

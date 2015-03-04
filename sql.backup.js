@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last updated: 26 February 2015
+ * Last updated: 03 March 2015
  */
 
 /* Requires */
@@ -9,40 +9,6 @@ var config = require('./config')
 
 /* Create SQL connection */
 var connection = mysql.createConnection(config.sql);
-
-/**
- * Handle errors. Exist if it is a fatal error.
- * @param  {OBJECT} err  [error objet]
- * @param  {STRING} type [describe error's type]
- */
-var errorHandler = function(err, type) {
-    if (err) {
-        console.log('[LOG] SQL ' + type + ' Query Error: ' + err.code);
-        if (err.fatal)
-            process.exit(1);
-    }
-}
-
-/**
- * Load accounting info from DB
- * @param  {FUNCTION} setMap [Callback function to send the information loaded]
- */
-exports.loadFromDB = function(setMap) {
-    var toReturn = {};
-    connection.query('SELECT * FROM users', function(err, results) {
-        if (results !== undefined && results.length !== 0)
-            for (i in results)
-                toReturn[results[i].nickname] = {
-                    requests:results[i].requests,
-                    userID: results[i].userID,
-                    reference: results[i].reference
-                }
-        else
-            console.log('[LOG] No data avaliable.');
-        setMap(toReturn);
-        delete toReturn;
-   });
-}
 
 /**
  * Connect to database server and create everything if it is necessary.
@@ -63,6 +29,48 @@ exports.init = function() {
                      requests   INTEGER, \
                      PRIMARY KEY (userID) \
                      ) ENGINE=InnoDB');
+}
+
+/**
+ * Handle errors. Exist if it is a fatal error.
+ * @param  {OBJECT} err  [error objet]
+ * @param  {STRING} type [describe error's type]
+ */
+var errorHandler = function(err, type) {
+    if (err) {
+        console.log('[LOG] SQL ' + type + ' Query Error: ' + err.code);
+        if (err.fatal)
+            process.exit(1);
+    }
+}
+
+var notify = function(user) {
+    console.log("User with pending request: " + user.nickname);
+    resetRequest(user.userID);
+}
+
+/**
+ * Load accounting info from DB
+ * @param  {FUNCTION} setMap [Callback function to send the information loaded]
+ */
+exports.loadFromDB = function(setMap) {
+    var toReturn = {};
+    connection.query('SELECT * FROM users', function(err, results) {
+        if (results !== undefined && results.length !== 0)
+            for (i in results) {
+                if (results[i].requests > 0)
+                    notify(results[i]);
+                toReturn[results[i].nickname] = {
+                    requests:0,
+                    userID: results[i].userID,
+                    reference: results[i].reference
+                }
+            }
+        else
+            console.log('[LOG] No data avaliable.');
+        setMap(toReturn);
+        delete toReturn;
+   });
 }
 
 /**
@@ -109,6 +117,16 @@ exports.getUserInfo = function(userID, retrieveInfo) {
     });
 }
 
+/**
+ * Reset request counter in DB.
+ * @param  {STRING} userID [user ID]
+ */
+var resetRequest = function(userID) {
+    connection.query("UPDATE users SET requests=? WHERE userID=?", [0,userID],
+                     function(err) {
+        errorHandler(err, 'Query');
+    });
+}
 /**
  * Disconnect from DB server.
  */

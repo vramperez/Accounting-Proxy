@@ -34,7 +34,7 @@ app.set('port', 9000);
 
 app.use(function(request, response, next) {
 	// Define a time stamp for the request
-	request.timeStamp = Date.now();
+	// request.timeStamp = Date.now();
 	var data = '';
 	// Receive data
 	request.on('data', function(d) {

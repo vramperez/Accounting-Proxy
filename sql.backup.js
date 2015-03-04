@@ -5,7 +5,8 @@
 
 /* Requires */
 var mysql = require('mysql');
-var config = require('./config')
+var config = require('./config');
+var info = require('./lib/info.json');
 
 /* Create SQL connection */
 var connection = mysql.createConnection(config.sql);
@@ -29,6 +30,14 @@ exports.init = function() {
                      requests   INTEGER, \
                      PRIMARY KEY (userID) \
                      ) ENGINE=InnoDB');
+    // Add new table of offers avaliable in use.
+    connection.query('CREATE TABLE IF NOT EXISTS offers ( \
+                     reference      VARCHAR(50), \
+                     organization   VARCHAR(50), \
+                     name           VARCHAR(50), \
+                     version        VARCHAR(10), \
+                     PRIMARY KEY (reference) \
+                     ) ENGINE=InnoDB');
 }
 
 /**
@@ -44,6 +53,11 @@ var errorHandler = function(err, type) {
     }
 }
 
+/**
+ * Send a request to WStore with accounting information of user.
+ * @param  {OBJECT} user [user object information]
+ * TODO: Implement method, xD
+ */
 var notify = function(user) {
     console.log("User with pending request: " + user.nickname);
     resetRequest(user.userID);

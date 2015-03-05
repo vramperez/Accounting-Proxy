@@ -103,7 +103,9 @@ exports.newUser = function(userID, user, reference, offer) {
 				// console.log(data);
 			});
 			console.log('[LOG] New purchase reference. Updating...');
-			sql.updateReference(userID, reference);
+			sql.updateReference(userID, reference, function(r){
+				map[user].reference = r;
+			});
 		}
 		else
 			console.log('[LOG] Reference is already up to date');

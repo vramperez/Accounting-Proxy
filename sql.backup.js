@@ -118,10 +118,13 @@ exports.newUser = function(userID, user, reference, offer) {
  * @param  {STRING} userID       [user ID]
  * @param  {STRING} newReference [purchase reference]
  */
-exports.updateReference = function(userID, newReference) {
+exports.updateReference = function(userID, newReference, callback) {
     connection.query("UPDATE users SET requests=?, reference=? WHERE userID=?",
-                     [0, newReference, userID],function(err) {
-        errorHandler(err, 'Query');
+                     [0, newReference, userID],function(err, data) {
+        if (err)
+            errorHandler(err, 'Query');
+        else
+            callback(newReference);
     });
 }
 

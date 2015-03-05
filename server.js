@@ -78,8 +78,9 @@ app.use(function(request, response) {
  * @param {STRING} userID 	 [user ID]
  * @param {STRING} user   	 [user's nickname]
  * @param {STRING} reference [purchase reference]
+ * @param {OBJECT} offer     [offer data]
  */
-exports.newUser = function(userID, user, reference) {
+exports.newUser = function(userID, user, reference, offer) {
 	// Add user only if he isn't exists already.
 	if (map[user] === undefined) {
 		// Update local list
@@ -89,7 +90,7 @@ exports.newUser = function(userID, user, reference) {
 			reference: reference
 		}
 		// Update DB
-		sql.newUser(userID, user, reference);
+		sql.newUser(userID, user, reference, offer);
 		console.log('[LOG] New user ' + user + ' added.');
 	}
 	else {

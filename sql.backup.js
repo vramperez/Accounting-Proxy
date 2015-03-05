@@ -98,11 +98,17 @@ exports.save = function(userData, user) {
 
 /**
  * Insert new user in DB.
- * @param  {STRING} userID [user ID]
- * @param  {STRING} user   [user's nickname]
+ * @param {STRING} userID    [user ID]
+ * @param {STRING} user      [user's nickname]
+ * @param {STRING} reference [buy reference]
+ * @param {OBJECT} offer     [offer data]
  */
-exports.newUser = function(userID, user, reference) {
+exports.newUser = function(userID, user, reference, offer) {
     connection.query("INSERT INTO users VALUE (?,?,?,?)", [userID,user,reference,0], function(err) {
+        errorHandler(err, 'Query');
+    });
+    connection.query("INSERT INTO offers VALUE (?,?,?,?)",
+                     [reference,offer.organization,offer.name,offer.version], function(err) {
         errorHandler(err, 'Query');
     });
 }

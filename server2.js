@@ -43,7 +43,7 @@ app.post('/notifications/buyers',function(request, response, next) {
                         && r[i].version === resource.version
                         && r[i].url === resource.url) {
                         console.log("[LOG] Resource OK!");
-                        mainSrv.newUser(body.customer, body.customer_name, body.reference);
+                        mainSrv.newUser(body.customer, body.customer_name, body.reference, body.offering);
                         return;
                     }
                 }

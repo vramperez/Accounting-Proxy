@@ -3,6 +3,9 @@ var config = {};
 config.app_host = 'google.com';
 config.app_port = '80';
 
+config.accounting_host = 'test.com';
+config.accounting_port = '80';
+
 config.sql = {
     user: 'jesus',
     password: 'conwet',
@@ -16,5 +19,9 @@ config.resource = {
     content_type: '',
     url: 'http://www.resource1.org/'
 }
+
+config.record_type = 'event';
+config.unit = 'calls';
+config.component_label = 'call usage';
 
 module.exports = config;

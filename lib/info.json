@@ -1,0 +1,14 @@
+{
+    "offering": {
+        "organization":"",
+        "name":"",
+        "version":""
+    },
+    "customer":"",
+    "time_stamp":"",
+    "correlation_number":"",
+    "record_type":"",
+    "unit":"",
+    "value":"",
+    "component_label":""
+}

@@ -1,12 +1,12 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last updated: 03 March 2015
+ * Last updated: 05 March 2015
  */
 
 /* Requires */
 var mysql = require('mysql');
 var config = require('./config');
-var info = require('./lib/info.json');
+var notifier = require('./notifier');
 
 /* Create SQL connection */
 var connection = mysql.createConnection(config.sql);
@@ -54,36 +54,33 @@ var errorHandler = function(err, type) {
 }
 
 /**
- * Send a request to WStore with accounting information of user.
- * @param  {OBJECT} user [user object information]
- * TODO: Implement method, xD
- */
-var notify = function(user) {
-    console.log("User with pending request: " + user.nickname);
-    resetRequest(user.userID);
-}
-
-/**
  * Load accounting info from DB
  * @param  {FUNCTION} setMap [Callback function to send the information loaded]
  */
 exports.loadFromDB = function(setMap) {
     var toReturn = {};
     connection.query('SELECT * FROM users', function(err, results) {
-        if (results !== undefined && results.length !== 0)
+        if (results !== undefined && results.length !== 0) {
+            var num = results.length; // num: controls pending requests.
             for (i in results) {
-                if (results[i].requests > 0)
-                    notify(results[i]);
-                toReturn[results[i].nickname] = {
-                    requests:0,
-                    userID: results[i].userID,
-                    reference: results[i].reference
-                }
+                notifier.notify(results[i], i, function(user, requests) {
+                    toReturn[user] = {
+                        requests: requests,
+                        userID: results[user].userID,
+                        reference: results[user].reference
+                    };
+                    // Decrement
+                    num--;
+                    // Invoke setMap callback if no pending requests.
+                    if (num === 0)
+                        setMap(toReturn);
+                });
             }
-        else
+        }
+        else {
             console.log('[LOG] No data avaliable.');
-        setMap(toReturn);
-        delete toReturn;
+            setMap(toReturn);
+        }
    });
 }
 
@@ -122,6 +119,11 @@ exports.updateReference = function(userID, newReference) {
     });
 }
 
+/**
+ * Retrieve user info
+ * @param  {STRING}     userID       [user iD]
+ * @param  {FUNCTION}   retrieveInfo [Function to retrieve data]
+ */
 exports.getUserInfo = function(userID, retrieveInfo) {
     connection.query("SELECT * FROM users WHERE userID=?", [userID],function(err, data) {
         if (err)
@@ -135,12 +137,27 @@ exports.getUserInfo = function(userID, retrieveInfo) {
  * Reset request counter in DB.
  * @param  {STRING} userID [user ID]
  */
-var resetRequest = function(userID) {
+exports.resetRequest = function(userID) {
     connection.query("UPDATE users SET requests=? WHERE userID=?", [0,userID],
                      function(err) {
         errorHandler(err, 'Query');
     });
 }
+
+/**
+ * Retrieve offer info
+ * @param  {STRING}     ref             [buy reference]
+ * @param  {FUNCTION}   retrieveInfo    [Function to retrieve data]
+ */
+exports.getOfferInfo = function(ref, retrieveInfo) {
+    connection.query("SELECT organization,name,version FROM offers WHERE reference=?", [ref],function(err, data) {
+        if (err)
+            errorHandler(err, 'Query');
+        else
+            retrieveInfo(data[0]);
+    });
+}
+
 /**
  * Disconnect from DB server.
  */

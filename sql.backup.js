@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last updated: 05 March 2015
+ * Last updated: 06 March 2015
  */
 
 /* Requires */

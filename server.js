@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 26 February 2015
+ * Last edit: 06 March 2015
  */
 
 /* Requires */
@@ -11,6 +11,7 @@ var proxy = require('./lib/HTTPClient.js');
 var sql = require('./sql.backup.js');
 var s2 = require('./server2.js');
 var notifier = require('./notifier.js');
+var cron = require('node-schedule');
 
 /* Create app with Express Framework */
 var app = express();
@@ -125,4 +126,19 @@ sql.loadFromDB(function(m) {
 	app.listen(app.get('port'));
 	// Start second server
 	s2.run()
+});
+
+/* Create daemon to update WStore every day */
+/* Cron format:
+ * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+ */
+var job = cron.scheduleJob('00 00 * * *', function() {
+	console.log('[LOG] Sending accouting information...')
+	// variable i is unused in this invocation.
+	for (user in map) {
+		notifier.notify(0, map[user], user, function(i, nickname, requests, correlation_number) {
+			map[nickname].requests = requests;
+			map[nickname].correlation_number = correlation_number;
+		});
+	}
 });

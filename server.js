@@ -125,5 +125,4 @@ sql.loadFromDB(function(m) {
 	app.listen(app.get('port'));
 	// Start second server
 	s2.run()
-	console.log(map);
 });

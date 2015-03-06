@@ -65,7 +65,7 @@ exports.loadFromDB = function(setMap) {
             var pendingRequests = results.length; // num: controls pending requests.
             for (i in results) {
                 notifier.notify(i, results[i], results[i].nickname, function(i, user, requests, n) {
-                    console.log("correlation_number: " + n);
+                    // console.log("correlation_number: " + n);
                     toReturn[user] = {
                         requests: requests,
                         userID: results[i].userID,

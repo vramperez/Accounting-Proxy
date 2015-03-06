@@ -25,7 +25,7 @@ app.post('/notifications/buyers',function(request, response, next) {
     if (request.originalUrl !== '/notifications/buyers')
         response.status(404).send('Cannot POST ' + request.originalUrl);
     else {
-        console.log("NEW USER RECIEVED");
+        console.log("[LOG] WStore notification recieved.");
         request.setEncoding('utf-8');
         var body = '';
         if (request.get('Content-Type') === 'application/json') {

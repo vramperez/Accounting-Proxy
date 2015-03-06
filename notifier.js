@@ -11,6 +11,7 @@ var info = require('./lib/info.json');
 
 /**
  * Send a request to WStore with accounting information of user.
+ * @param {INTEGER}  i        [callback information]
  * @param {OBJECT}   user     [user object information]
  * @param {STRING}   nickname [user nickname]
  * @param {FUNCTION} callback [callback to return request number]
@@ -39,9 +40,10 @@ exports.notify = function(i, user, nickname, callback) {
 
 /**
  * Send notification to accounting server
- * @param {OBJECT} user     [user object]
- * @param {STRING} nickname [description]
- * @param {OBJECT} body     [JSON based on 'info.json']
+ * @param {INTEGER} i        [callback information]
+ * @param {OBJECT}  user     [user object]
+ * @param {STRING}  nickname [description]
+ * @param {OBJECT}  body     [JSON based on 'info.json']
  */
 var sendNotification = function(i, user, nickname, callback) {
     // Parse info to create bodo for the post
@@ -60,7 +62,9 @@ var sendNotification = function(i, user, nickname, callback) {
     // Prepare request
     var request = http.request(options, function(res) {
         // Check response status code is valid
-        if (true || ((200 <= res.statusCode) && (res.statusCode <= 299))) {
+        // Debug:
+        // if (true || ((200 <= res.statusCode) && (res.statusCode <= 299))) {
+        if ((200 <= res.statusCode) && (res.statusCode <= 299)) {
             console.log('[LOG] Request WORK!');
             sql.resetRequest(user.userID, user.correlation_number+1);
             callback(i, nickname, 0, user.correlation_number+1);

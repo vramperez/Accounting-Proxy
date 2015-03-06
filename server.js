@@ -10,6 +10,7 @@ var config = require('./config');
 var proxy = require('./lib/HTTPClient.js');
 var sql = require('./sql.backup.js');
 var s2 = require('./server2.js');
+var notifier = require('./notifier.js');
 
 /* Create app with Express Framework */
 var app = express();
@@ -87,7 +88,8 @@ exports.newUser = function(userID, user, reference, offer) {
 		map[user] = {
 			requests: 0,
 			userID: userID,
-			reference: reference
+			reference: reference,
+			correlation_number: 0
 		}
 		// Update DB
 		sql.newUser(userID, user, reference, offer);
@@ -97,14 +99,14 @@ exports.newUser = function(userID, user, reference, offer) {
 		console.log('[LOG] User ' + user + ' already exists');
 		console.log('[LOG] Checking purchase reference...');
 		if (map[user].reference !== reference) {
-			// TODO: Send old user information to WStores
-			sql.getUserInfo(userID, function(data) {
-				// Debugging:
-				// console.log(data);
-			});
 			console.log('[LOG] New purchase reference. Updating...');
-			sql.updateReference(userID, reference, function(r){
-				map[user].reference = r;
+			// i parameter is unused in this invocation
+			notifier.notify(0, map[user], user, function(i, nickname, request, correlation_number) {
+				map[nickname].correlation_number = correlation_number;
+				sql.updateReference(userID, reference, function(r){
+					map[user].reference = r;
+					map[nickname].requests = 0;
+				});
 			});
 		}
 		else
@@ -122,5 +124,6 @@ sql.loadFromDB(function(m) {
 	// Listening at port 9000
 	app.listen(app.get('port'));
 	// Start second server
-	s2.run();
+	s2.run()
+	console.log(map);
 });

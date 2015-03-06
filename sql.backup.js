@@ -24,10 +24,11 @@ exports.init = function() {
     connection.query('USE AccountingDDBB');
     // Add new table of users that can use the service.
     connection.query('CREATE TABLE IF NOT EXISTS users ( \
-                     userID     VARCHAR(30), \
-                     nickname   VARCHAR(20), \
-                     reference  VARCHAR(50), \
-                     requests   INTEGER, \
+                     userID             VARCHAR(30), \
+                     nickname           VARCHAR(20), \
+                     reference          VARCHAR(50), \
+                     requests           INTEGER, \
+                     correlation_number INTEGER, \
                      PRIMARY KEY (userID) \
                      ) ENGINE=InnoDB');
     // Add new table of offers avaliable in use.
@@ -61,18 +62,20 @@ exports.loadFromDB = function(setMap) {
     var toReturn = {};
     connection.query('SELECT * FROM users', function(err, results) {
         if (results !== undefined && results.length !== 0) {
-            var num = results.length; // num: controls pending requests.
+            var pendingRequests = results.length; // num: controls pending requests.
             for (i in results) {
-                notifier.notify(results[i], i, function(user, requests) {
+                notifier.notify(i, results[i], results[i].nickname, function(i, user, requests, n) {
+                    console.log("correlation_number: " + n);
                     toReturn[user] = {
                         requests: requests,
-                        userID: results[user].userID,
-                        reference: results[user].reference
+                        userID: results[i].userID,
+                        reference: results[i].reference,
+                        correlation_number: n
                     };
                     // Decrement
-                    num--;
+                    pendingRequests--;
                     // Invoke setMap callback if no pending requests.
-                    if (num === 0)
+                    if (pendingRequests === 0)
                         setMap(toReturn);
                 });
             }
@@ -104,7 +107,7 @@ exports.save = function(userData, user) {
  * @param {OBJECT} offer     [offer data]
  */
 exports.newUser = function(userID, user, reference, offer) {
-    connection.query("INSERT INTO users VALUE (?,?,?,?)", [userID,user,reference,0], function(err) {
+    connection.query("INSERT INTO users VALUE (?,?,?,?,?)", [userID,user,reference,0,0], function(err) {
         errorHandler(err, 'Query');
     });
     connection.query("INSERT INTO offers VALUE (?,?,?,?)",
@@ -146,9 +149,9 @@ exports.getUserInfo = function(userID, retrieveInfo) {
  * Reset request counter in DB.
  * @param  {STRING} userID [user ID]
  */
-exports.resetRequest = function(userID) {
-    connection.query("UPDATE users SET requests=? WHERE userID=?", [0,userID],
-                     function(err) {
+exports.resetRequest = function(userID, correlation_number) {
+    connection.query("UPDATE users SET requests=?, correlation_number=? WHERE userID=?",
+     [0, correlation_number, userID], function(err) {
         errorHandler(err, 'Query');
     });
 }

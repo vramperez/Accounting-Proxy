@@ -4,6 +4,7 @@
 - NodeJS with npm: [Homepage](http://nodejs.org/).
     + Express Framework: [Homepage](http://expressjs.com/).
     + MySQL for NodeJS: [GitHub](https://github.com/felixge/node-mysql).
+    + Node Schedule: [GitHub](https://github.com/node-schedule/node-schedule).
 - MySQL server.
 
 #### Configuration:

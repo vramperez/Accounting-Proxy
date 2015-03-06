@@ -5,7 +5,8 @@
     "author": "FI-WARE",
     "dependencies": {
         "express": "4.x",
-        "mysql": "2.5.x"
+        "mysql": "2.5.x",
+        "node-schedule": "0.2.x"
     },
     "repository": {
         "type": "git",

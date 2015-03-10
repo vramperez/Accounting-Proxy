@@ -64,11 +64,11 @@ exports.loadFromDB = function(setMap) {
         if (results !== undefined && results.length !== 0) {
             var pendingRequests = results.length; // num: controls pending requests.
             for (i in results) {
-                notifier.notify(i, results[i], results[i].nickname, function(i, user, requests, n) {
+                notifier.notify(i, results[i], results[i].userID, function(i, userID, requests, n) {
                     // console.log("correlation_number: " + n);
-                    toReturn[user] = {
+                    toReturn[userID] = {
                         requests: requests,
-                        userID: results[i].userID,
+                        nickname: results[i].nickname,
                         reference: results[i].reference,
                         correlation_number: n
                     };
@@ -92,9 +92,8 @@ exports.loadFromDB = function(setMap) {
  * @param  {OBJECT} userData   [user data]
  * @param  {STRING} user       [user name]
  */
-exports.save = function(userData, user) {
-    connection.query("UPDATE users SET requests=? WHERE nickname=? AND userID=?",
-                     [userData.requests, user, userData.userID],function(err) {
+exports.save = function(user, requests) {
+    connection.query("UPDATE users SET requests=? WHERE userID=?", [requests, user],function(err) {
         errorHandler(err, 'Query');
     });
 }
@@ -118,8 +117,9 @@ exports.newUser = function(userID, user, reference, offer) {
 
 /**
  * Update purchase reference in DB and set to 0 the number of requests.
- * @param  {STRING} userID       [user ID]
- * @param  {STRING} newReference [purchase reference]
+ * @param {STRING}   userID       [user ID]
+ * @param {STRING}   newReference [purchase reference]
+ * @param {FUNCTION} callback     [callback to return when everything went OK]
  */
 exports.updateReference = function(userID, newReference, callback) {
     connection.query("UPDATE users SET requests=?, reference=? WHERE userID=?",
@@ -147,7 +147,8 @@ exports.getUserInfo = function(userID, retrieveInfo) {
 
 /**
  * Reset request counter in DB.
- * @param  {STRING} userID [user ID]
+ * @param {STRING}  userID             [user ID]
+ * @param {INTEGER} correlation_number [accounting correlation number of the user]
  */
 exports.resetRequest = function(userID, correlation_number) {
     connection.query("UPDATE users SET requests=?, correlation_number=? WHERE userID=?",

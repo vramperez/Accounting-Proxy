@@ -1,6 +1,6 @@
 /**
  * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 06 March 2015
+ * Last edit: 10 March 2015
  */
 
 /* Requires */
@@ -28,7 +28,7 @@ var count = function(user) {
 		console.log('[LOG] Unauthorized user: ' + user);
 	else {
 		map[user].requests += 1;
-		sql.save(map[user], user);
+		sql.save(user, map[user].requests);
 	}
 };
 
@@ -51,8 +51,8 @@ app.use(function(request, response, next) {
 
 app.use(function(request, response) {
 	// Save information
-	var user = request.get('X-Nick-Name');
-	if (user !== undefined) {
+	var userID = request.get('X-Nick-Name'); ///// HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	if (userID !== undefined) {
 		// Redirect request
 		var options = {
 			host: config.app_host,
@@ -68,7 +68,7 @@ app.use(function(request, response) {
 				response.setHeader(idx, headers[idx]);
 			response.send(resp);
 			// Counter ++ and update DB
-			count(user);
+			count(userID);
 		});
 	}
 	else
@@ -84,11 +84,11 @@ app.use(function(request, response) {
  */
 exports.newUser = function(userID, user, reference, offer) {
 	// Add user only if he isn't exists already.
-	if (map[user] === undefined) {
+	if (map[userID] === undefined) {
 		// Update local list
-		map[user] = {
+		map[userID] = {
 			requests: 0,
-			userID: userID,
+			username: user,
 			reference: reference,
 			correlation_number: 0
 		}
@@ -99,14 +99,14 @@ exports.newUser = function(userID, user, reference, offer) {
 	else {
 		console.log('[LOG] User ' + user + ' already exists');
 		console.log('[LOG] Checking purchase reference...');
-		if (map[user].reference !== reference) {
+		if (map[userID].reference !== reference) {
 			console.log('[LOG] New purchase reference. Updating...');
 			// i parameter is unused in this invocation
-			notifier.notify(0, map[user], user, function(i, nickname, request, correlation_number) {
-				map[nickname].correlation_number = correlation_number;
-				sql.updateReference(userID, reference, function(r){
-					map[user].reference = r;
-					map[nickname].requests = 0;
+			notifier.notify(0, map[userID], userID, function(i, user_id, request, correlation_number) {
+				map[user_id].correlation_number = correlation_number;
+				sql.updateReference(user_id, reference, function(r){
+					map[user_id].reference = r;
+					map[user_id].requests = 0;
 				});
 			});
 		}
@@ -121,6 +121,7 @@ sql.init();
 /* Get data from DB if it is avaliable */
 sql.loadFromDB(function(m) {
 	map = m;
+	console.log(map);
 	console.log('[LOG] Data loaded.');
 	// Listening at port 9000
 	app.listen(app.get('port'));
@@ -135,10 +136,10 @@ sql.loadFromDB(function(m) {
 var job = cron.scheduleJob('00 00 * * *', function() {
 	console.log('[LOG] Sending accouting information...')
 	// variable i is unused in this invocation.
-	for (user in map) {
-		notifier.notify(0, map[user], user, function(i, nickname, requests, correlation_number) {
-			map[nickname].requests = requests;
-			map[nickname].correlation_number = correlation_number;
+	for (userID in map) {
+		notifier.notify(0, map[userID], userID, function(i, user_id, requests, correlation_number) {
+			map[user_id].requests = requests;
+			map[user_id].correlation_number = correlation_number;
 		});
 	}
 });

@@ -7,7 +7,7 @@
 var http = require('http');
 var sql = require('./sql.backup');
 var config = require('./config');
-var info = require('./lib/info.json');
+var info = require('./HTTP_Client/info.json');
 
 /**
  * Send a request to WStore with accounting information of user.

@@ -18,8 +18,8 @@ To configure it, open 'config' and complete the fields with your configuration:
 config.app_host = 'google.com';         // Hostname to forward request
 config.app_port = '80';                 // Port where is running
 
-config.accounting_host = 'test.com';    // Accounting destination host
-config.accounting_port = '80';          // Accounting destination port
+config.accounting_host = 'test.com';    // Accounting information destination host
+config.accounting_port = '80';          // Accounting information destination port
 
 config.sql = {
     user: 'user1',                      // SQL Database user

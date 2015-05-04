@@ -103,3 +103,22 @@ exports.checkRequest = function(actorID, publicPath, callback) {
                 console.log("[ERROR] Invalid query.")
     });
 }
+
+exports.count = function(actorID, privatePath, port) {
+    db.run('UPDATE accounting \
+            SET num=num+1 \
+            WHERE actorID=$actorID AND EXISTS ( \
+              SELECT provider, name, version, privatePath, port \
+              FROM resources \
+              WHERE accounting.provider=provider AND accounting.resourceName=name AND accounting.resourceVersion=version AND \
+                    resources.privatePath=$privatePath AND resources.port=$port AND EXISTS ( \
+                SELECT organization, offerName, offerVersion, provider, resourceName, resourceVersion \
+                FROM offerResource \
+                WHERE accounting.organization=organization AND accounting.offerName=offerName AND accounting.offerVersion=offerVersion \
+                      AND resources.provider=provider AND resources.name=resourceName AND resources.version = resourceVersion))',
+        {
+            $actorID: actorID,
+            $privatePath: privatePath,
+            $port: port
+        });
+}

@@ -98,9 +98,9 @@ exports.checkRequest = function(actorID, publicPath, callback) {
                   WHERE actorID=$actorID AND offerResource.organization=organization AND offerResource.offerName=name AND offerResource.offerVersion=version)))',
         {$actorID: actorID, $publicPath: publicPath}, function(error, row) {
             if (row.length === 1)
-                callback(row[0].privatePath, row[0].port);
+                callback(null, row[0].privatePath, row[0].port);
             else
-                console.log("[ERROR] Invalid query.")
+                callback("User doesn't have access", null, null);
     });
 }
 

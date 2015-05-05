@@ -83,6 +83,28 @@ exports.init = function() {
         });
 }
 
+exports.loadFromDB = function(setData) {
+    var data = {};
+    db.all('SELECT servicies.privatePath, servicies.port, public.publicPath \
+            FROM servicies \
+            INNER JOIN public \
+            WHERE public.privatePath=servicies.privatePath AND public.port=servicies.port',
+            function(err, row) {
+                for (i in row) {
+                    var id = row[i].publicPath;
+                    if (data[id] === undefined) {
+                        data[id] =  {
+                            path: row[i].privatePath,
+                            port: row[i].port,
+                            users: [] // TODO: Load all users
+                        };
+                    }
+                    data[id]
+                }
+                setData(null, data);
+    });
+}
+
 exports.checkRequest = function(actorID, publicPath, callback) {
     db.all('SELECT privatePath, port \
             FROM public \

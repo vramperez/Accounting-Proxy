@@ -90,19 +90,61 @@ exports.loadFromDB = function(setData) {
             INNER JOIN public \
             WHERE public.privatePath=servicies.privatePath AND public.port=servicies.port',
             function(err, row) {
+                var counter = row.length;
+                // console.log(counter)
                 for (i in row) {
-                    var id = row[i].publicPath;
-                    if (data[id] === undefined) {
-                        data[id] =  {
-                            path: row[i].privatePath,
-                            port: row[i].port,
-                            users: [] // TODO: Load all users
-                        };
-                    }
-                    data[id]
+                    loadUsers(data, row[i], function() {
+                        counter--;
+                        if (counter === 0)
+                            setData(null, data);
+                    });
                 }
-                setData(null, data);
-    });
+            }
+    );
+}
+
+function loadUsers(data, row, callback) {
+    db.all('SELECT offerAccount.actorID, API_KEY, accounting.num \
+            FROM offerAccount, accounting \
+            WHERE EXISTS ( \
+              SELECT organization, offerName, offerVersion \
+              FROM offerResource \
+              WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.offerName AND \
+                    offerAccount.version=offerResource.offerVersion AND EXISTS ( \
+                SELECT provider, name, version \
+                FROM resources \
+                WHERE offerResource.provider=provider AND offerResource.resourceName=name AND \
+                      offerResource.resourceVersion=version AND privatePath=$privatePath AND port=$port AND EXISTS ( \
+                  SELECT actorID, provider, resourceName, resourceVersion, organization, offerName, offerVersion, num \
+                  FROM accounting \
+                  WHERE resources.provider=accounting.provider AND resources.name=accounting.resourceName AND \
+                    resources.version=accounting.resourceVersion AND accounting.organization=offerAccount.organization AND \
+                    accounting.offerName=offerAccount.name AND accounting.offerVersion=offerAccount.version AND \
+                    accounting.actorID=offerAccount.actorID \
+                  ) \
+                ) \
+              ) \
+            GROUP BY API_KEY',
+            { $privatePath: row.privatePath, $port: row.port },
+            function(err, row2) {
+                var id = row.publicPath;
+                if (data[id] === undefined) {
+                    data[id] =  {
+                        path: row.privatePath,
+                        port: row.port,
+                        users: []
+                    };
+                }
+                for (j in row2) {
+                    data[id].users.push({
+                        id: row2[j].actorID,
+                        API_KEY: row2[j].API_KEY,
+                        num: row2[j].num
+                    });
+                }
+                callback();
+            }
+    );
 }
 
 exports.checkRequest = function(actorID, publicPath, callback) {

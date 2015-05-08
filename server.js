@@ -1,14 +1,7 @@
-/**
- * Author: Jesús Martínez-Barquero Herrada
- * Last edit: 10 March 2015
- */
-
-/* Requires */
-var xmlhttprequest = require('./lib/xmlhttprequest').XMLHttpRequest;
 var express = require('express');
 var config = require('./config');
-var proxy = require('./lib/HTTPClient.js');
-var sql = require('./sql.backup.js');
+var proxy = require('./HTTP_Client/HTTPClient.js');
+var db = require('./db.js');
 var s2 = require('./server2.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
@@ -18,17 +11,19 @@ var app = express();
 
 /* Map for saving users' requests */
 var map = {};
+var servicies = [];
 
 /**
  * Add a new request to the user
  * @param  {STRING} user [user's nickname]
+ * DEPRECATED
  */
 var count = function(user) {
 	if (map[user] === undefined)
 		console.log('[LOG] Unauthorized user: ' + user);
 	else {
 		map[user].requests += 1;
-		sql.save(user, map[user].requests);
+		db.save(user, map[user].requests);
 	}
 };
 
@@ -51,28 +46,38 @@ app.use(function(request, response, next) {
 
 app.use(function(request, response) {
 	// Save information
-	var userID = request.get('X-Nick-Name'); ///// HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	var userID = request.get('X-Actor-ID'); ///// HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	var publicPath = request.path;
+	// console.log(publicPath)
 	if (userID !== undefined) {
-		// Redirect request
-		var options = {
-			host: config.app_host,
-			port: config.app_port,
-			path: request.url,
-			method: request.method,
-			headers: proxy.getClientIp(request, request.headers)
-		}
-		// Redirect the request
-		proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
-			response.statusCode = status;
-			for(var idx in headers)
-				response.setHeader(idx, headers[idx]);
-			response.send(resp);
-			// Counter ++ and update DB
-			count(userID);
+		db.checkRequest(userID, publicPath, function(err, privatePath, port) {
+			if (err) {
+				console.log("[ERROR]" + err);
+				response.status(403).end();
+			}
+			else {
+				var options = {
+		            host: config.app_host,
+		            port: config.app_port,
+		            path: privatePath,
+		            method: request.method,
+		            headers: proxy.getClientIp(request, request.headers)
+		        }
+
+       			proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+            		response.statusCode = status;
+            		for(var idx in headers)
+                		response.setHeader(idx, headers[idx]);
+            		response.send(resp);
+					db.count(userID, privatePath, port); // Counter++
+        		});
+			}
 		});
 	}
-	else
+	else {
 		console.log("[LOG] Undefined username");
+		response.status(401).end();
+	}
 });
 
 /**
@@ -81,6 +86,7 @@ app.use(function(request, response) {
  * @param {STRING} user   	 [user's nickname]
  * @param {STRING} reference [purchase reference]
  * @param {OBJECT} offer     [offer data]
+ * DEPRECATED
  */
 exports.newUser = function(userID, user, reference, offer) {
 	// Add user only if he isn't exists already.
@@ -93,7 +99,7 @@ exports.newUser = function(userID, user, reference, offer) {
 			correlation_number: 0
 		}
 		// Update DB
-		sql.newUser(userID, user, reference, offer);
+		db.newUser(userID, user, reference, offer);
 		console.log('[LOG] New user ' + user + ' added.');
 	}
 	else {
@@ -104,7 +110,7 @@ exports.newUser = function(userID, user, reference, offer) {
 			// i parameter is unused in this invocation
 			notifier.notify(0, map[userID], userID, function(i, user_id, request, correlation_number) {
 				map[user_id].correlation_number = correlation_number;
-				sql.updateReference(user_id, reference, function(r){
+				db.updateReference(user_id, reference, function(r){
 					map[user_id].reference = r;
 					map[user_id].requests = 0;
 				});
@@ -112,26 +118,32 @@ exports.newUser = function(userID, user, reference, offer) {
 		}
 		else
 			console.log('[LOG] Reference is already up to date');
+
+}}
+
+db.init();
+
+db.loadFromDB(function(err, data) {
+	if (err)
+		console.log('Something went wrong');
+	else {
+		map = data;
+		if (Object.getOwnPropertyNames(data).length === 0) // isEmpty
+			console.log("[LOG] No data avaliable")
+		else {
+			console.log(map);
+			console.log(JSON.stringify(map, null, 2));
+		}
+		app.listen(app.get('port'));
+		// Start API Server
+		s2.run();
 	}
-}
-
-/* Establish connection with DB */
-sql.init();
-
-/* Get data from DB if it is avaliable */
-sql.loadFromDB(function(m) {
-	map = m;
-	console.log(map);
-	console.log('[LOG] Data loaded.');
-	// Listening at port 9000
-	app.listen(app.get('port'));
-	// Start second server
-	s2.run()
 });
 
 /* Create daemon to update WStore every day */
 /* Cron format:
  * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+ * DEPRECATED
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
 	console.log('[LOG] Sending accouting information...')

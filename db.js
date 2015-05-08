@@ -91,14 +91,16 @@ exports.loadFromDB = function(setData) {
             WHERE public.privatePath=servicies.privatePath AND public.port=servicies.port',
             function(err, row) {
                 var counter = row.length;
-                // console.log(counter)
-                for (i in row) {
-                    loadUsers(data, row[i], function() {
-                        counter--;
-                        if (counter === 0)
-                            setData(null, data);
-                    });
-                }
+                if (row.length !== 0)
+                    for (i in row) {
+                        loadUsers(data, row[i], function() {
+                            counter--;
+                            if (counter === 0)
+                                setData(null, data);
+                        });
+                    }
+                else
+                    setData(null, data);
             }
     );
 }

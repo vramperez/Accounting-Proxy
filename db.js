@@ -83,6 +83,8 @@ exports.init = function() {
         });
 }
 
+// TODO: Considers API_KEY to load accounting information
+// TODO: Notify data on boot
 exports.loadFromDB = function(setData) {
     var data = {};
     db.all('SELECT servicies.privatePath, servicies.port, public.publicPath \
@@ -149,6 +151,7 @@ function loadUsers(data, row, callback) {
     );
 }
 
+// UNUSED
 exports.checkRequest = function(actorID, publicPath, callback) {
     db.all('SELECT privatePath, port \
             FROM public \
@@ -170,6 +173,7 @@ exports.checkRequest = function(actorID, publicPath, callback) {
     });
 }
 
+// TODO: Use API_KEY
 exports.count = function(actorID, privatePath, port) {
     db.run('UPDATE accounting \
             SET num=num+1 \

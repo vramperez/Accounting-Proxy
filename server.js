@@ -6,12 +6,9 @@ var s2 = require('./server2.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
 
-/* Create app with Express Framework */
 var app = express();
 
-/* Map for saving users' requests */
 var map = {};
-var servicies = [];
 
 /**
  * Add a new request to the user
@@ -63,12 +60,9 @@ app.use(function(request, response) {
                 response.status(403).end();
             } else {
                 var options = {
-                    host: 'www.google.es',
-                    port: 80,
-                    path: '',
-                    // host: 'localhost',
-                    // port: map[publicPath].port,
-                    // path: map[publicPath].privatePath,
+                    host: 'localhost',
+                    port: map[publicPath].port,
+                    path: map[publicPath].path,
                     method: request.method,
                     headers: proxy.getClientIp(request, request.headers)
                 }
@@ -79,36 +73,11 @@ app.use(function(request, response) {
                         response.setHeader(idx, headers[idx]);
                     response.send(resp);
                     user.num++;
-                    // map[publicPath].users[i].num += 1;
                     db.count(userID, map[publicPath].path, map[publicPath].port); // Counter++
-                    console.log(JSON.stringify(map, null, 2));
+                    // console.log(JSON.stringify(map, null, 2));
                 });
             }
         }
-        // OLD METHOD: Works directly with database
-        // db.checkRequest(userID, publicPath, function(err, privatePath, port) {
-        //     if (err) {
-        //         console.log("[ERROR]" + err);
-        //         response.status(403).end();
-        //     }
-        //     else {
-        //         var options = {
-        //             host: 'localhost',
-        //             port: port,
-        //             path: privatePath,
-        //             method: request.method,
-        //             headers: proxy.getClientIp(request, request.headers)
-        //         }
-
-        //         proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
-        //             response.statusCode = status;
-        //             for(var idx in headers)
-        //                 response.setHeader(idx, headers[idx]);
-        //             response.send(resp);
-        //             db.count(userID, privatePath, port); // Counter++
-        //         });
-        //     }
-        // });
     }
     else {
         console.log("[LOG] Undefined username");

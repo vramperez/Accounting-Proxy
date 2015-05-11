@@ -80,7 +80,8 @@ exports.init = function() {
 
 // TODO: Notify data on boot
 exports.loadFromDB = function(setData) {
-    var data = {};
+    var data  = {},
+        users = {};
     db.all('SELECT servicies.privatePath, servicies.port, public.publicPath \
             FROM servicies \
             INNER JOIN public \
@@ -89,19 +90,19 @@ exports.loadFromDB = function(setData) {
                 var counter = row.length;
                 if (row.length !== 0)
                     for (i in row) {
-                        loadUsers(data, row[i], function() {
+                        loadUsers(data, users, row[i], function() {
                             counter--;
                             if (counter === 0)
-                                setData(null, data);
+                                setData(null, data, users);
                         });
                     }
                 else
-                    setData(null, data);
+                    setData(null, data, users);
             }
     );
 }
 
-function loadUsers(data, row, callback) {
+function loadUsers(data, users, row, callback) {
     db.all('SELECT accounting.actorID, accounting.API_KEY, accounting.num \
             FROM accounting \
             INNER JOIN \
@@ -122,7 +123,6 @@ function loadUsers(data, row, callback) {
             ON t.actorID=accounting.actorID AND t.API_KEY=accounting.API_KEY',
             { $privatePath: row.privatePath, $port: row.port },
             function(err, row2) {
-                console.log(row2)
                 var id = row.publicPath;
                 if (data[id] === undefined) {
                     data[id] =  {
@@ -132,11 +132,14 @@ function loadUsers(data, row, callback) {
                     };
                 }
                 for (j in row2) {
-                    data[id].users.push({
-                        id: row2[j]["accounting.actorID"],
-                        API_KEY: row2[j]["accounting.API_KEY"],
-                        num: row2[j]["accounting.num"]
-                    });
+                    if (users[row2[j]["accounting.API_KEY"]] === undefined) {
+                        users[row2[j]["accounting.API_KEY"]] = {
+                            API_KEY: row2[j]["accounting.API_KEY"],
+                            id: row2[j]["accounting.actorID"],
+                            num: row2[j]["accounting.num"]
+                        }
+                    }
+                    data[id].users.push(users[row2[j]["accounting.API_KEY"]]);
                 }
                 callback();
             }

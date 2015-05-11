@@ -63,27 +63,21 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     reference       TEXT, \
-                    PRIMARY KEY (organization, name, version, actorID), \
+                    PRIMARY KEY (organization, name, version, actorID, API_KEY), \
                     FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version), \
                     FOREIGN KEY (actorID) REFERENCES accounts (actorID) \
                )');
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
                     actorID         TEXT, \
-                    provider        TEXT, \
-                    resourceName    TEXT, \
-                    resourceVersion TEXT, \
-                    organization    TEXT, \
-                    offerName       TEXT, \
-                    offerVersion    TEXT, \
+                    API_KEY         TEXT, \
                     num             INT,  \
-                    PRIMARY KEY (actorID, provider, resourceName, resourceVersion, organization, offerName, offerVersion), \
-                    FOREIGN KEY (provider, resourceName, resourceVersion) REFERENCES resources (provider, name, version), \
-                    FOREIGN KEY (organization, offerName, offerVersion) REFERENCES offers (organization, name, version) \
+                    PRIMARY KEY (actorID, API_KEY), \
+                    FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
+                    FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
                )');
         });
 }
 
-// TODO: Considers API_KEY to load accounting information
 // TODO: Notify data on boot
 exports.loadFromDB = function(setData) {
     var data = {};
@@ -108,29 +102,27 @@ exports.loadFromDB = function(setData) {
 }
 
 function loadUsers(data, row, callback) {
-    db.all('SELECT offerAccount.actorID, API_KEY, accounting.num \
-            FROM offerAccount, accounting \
-            WHERE EXISTS ( \
-              SELECT organization, offerName, offerVersion \
-              FROM offerResource \
-              WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.offerName AND \
-                    offerAccount.version=offerResource.offerVersion AND EXISTS ( \
-                SELECT provider, name, version \
-                FROM resources \
-                WHERE offerResource.provider=provider AND offerResource.resourceName=name AND \
-                      offerResource.resourceVersion=version AND privatePath=$privatePath AND port=$port AND EXISTS ( \
-                  SELECT actorID, provider, resourceName, resourceVersion, organization, offerName, offerVersion, num \
-                  FROM accounting \
-                  WHERE resources.provider=accounting.provider AND resources.name=accounting.resourceName AND \
-                    resources.version=accounting.resourceVersion AND accounting.organization=offerAccount.organization AND \
-                    accounting.offerName=offerAccount.name AND accounting.offerVersion=offerAccount.version AND \
-                    accounting.actorID=offerAccount.actorID \
-                  ) \
+    db.all('SELECT accounting.actorID, accounting.API_KEY, accounting.num \
+            FROM accounting \
+            INNER JOIN \
+            (SELECT offerAccount.actorID, offerAccount.API_KEY \
+              FROM offerAccount \
+              WHERE EXISTS ( \
+                SELECT organization, offerName, offerVersion \
+                FROM offerResource \
+                WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.offerName AND \
+                      offerAccount.version=offerResource.offerVersion AND EXISTS ( \
+                      SELECT provider, name, version \
+                      FROM resources \
+                      WHERE offerResource.provider=provider AND offerResource.resourceName=name AND \
+                            offerResource.resourceVersion=version AND privatePath=$privatePath AND port=$port \
                 ) \
               ) \
-            GROUP BY API_KEY',
+            ) t \
+            ON t.actorID=accounting.actorID AND t.API_KEY=accounting.API_KEY',
             { $privatePath: row.privatePath, $port: row.port },
             function(err, row2) {
+                console.log(row2)
                 var id = row.publicPath;
                 if (data[id] === undefined) {
                     data[id] =  {
@@ -141,9 +133,9 @@ function loadUsers(data, row, callback) {
                 }
                 for (j in row2) {
                     data[id].users.push({
-                        id: row2[j].actorID,
-                        API_KEY: row2[j].API_KEY,
-                        num: row2[j].num
+                        id: row2[j]["accounting.actorID"],
+                        API_KEY: row2[j]["accounting.API_KEY"],
+                        num: row2[j]["accounting.num"]
                     });
                 }
                 callback();
@@ -173,22 +165,12 @@ exports.checkRequest = function(actorID, publicPath, callback) {
     });
 }
 
-// TODO: Use API_KEY
-exports.count = function(actorID, privatePath, port) {
+exports.count = function(actorID, API_KEY) {
     db.run('UPDATE accounting \
             SET num=num+1 \
-            WHERE actorID=$actorID AND EXISTS ( \
-              SELECT provider, name, version, privatePath, port \
-              FROM resources \
-              WHERE accounting.provider=provider AND accounting.resourceName=name AND accounting.resourceVersion=version AND \
-                    resources.privatePath=$privatePath AND resources.port=$port AND EXISTS ( \
-                SELECT organization, offerName, offerVersion, provider, resourceName, resourceVersion \
-                FROM offerResource \
-                WHERE accounting.organization=organization AND accounting.offerName=offerName AND accounting.offerVersion=offerVersion \
-                      AND resources.provider=provider AND resources.name=resourceName AND resources.version = resourceVersion))',
+            WHERE actorID=$actorID AND API_KEY=$API_KEY',
         {
             $actorID: actorID,
-            $privatePath: privatePath,
-            $port: port
+            $API_KEY: API_KEY
         });
 }

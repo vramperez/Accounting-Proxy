@@ -30,6 +30,7 @@ app.use(function(request, response, next) {
 app.use(function(request, response) {
     // Save information
     var userID = request.get('X-Actor-ID');
+    var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
     if (userID !== undefined) {
         if (map[publicPath] !== undefined) {
@@ -37,7 +38,7 @@ app.use(function(request, response) {
             for (var idx in map[publicPath].users) {
                 // TODO: Use API_KEY from header
                 if (map[publicPath].users[idx].id === userID &&
-                    map[publicPath].users[idx].API_KEY === '1234') {
+                    map[publicPath].users[idx].API_KEY === API_KEY) {
                     user = map[publicPath].users[idx];
                     break;
                 }

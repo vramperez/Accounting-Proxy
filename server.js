@@ -55,7 +55,7 @@ app.use(function(request, response) {
                     break;
                 }
             }
-            if (i === undefined) {
+            if (user === undefined) {
                 console.log("[ERROR] User doesn't have access.");
                 response.status(403).end();
             } else {

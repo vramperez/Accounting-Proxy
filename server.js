@@ -8,7 +8,8 @@ var cron = require('node-schedule');
 
 var app = express();
 
-var map = {};
+var map = {},
+    users = {};
 
 /**
  * Add a new request to the user
@@ -73,7 +74,7 @@ app.use(function(request, response) {
                         response.setHeader(idx, headers[idx]);
                     response.send(resp);
                     user.num++;
-                    db.count(userID, map[publicPath].path, map[publicPath].port); // Counter++
+                    db.count(userID, user.API_KEY); // Counter++
                     // console.log(JSON.stringify(map, null, 2));
                 });
             }
@@ -128,11 +129,12 @@ exports.newUser = function(userID, user, reference, offer) {
 
 db.init();
 
-db.loadFromDB(function(err, data) {
+db.loadFromDB(function(err, data, usr) {
     if (err)
         console.log('Something went wrong');
     else {
         map = data;
+        users = usr;
         if (Object.getOwnPropertyNames(data).length === 0) // isEmpty
             console.log("[LOG] No data avaliable")
         else {

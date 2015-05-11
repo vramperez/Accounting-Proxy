@@ -1,5 +1,5 @@
 var express = require('express');
-var config = require('./config');
+var config = require('./config.json');
 var proxy = require('./HTTP_Client/HTTPClient.js');
 var db = require('./db.js');
 var s2 = require('./server2.js');
@@ -10,20 +10,6 @@ var app = express();
 
 var map = {},
     users = {};
-
-/**
- * Add a new request to the user
- * @param  {STRING} user [user's nickname]
- * DEPRECATED
- */
-var count = function(user) {
-    if (map[user] === undefined)
-        console.log('[LOG] Unauthorized user: ' + user);
-    else {
-        map[user].requests += 1;
-        db.save(user, map[user].requests);
-    }
-};
 
 app.set('port', 9000);
 

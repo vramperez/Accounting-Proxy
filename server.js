@@ -111,8 +111,8 @@ exports.newUser = function(userID, user, reference, offer) {
         }
         else
             console.log('[LOG] Reference is already up to date');
-
-}}
+    }
+}
 
 db.init();
 

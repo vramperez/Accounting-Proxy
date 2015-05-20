@@ -2,7 +2,7 @@ var express = require('express');
 var config = require('./config.json');
 var proxy = require('./HTTP_Client/HTTPClient.js');
 var db = require('./db.js');
-var s2 = require('./server2.js');
+var api = require('./APIServer.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
 
@@ -53,7 +53,7 @@ app.use(function(request, response) {
                     path: map[publicPath].path,
                     method: request.method,
                     headers: proxy.getClientIp(request, request.headers)
-                }
+                };
 
                 proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
                     response.statusCode = status;
@@ -90,7 +90,7 @@ exports.newUser = function(userID, user, reference, offer) {
             username: user,
             reference: reference,
             correlation_number: 0
-        }
+        };
         // Update DB
         db.newUser(userID, user, reference, offer);
         console.log('[LOG] New user ' + user + ' added.');
@@ -112,7 +112,7 @@ exports.newUser = function(userID, user, reference, offer) {
         else
             console.log('[LOG] Reference is already up to date');
     }
-}
+};
 
 db.init();
 
@@ -123,14 +123,14 @@ db.loadFromDB(function(err, data, usr) {
         map = data;
         users = usr;
         if (Object.getOwnPropertyNames(data).length === 0) // isEmpty
-            console.log("[LOG] No data avaliable")
+            console.log("[LOG] No data avaliable");
         else {
             console.log(map);
             console.log(JSON.stringify(map, null, 2));
         }
         app.listen(app.get('port'));
         // Start API Server
-        s2.run();
+        api.run();
     }
 });
 
@@ -140,7 +140,7 @@ db.loadFromDB(function(err, data, usr) {
  * DEPRECATED
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
-    console.log('[LOG] Sending accouting information...')
+    console.log('[LOG] Sending accouting information...');
     // variable i is unused in this invocation.
     for (userID in map) {
         notifier.notify(0, map[userID], userID, function(i, user_id, requests, correlation_number) {

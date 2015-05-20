@@ -32,6 +32,7 @@ exports.init = function() {
                     PRIMARY KEY (provider, name, version), \
                     FOREIGN KEY (privatePath, port) REFERENCES servicies (privatePath, port) ON UPDATE CASCADE \
                )');
+
         db.run('CREATE TABLE IF NOT EXISTS offers ( \
                     organization    TEXT, \
                     name            TEXT, \
@@ -63,10 +64,11 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     reference       TEXT, \
-                    PRIMARY KEY (organization, name, version, actorID, API_KEY), \
+                    PRIMARY KEY (API_KEY), \
                     FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version), \
                     FOREIGN KEY (actorID) REFERENCES accounts (actorID) \
                )');
+
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
                     actorID         TEXT, \
                     API_KEY         TEXT, \
@@ -76,7 +78,7 @@ exports.init = function() {
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
                )');
         });
-}
+};
 
 // TODO: Notify data on boot
 exports.loadFromDB = function(setData) {
@@ -100,7 +102,7 @@ exports.loadFromDB = function(setData) {
                     setData(null, data, users);
             }
     );
-}
+};
 
 function loadUsers(data, users, row, callback) {
     db.all('SELECT accounting.actorID, accounting.API_KEY, accounting.num \
@@ -137,7 +139,7 @@ function loadUsers(data, users, row, callback) {
                             API_KEY: row2[j]["accounting.API_KEY"],
                             id: row2[j]["accounting.actorID"],
                             num: row2[j]["accounting.num"]
-                        }
+                        };
                     }
                     data[id].users.push(users[row2[j]["accounting.API_KEY"]]);
                 }
@@ -166,7 +168,7 @@ exports.checkRequest = function(actorID, publicPath, callback) {
             else
                 callback("User doesn't have access", null, null);
     });
-}
+};
 
 exports.count = function(actorID, API_KEY) {
     db.run('UPDATE accounting \

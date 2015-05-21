@@ -203,49 +203,81 @@ exports.loadResources = function(callback) {
 };
 
 // TODO: API_KEY Generation
-exports.addUser = function(user, reference, resource, offer) {
-    db.serialize(function() {
-        // Add user if not exists
-        db.run('INSERT OR REPLACE INTO accounts \
+exports.getApiKey = function(user, offer, reference, callback) {
+
+    db.all('SELECT API_KEY \
+            FROM offerAccount \
+            WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
+           {
+               $org: offer.organization,
+               $name: offer.name,
+               $version: offer.version,
+               $actorID: user,
+               $ref: reference
+           },
+           function(err, row) {
+               if (row.length === 1) {
+                   api = row[0].API_KEY;
+               }
+               else
+                   // TODO: GENERATE new API_KEY
+                   api = "1111";
+               console.log('[DEBUG] API_KEY: ' + api);
+               callback(api);
+           });
+    
+};
+
+exports.addUser = function(user, reference, resource, offer, api) {
+    var res;
+    for (var i in resource) {
+        res = resource[i];
+        db.serialize(function() {
+            // Add user if not exists
+            db.run('INSERT OR REPLACE INTO accounts \
                 VALUES ($user)',
-               {$user: user});
-        // Add offer it not existes
-        db.run('INSERT OR REPLACE INTO offers \
-                VALUES ($org, $name, $version)',
-               {
-                   $org: offer.organization,
-                   $name: offer.name,
-                   $version: offer.version
-               });
-        // Add reference: OVERWRITE REFERENCE!!
-        db.run('INSERT OR REPLACE INTO offerAccount \
-                VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
-               {
-                   $org: offer.organization,
-                   $name: offer.name,
-                   $version: offer.version,
-                   $actorID: user,
-                   $API_KEY: "1234567",
-                   $ref: reference
-               });
-        // Add resource link to offer
-        db.run('INSERT OR REPLACE INTO offerResource \
-                VALUES ($pro, $resName, $resVersion, $org, $offerName, $offerVersion)',
-               {
-                   $pro: resource.provider,
-                   $resName: resource.name,
-                   $resVersion: resource.version,
-                   $org: offer.organization,
-                   $offerName: offer.name,
-                   $offerVersion: offer.version
-               });
-        // Add accounting
-        // TODO: What if it exists?
-        db.run('INSERT OR REPLACE INTO accounting \
-                VALUES ($actorID, $API_KEY, 0)',
-               {
-                   $actorID: user,
-                   $API_KEY: "1234567"
-               });
-    });
+                   {$user: user});
+
+            // Add offer it not existes
+            db.run('INSERT OR REPLACE INTO offers \
+                    VALUES ($org, $name, $version)',
+                   {
+                       $org: offer.organization,
+                       $name: offer.name,
+                       $version: offer.version
+                   });
+
+            // Add reference: OVERWRITE REFERENCE!!
+            db.run('INSERT OR REPLACE INTO offerAccount \
+                    VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
+                   {
+                       $org: offer.organization,
+                       $name: offer.name,
+                       $version: offer.version,
+                       $actorID: user,
+                       $API_KEY: api,
+                       $ref: reference
+                   });
+
+            // Add resource link to offer
+            db.run('INSERT OR REPLACE INTO offerResource \
+                    VALUES ($pro, $resName, $resVersion, $org, $offerName, $offerVersion)',
+                   {
+                       $pro: res.provider,
+                       $resName: res.name,
+                       $resVersion: res.version,
+                       $org: offer.organization,
+                       $offerName: offer.name,
+                       $offerVersion: offer.version
+                   });
+            // Add accounting
+            // TODO: What if it exists?
+            db.run('INSERT OR REPLACE INTO accounting \
+                    VALUES ($actorID, $API_KEY, 0)',
+                   {
+                       $actorID: user,
+                       $API_KEY: "1234567"
+                   });
+        });
+    }
 };

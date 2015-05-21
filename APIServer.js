@@ -30,7 +30,8 @@ router.post('/users', function(req, res) {
             var offer = body.offering,
                 resrc = body.resources,
                 user  = body.customer,
-                ref   = body.reference;
+                ref   = body.reference,
+                temRes = [];
             db.getResources(offer.organization, offer.name, offer.version, function(data) {
                 if (data) {
                     for (i in data) {
@@ -38,24 +39,28 @@ router.post('/users', function(req, res) {
                             if (data[i].provider === resrc[j].provider &&
                                 data[i].name === resrc[j].name &&
                                 data[i].version === resrc[j].version) {
-                                console.log('FOUND!!');
-                                db.addUser(user, ref, resrc[j], offer);
+                                // console.log('FOUND!!');
+                                temRes.push(resrc[j]);
                             }
                         }
                     }
                 } else {
-                    console.log("New offer");
+                    console.log("New offer!!");
                     for (i in resources) {
                         for (j in resrc) {
                             if (resources[i].provider === resrc[j].provider &&
                                 resources[i].name === resrc[j].name &&
                                 resources[i].version == resrc[j].version) {
-                                console.log('found!!');
-                                // TODO: Update DB
+                                // console.log('found!!');
+                                temRes.push(resrc[j]);
                             }
                         }
                     }
                 }
+                console.log(temRes);
+                db.getApiKey(user, offer, ref, function(API_KEY) {
+                    db.addUser(user, ref, temRes, offer, API_KEY);
+                });
             });
             // console.log(JSON.stringify(offer, null, 2));
             res.send("API Server Woking!");

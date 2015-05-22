@@ -36,7 +36,6 @@ app.use(function(request, response) {
         if (map[publicPath] !== undefined) {
             var user;
             for (var idx in map[publicPath].users) {
-                // TODO: Use API_KEY from header
                 if (map[publicPath].users[idx].id === userID &&
                     map[publicPath].users[idx].API_KEY === API_KEY) {
                     user = map[publicPath].users[idx];
@@ -73,45 +72,32 @@ app.use(function(request, response) {
     }
 });
 
-/**
- * Update users list with new user
- * @param {STRING} userID    [user ID]
- * @param {STRING} user      [user's nickname]
- * @param {STRING} reference [purchase reference]
- * @param {OBJECT} offer     [offer data]
- * DEPRECATED
- */
-exports.newUser = function(userID, user, reference, offer) {
-    // Add user only if he isn't exists already.
-    if (map[userID] === undefined) {
-        // Update local list
-        map[userID] = {
-            requests: 0,
-            username: user,
-            reference: reference,
-            correlation_number: 0
+exports.newUser = function(user, apiKey, paths) {
+
+    // Add user if not exist.
+    if (users[apiKey] === undefined)
+        console.log("New user found!!");
+        users[apiKey] = {
+            API_KEY: api,
+            id: user,
+            num: 0
         };
-        // Update DB
-        db.newUser(userID, user, reference, offer);
-        console.log('[LOG] New user ' + user + ' added.');
-    }
-    else {
-        console.log('[LOG] User ' + user + ' already exists');
-        console.log('[LOG] Checking purchase reference...');
-        if (map[userID].reference !== reference) {
-            console.log('[LOG] New purchase reference. Updating...');
-            // i parameter is unused in this invocation
-            notifier.notify(0, map[userID], userID, function(i, user_id, request, correlation_number) {
-                map[user_id].correlation_number = correlation_number;
-                db.updateReference(user_id, reference, function(r){
-                    map[user_id].reference = r;
-                    map[user_id].requests = 0;
-                });
-            });
+
+    // Add user to paths
+    for (var i in paths) {
+        var found = false;
+        for (var j in map[paths[i].publicPath].users) {
+            if (map[paths[i].publicPath].users[j].id === user &&
+                map[paths[i].publicPath].users[j].API_KEY === apiKey) {
+                found = true;
+                break;
+            }
         }
-        else
-            console.log('[LOG] Reference is already up to date');
+        if (!found)
+            map[paths[i].publicPath].users.push(users[apiKey]);
     }
+
+    // console.log(JSON.stringify(map, null, 2));
 };
 
 db.init();
@@ -122,7 +108,7 @@ db.loadFromDB(function(err, data, usr) {
     else {
         map = data;
         users = usr;
-        if (Object.getOwnPropertyNames(data).length === 0) // isEmpty
+        if (Object.getOwnPropertyNames(data).length === 0)
             console.log("[LOG] No data avaliable");
         else {
             console.log(map);

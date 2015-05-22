@@ -228,10 +228,11 @@ exports.getApiKey = function(user, offer, reference, callback) {
     
 };
 
-exports.addUser = function(user, reference, resource, offer, api) {
+exports.addUser = function(user, reference, resource, offer, api, callback) {
     var res;
     for (var i in resource) {
         res = resource[i];
+
         db.serialize(function() {
             // Add user if not exists
             db.run('INSERT OR REPLACE INTO accounts \
@@ -276,7 +277,7 @@ exports.addUser = function(user, reference, resource, offer, api) {
                     VALUES ($actorID, $API_KEY, 0)',
                    {
                        $actorID: user,
-                       $API_KEY: "1234567"
+                       $API_KEY: api
                    });
         });
     }

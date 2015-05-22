@@ -31,7 +31,8 @@ router.post('/users', function(req, res) {
                 resrc = body.resources,
                 user  = body.customer,
                 ref   = body.reference,
-                temRes = [];
+                temRes = [],
+                apiKey;
             db.getResources(offer.organization, offer.name, offer.version, function(data) {
                 if (data) {
                     for (i in data) {
@@ -59,8 +60,15 @@ router.post('/users', function(req, res) {
                 }
                 console.log(temRes);
                 db.getApiKey(user, offer, ref, function(API_KEY) {
+                    apiKey = API_KEY;
                     db.addUser(user, ref, temRes, offer, API_KEY);
                 });
+                for (var i in temRes) {
+                    db.getPublicPaths(temRes[i], function(paths) {
+                        mainSrv.newUser(user, apiKey, paths);
+                    });
+
+                }
             });
             // console.log(JSON.stringify(offer, null, 2));
             res.send("API Server Woking!");

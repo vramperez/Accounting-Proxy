@@ -282,3 +282,19 @@ exports.addUser = function(user, reference, resource, offer, api, callback) {
         });
     }
 };
+
+exports.getPublicPaths = function(resource, callback) {
+    db.all('SELECT publicPath \
+            FROM public \
+            WHERE EXISTS ( \
+              SELECT privatePath, port \
+              FROM resources \
+              WHERE resources.provider=$prov AND resources.name=$name AND resources.version=$version AND public.privatePath=resources.privatePath AND public.port=resources.port)',
+           {
+               $prov: resource.provider,
+               $name: resource.name,
+               $version: resource.version
+           }, function(err, row) {
+               callback(row);
+           });
+};

@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+
+var cli = require('commander');
+var db = require('./db.js');
+
+cli
+    .description("Configuration tool for accounting proxy.")
+    .version('1.0.0');
+
+cli
+    .command('addService [path] [port]')
+    .description('Add new service to proxy database.')
+    .action(function(path, port) {
+        db.newService(path, port, function(err) {
+            if (err)
+                console.log(err);
+        });
+    });
+
+cli.parse(process.argv);

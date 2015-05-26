@@ -298,3 +298,17 @@ exports.getPublicPaths = function(resource, callback) {
                callback(row);
            });
 };
+
+// CLI: addService [path] [port]
+exports.newService = function(path, port, callback) {
+    db.run('INSERT OR REPLACE INTO servicies \
+            VALUES ($path, $port)',
+           {
+               $path: path,
+               $port: port
+           }, function(err) {
+               if (err)
+                   callback("[ERROR] Add new service failed.");
+               callback();
+           });
+};

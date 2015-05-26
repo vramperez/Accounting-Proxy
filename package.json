@@ -11,6 +11,7 @@
     "wstore"
   ],
   "dependencies": {
+    "commander": "2.x.x",
     "express": "4.x",
     "node-schedule": "0.2.x",
     "sqlite3": "3.x"

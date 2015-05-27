@@ -11,10 +11,15 @@ cli
     .command('addService [path] [port]')
     .description('Add new service to proxy database.')
     .action(function(path, port) {
-        db.newService(path, port, function(err) {
-            if (err)
-                console.log(err);
-        });
+        if (/\/((\w+)\/?)*$/.test(path) &&
+            /^\d*$/.test(port))
+            db.newService(path, port, function(err) {
+                if (err)
+                    console.log(err);
+            });
+        else {
+            console.log("[ERROR] Invalid parameters.");
+        }
     });
 
 cli.parse(process.argv);

@@ -312,6 +312,16 @@ exports.newService = function(path, port, callback) {
                callback();
            });
 };
+
+exports.deleteService = function(path, port, callback){
+    db.run('DELETE FROM servicies \
+            WHERE privatePath=$path AND port=$port',
+           {
+               $path: path,
+               $port: port
+           }, function(err) {
+               if (err)
+                   callback("[ERROR] Deleting service failed.");
                callback();
            });
 };

@@ -313,6 +313,7 @@ exports.newService = function(path, port, callback) {
            });
 };
 
+// CLI: deleteService [path] [port]
 exports.deleteService = function(path, port, callback){
     db.run('DELETE FROM servicies \
             WHERE privatePath=$path AND port=$port',

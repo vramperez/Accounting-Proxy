@@ -308,7 +308,10 @@ exports.newService = function(path, port, callback) {
                $port: port
            }, function(err) {
                if (err)
-                   callback("[ERROR] Add new service failed.");
+                   callback("[ERROR] Adding new service failed.");
+               callback();
+           });
+};
                callback();
            });
 };

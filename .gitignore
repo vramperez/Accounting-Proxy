@@ -1,5 +1,6 @@
-*.sublime-*
 node_modules/*
 requests.backup
 TODO.tasks
 *.sqlite
+*~
+.*~

@@ -28,7 +28,6 @@ router.post('/users', function(req, res) {
         req.on('data', function(data) {
             body += data;
         });
-
         req.on('end', function() {
 
             body = JSON.parse(body);
@@ -78,6 +77,28 @@ router.post('/users', function(req, res) {
 
             res.send("API Server Woking!");
         });
+    }
+});
+
+router.post('/resources', function(req, res) {
+
+    console.log("[LOG] New resource notification recieved");
+    req.setEncoding('utf-8');
+
+    var body = '';
+
+    if (req.get('Content-Type') === 'application/json') {
+        req.on('data', function(data) {
+            body += data;
+        });
+
+        req.on('end', function() {
+            body = JSON.parse(body);
+            // TODO: Treat new resource
+            console.log(JSON.stringify(body, null, 2));
+        });
+
+        res.end();
     }
 });
 

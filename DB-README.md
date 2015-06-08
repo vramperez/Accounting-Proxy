@@ -51,3 +51,77 @@ Returns all public paths related with the resources parameter. 'resources' param
     }
 ]
 ```
+
+#### count(user, API_KEY) ####
+
+Add +1 in accounting table for 'user' with this 'API_KEY'.
+
+#### init() ####
+
+Create and connect to database.
+
+#### loadFromDB(callback) ####
+
+Load all database information and returns two objects in the callback function. 'callback' looks like:
+
+```
+function(err, data, users) {...}
+```
+
+'data' looks like:
+
+```
+{
+    "/publicPath1": {
+        path: "/privatePath1",
+        port: "8080",
+        users: [...]
+    },
+    "/publicPath1": {
+        path: "/privatePath2",
+        port: "8080",
+        users: [...]
+    }
+}
+```
+The users's array refers to the other 'user' object, that looks like:
+
+```
+{
+    "1111": {
+        API_KEY: "1111",
+        id: "user1",
+        num: 0
+    },
+    "1112": {
+        API_KEY: "1112",
+        id: "user2",
+        num: 0
+    }
+}
+```
+
+The users's array refers to the other 'user' object, that looks like:
+
+```
+{
+    "1111": {
+        API_KEY: "1111",
+        id: "user1",
+        num: 0
+    },
+    "1112": {
+        API_KEY: "1112",
+        id: "user2",
+        num: 0
+    }
+}
+```
+
+#### newService(private_path, port, callback) ####
+
+Method used by the CLI tool. Add a new service (private_path, port) to DB.
+
+#### deleteService(private_path, port, callback) ####
+
+Method used by the CLI tool. Delete the service (private_path, port) from DB.

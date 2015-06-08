@@ -225,7 +225,6 @@ exports.getApiKey = function(user, offer, reference, callback) {
                console.log('[DEBUG] API_KEY: ' + api);
                callback(api);
            });
-    
 };
 
 exports.addUser = function(user, reference, resource, offer, api, callback) {

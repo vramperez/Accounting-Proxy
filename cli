@@ -39,4 +39,25 @@ cli
         }
     });
 
+cli
+    .command('getInfo [user]')
+    .description('Get user\'s information.')
+    .action(function(user) {
+        db.getInfo(user, function(err, data) {
+            if (err)
+                console.log('Error occur in DB.');
+            else if (data === undefined)
+                console.log('No data avaliable.');
+            else {
+                console.log("[FORMAT: Organization - Name - Version - API_KEY]");
+                for (i in data) {
+                    console.log(data[i].organization + " - " +
+                                data[i].name + " - " +
+                                data[i].version + " - " +
+                                data[i].API_KEY);
+                }
+            }
+        });
+    });
+
 cli.parse(process.argv);

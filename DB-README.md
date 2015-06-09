@@ -125,3 +125,32 @@ Method used by the CLI tool. Add a new service (private_path, port) to DB.
 #### deleteService(private_path, port, callback) ####
 
 Method used by the CLI tool. Delete the service (private_path, port) from DB.
+
+#### getInfo(user, callback) ####
+
+Method used by the CLI tools. Retrieve all user information (organization, name, verison, API_KEY). The callback method looks like:
+
+```
+function(err, data) {...}
+```
+
+If everything goes well in DB, set `err = null`.
+If the theres is no info, set `data = undefined`.
+If there is data, it must be:
+
+```
+[
+    {
+        organization: "organization1",
+        name: "name1",
+        version: "version1",
+        API_KEY: "1a2b3c"
+    },
+    {
+        organization: "organization2",
+        name: "name2",
+        version: "version2",
+        API_KEY: "1a2b3c"
+    }
+]
+```

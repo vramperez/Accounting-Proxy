@@ -202,7 +202,6 @@ exports.loadResources = function(callback) {
     });
 };
 
-// TODO: API_KEY Generation
 exports.getApiKey = function(user, offer, reference, callback) {
 
     db.all('SELECT API_KEY \
@@ -309,7 +308,7 @@ exports.newService = function(path, port, callback) {
 };
 
 // CLI: deleteService [path] [port]
-exports.deleteService = function(path, port, callback){
+exports.deleteService = function(path, port, callback) {
     db.run('DELETE FROM servicies \
             WHERE privatePath=$path AND port=$port',
            {
@@ -319,5 +318,23 @@ exports.deleteService = function(path, port, callback){
                if (err)
                    callback("[ERROR] Deleting service failed.");
                callback();
+           });
+};
+
+// CLI: getInfo [user]
+exports.getInfo = function(user, callback) {
+    db.all('SELECT organization, name, version, API_KEY \
+            FROM offerAccount \
+            WHERE actorID=$user',
+           {
+               $user: user
+           }, function(err, row) {
+               console.log(row);
+               if (err)
+                   callback(err, undefined);
+               else if (row.length === 0)
+                   callback(null, undefined);
+               else
+                   callback(null,row);
            });
 };

@@ -1,4 +1,5 @@
 var express = require('express');
+var crypto = require('crypto');
 var mainSrv = require('./server');
 var resource = require('./config').resource;
 var db = require('./db.js');
@@ -64,8 +65,17 @@ router.post('/users', function(req, res) {
                 }
 
                 db.getApiKey(user, offer, ref, function(API_KEY) {
-                    apiKey = API_KEY;
-                    db.addUser(user, ref, temRes, offer, API_KEY);
+                    if (API_KEY === undefined){
+                        var apiKeyBase = user + offer.organization + offer.name + offer.version;
+                        var sha1 = crypto.createHash('sha1');
+                        sha1.update(apiKeyBase);
+                        apiKey = sha1.digest('hex');
+                        console.log("Type: " + typeof(apiKey));
+                    }
+                    else
+                        apiKey = API_KEY;
+                    // console.log("API_KEY: " + apiKey);
+                    db.addUser(user, ref, temRes, offer, apiKey);
                 });
 
                 for (var i in temRes) {

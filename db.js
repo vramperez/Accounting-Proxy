@@ -216,14 +216,10 @@ exports.getApiKey = function(user, offer, reference, callback) {
                $ref: reference
            },
            function(err, row) {
-               if (row.length === 1) {
-                   api = row[0].API_KEY;
-               }
+               if (row.length === 1)
+                   callback(row[0].API_KEY);
                else
-                   // TODO: GENERATE new API_KEY
-                   api = "1111";
-               console.log('[DEBUG] API_KEY: ' + api);
-               callback(api);
+                    callback();
            });
 };
 

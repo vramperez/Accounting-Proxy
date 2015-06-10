@@ -56,6 +56,10 @@ Returns all public paths related with the resources parameter. 'resources' param
 
 Add +1 in accounting table for 'user' with this 'API_KEY'.
 
+#### resetCount(user, API_KEY) ####
+
+Reset accounting number to 0 for 'user' with this 'API_KEY'.
+
 #### init() ####
 
 Create and connect to database.

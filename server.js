@@ -113,6 +113,11 @@ db.loadFromDB(function(err, data, usr) {
         else {
             console.log(map);
             console.log(JSON.stringify(map, null, 2));
+            for (var user in users) {
+                notifier.notify(users[user].id, users[user].API_KEY, users[user].num, function(user, API_KEY, num) {
+                    users[API_KEY].num = num;
+                });
+            }
         }
         app.listen(app.get('port'));
         // Start API Server

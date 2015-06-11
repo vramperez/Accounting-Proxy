@@ -114,9 +114,17 @@ db.loadFromDB(function(err, data, usr) {
             console.log(map);
             console.log(JSON.stringify(map, null, 2));
             for (var user in users) {
-                notifier.notify(users[user].id, users[user].API_KEY, users[user].num, function(user, API_KEY, num) {
-                    users[API_KEY].num = num;
-                });
+                if (users[user].num != 0) {
+                    db.getReference(users[user].API_KEY, function(ref) {
+                        if (ref !== undefined) {
+                            notifier.notify(users[user].id, users[user].API_KEY, ref, users[user].num, function(user, API_KEY, num) {
+                                users[API_KEY].num = num;
+                                // console.log(JSON.stringify(map, null, 2));
+                            });
+                        } else
+                            console.log('[LOG] No reference information.');
+                    });
+                }
             }
         }
         app.listen(app.get('port'));

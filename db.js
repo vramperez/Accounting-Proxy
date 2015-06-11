@@ -80,7 +80,6 @@ exports.init = function() {
         });
 };
 
-// TODO: Notify data on boot
 exports.loadFromDB = function(setData) {
     var data  = {},
         users = {};
@@ -300,6 +299,19 @@ exports.getPublicPaths = function(resource, callback) {
                $version: resource.version
            }, function(err, row) {
                callback(row);
+           });
+};
+
+exports.getReference = function(API_KEY, callback) {
+    db.all('SELECT reference \
+            FROM offerAccount \
+            WHERE API_KEY=$api',
+           { $api: API_KEY},
+           function(err, row) {
+               if (err || row.length === 0)
+                   callback(undefined);
+               else
+                   callback(row[0].reference);
            });
 };
 

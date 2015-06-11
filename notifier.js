@@ -3,7 +3,7 @@ var db = require('./db.js');
 var info = require('./HTTP_Client/info.json');
 var config = require('./config.json');
 
-exports.notify = function(user, API_KEY, num, callback) {
+exports.notify = function(user, API_KEY, ref, num, callback) {
     console.log(user, API_KEY, num);
     if (num === 0){
         console.log('[LOG] NO request needed.');
@@ -18,7 +18,7 @@ exports.notify = function(user, API_KEY, num, callback) {
             host: config.accounting_host,
             port: config.accounting_port,
             // TODO: get reference form DB
-            path: '/api/contracting/' + '1234' + '/accounting',
+            path: '/api/contracting/' + ref + '/accounting',
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

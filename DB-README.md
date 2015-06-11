@@ -122,6 +122,10 @@ The users's array refers to the other 'user' object, that looks like:
 }
 ```
 
+#### getReference (API_KEY, callback) ####
+
+Return the buying reference using 'callbak'. If there is an error or no reference is return by the DB, returns 'undefined'.
+
 #### newService(private_path, port, callback) ####
 
 Method used by the CLI tool. Add a new service (private_path, port) to DB.

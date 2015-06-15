@@ -315,6 +315,19 @@ exports.getReference = function(API_KEY, callback) {
            });
 };
 
+exports.getOffer = function(API_KEY, callback) {
+    db.all('SELECT organization, name, version \
+            FROM offerAccount \
+            WHERE API_KEY=$api',
+           { $api: API_KEY },
+           function(err, row) {
+               if (err || row.length === 0)
+                   callback(undefined);
+               else
+                   callback(row[0]);
+           });
+};
+
 // CLI: addService [path] [port]
 exports.newService = function(path, port, callback) {
     db.run('INSERT OR REPLACE INTO servicies \

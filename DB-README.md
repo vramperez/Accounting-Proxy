@@ -124,7 +124,19 @@ The users's array refers to the other 'user' object, that looks like:
 
 #### getReference (API_KEY, callback) ####
 
-Return the buying reference using 'callbak'. If there is an error or no reference is return by the DB, returns 'undefined'.
+Return the buying reference using 'callback'. If there is an error or no reference is return by the DB, returns 'undefined'.
+
+#### getOffer ####
+
+Return offer information from the given API_KEY using callback.
+
+```
+{
+    "organization": "org1",
+    "name": "name1",
+    "version": "1.0"
+}
+```
 
 #### newService(private_path, port, callback) ####
 

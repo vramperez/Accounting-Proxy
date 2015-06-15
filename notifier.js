@@ -4,40 +4,53 @@ var info = require('./HTTP_Client/info.json');
 var config = require('./config.json');
 
 exports.notify = function(user, API_KEY, ref, num, callback) {
-    console.log(user, API_KEY, num);
+    // console.log(user, API_KEY, num);
     if (num === 0){
         console.log('[LOG] NO request needed.');
         callback(user, API_KEY, 0);
     } else {
         console.log('[LOG] Request needed.');
+        db.getOffer(API_KEY, function(offering) {
 
-        var body = JSON.stringify(info);
-        //TODO: fill info
-        console.log(config.accounting_host, config.accounting_port);
-        var options = {
-            host: config.accounting_host,
-            port: config.accounting_port,
-            // TODO: get reference form DB
-            path: '/api/contracting/' + ref + '/accounting',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': body.length
-            }
-        };
-
-        var request = http.request(options, function(res) {
-            if (200 <= res.statusCode && res.statusCode <= 299) {
-                console.log('[LOG] Resquest worked!');
-                db.resetCount(user, API_KEY);
-                callback(user, API_KEY, 0);
-            } else {
-                console.log('[LOG] Resquest failed!');
+            if (offering === undefined)
                 callback(user, API_KEY, num);
-            }
-        });
 
-        request.end();
+            info.offering = offering;
+            info.customer = user;
+            info.time_stamp = (new Date()).toISOString();
+            info.value = num.toString();
+            // info.correlation_number = user.num;
+            // info.record_type = config.record_type;
+            // info.unit = config.unit;
+            // info.component_label = config.component_label;
+
+            var body = JSON.stringify(info);
+
+            console.log(config.accounting_host, config.accounting_port);
+            var options = {
+                host: config.accounting_host,
+                port: config.accounting_port,
+                path: '/api/contracting/' + ref + '/accounting',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': body.length
+                }
+            };
+
+            var request = http.request(options, function(res) {
+                if (200 <= res.statusCode && res.statusCode <= 299) {
+                    console.log('[LOG] Resquest worked!');
+                    db.resetCount(user, API_KEY);
+                    callback(user, API_KEY, 0);
+                } else {
+                    console.log('[LOG] Resquest failed!');
+                    callback(user, API_KEY, num);
+                }
+            });
+            request.write(body);
+            request.end();
+        });
     }
 };
 

@@ -29,6 +29,9 @@ exports.init = function() {
                     content_type    TEXT, \
                     privatePath     TEXT, \
                     port            TEXT, \
+                    recorde_type    TEXT, \
+                    unit            TEXT, \
+                    component_label TEXT, \
                     PRIMARY KEY (provider, name, version), \
                     FOREIGN KEY (privatePath, port) REFERENCES servicies (privatePath, port) ON UPDATE CASCADE \
                )');

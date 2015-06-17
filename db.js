@@ -15,25 +15,20 @@ exports.init = function() {
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS public ( \
-                    publicPath     TEXT, \
-                    privatePath    TEXT, \
-                    port           TEXT, \
+                    publicPath      TEXT, \
+                    privatePath     TEXT, \
+                    port            TEXT, \
                     PRIMARY KEY (publicPath), \
                     FOREIGN KEY (privatePath, port) REFERENCES servicies (privatePath, port) ON UPDATE CASCADE \
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS resources ( \
-                    provider        TEXT, \
-                    name            TEXT, \
-                    version         TEXT, \
-                    content_type    TEXT, \
-                    privatePath     TEXT, \
-                    port            TEXT, \
+                    publicPath      TEXT, \
                     recorde_type    TEXT, \
                     unit            TEXT, \
                     component_label TEXT, \
-                    PRIMARY KEY (provider, name, version), \
-                    FOREIGN KEY (privatePath, port) REFERENCES servicies (privatePath, port) ON UPDATE CASCADE \
+                    PRIMARY KEY (publicPath), \
+                    FOREIGN KEY (publicPath) REFERENCES public (publicPath) ON UPDATE CASCADE \
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offers ( \
@@ -44,15 +39,13 @@ exports.init = function() {
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offerResource ( \
-                    provider        TEXT, \
-                    resourceName    TEXT, \
-                    resourceVersion TEXT, \
+                    publicPath      TEXT, \
                     organization    TEXT, \
-                    offerName       TEXT, \
-                    offerVersion    TEXT, \
-                    PRIMARY KEY (provider, resourceName, resourceVersion, organization, offerName, offerVersion), \
-                    FOREIGN KEY (provider, resourceName, resourceVersion) REFERENCES resources (provider, name, version), \
-                    FOREIGN KEY (organization, offerName, offerVersion) REFERENCES offers (organization, name, version) \
+                    name            TEXT, \
+                    version         TEXT, \
+                    PRIMARY KEY (publicPath, organization, name, version), \
+                    FOREIGN KEY (publicPath) REFERENCES resources (publicPath), \
+                    FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version) \
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS accounts ( \
@@ -76,9 +69,11 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     num             INT,  \
-                    PRIMARY KEY (actorID, API_KEY), \
+                    publicPath      TEXT, \
+                    PRIMARY KEY (actorID, API_KEY, publicPath), \
                     FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
+                    FOREIGN KEY (publicPath) REFERENCES resources(publicPath) \
                )');
         });
 };

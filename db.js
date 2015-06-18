@@ -80,7 +80,7 @@ exports.init = function() {
 
 exports.loadFromDB = function(setData) {
     var data  = {},
-        users = {};
+        users = [];
     db.all('SELECT servicies.privatePath, servicies.port, public.publicPath \
             FROM servicies \
             INNER JOIN public \
@@ -102,46 +102,46 @@ exports.loadFromDB = function(setData) {
 };
 
 function loadUsers(data, users, row, callback) {
-    db.all('SELECT accounting.actorID, accounting.API_KEY, accounting.num \
+    db.all('SELECT actorID, API_KEY, num \
             FROM accounting \
-            INNER JOIN \
-            (SELECT offerAccount.actorID, offerAccount.API_KEY \
-              FROM offerAccount \
-              WHERE EXISTS ( \
-                SELECT organization, offerName, offerVersion \
-                FROM offerResource \
-                WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.offerName AND \
-                      offerAccount.version=offerResource.offerVersion AND EXISTS ( \
-                      SELECT provider, name, version \
-                      FROM resources \
-                      WHERE offerResource.provider=provider AND offerResource.resourceName=name AND \
-                            offerResource.resourceVersion=version AND privatePath=$privatePath AND port=$port \
-                ) \
-              ) \
-            ) t \
-            ON t.actorID=accounting.actorID AND t.API_KEY=accounting.API_KEY',
-            { $privatePath: row.privatePath, $port: row.port },
-            function(err, row2) {
-                var id = row.publicPath;
-                if (data[id] === undefined) {
-                    data[id] =  {
-                        path: row.privatePath,
-                        port: row.port,
-                        users: []
-                    };
-                }
-                for (j in row2) {
-                    if (users[row2[j]["accounting.API_KEY"]] === undefined) {
-                        users[row2[j]["accounting.API_KEY"]] = {
-                            API_KEY: row2[j]["accounting.API_KEY"],
-                            id: row2[j]["accounting.actorID"],
-                            num: row2[j]["accounting.num"]
-                        };
-                    }
-                    data[id].users.push(users[row2[j]["accounting.API_KEY"]]);
-                }
-                callback();
-            }
+            WHERE publicPath=$publicPath',
+           { $publicPath: row.publicPath },
+           function(err, row2) {
+               // console.log(row2);
+               var id = row.publicPath;
+               if (data[id] === undefined) {
+                   data[id] =  {
+                       path: row.privatePath,
+                       port: row.port,
+                       users: []
+                   };
+               }
+
+               for (var j in row2) {
+
+                   // Search in users vector
+                   var user = undefined;
+                   for (var index in users)
+                       if (users[index].API_KEY === row2[j].API_KEY &&
+                           users[index].publicPath === row.publicPath) {
+                           user = users[index];
+                           break;
+                       }
+
+                   if (user === undefined) {
+                       user = {
+                           publicPath: row.publicPath,
+                           API_KEY: row2[j].API_KEY,
+                           id: row2[j].actorID,
+                           num: row2[j].num
+                       };
+                       users.push(user);
+                   }
+
+                   data[id].users.push(user);
+               }
+               callback();
+           }
     );
 }
 

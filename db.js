@@ -167,13 +167,15 @@ exports.checkRequest = function(actorID, publicPath, callback) {
     });
 };
 
-exports.count = function(actorID, API_KEY) {
+exports.count = function(actorID, API_KEY, publicPath, amount) {
     db.run('UPDATE accounting \
-            SET num=num+1 \
-            WHERE actorID=$actorID AND API_KEY=$API_KEY',
+            SET num=num+$amount \
+            WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
         {
             $actorID: actorID,
-            $API_KEY: API_KEY
+            $API_KEY: API_KEY,
+            $publicPath: publicPath,
+            $amount: amount
         });
 };
 

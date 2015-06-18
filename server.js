@@ -9,12 +9,11 @@ var cron = require('node-schedule');
 var app = express();
 
 var map = {},
-    users = {};
+    users = [];
 
 app.set('port', 9000);
 
 app.use(function(request, response, next) {
-    // Define a time stamp for the request
     var data = '';
     // Receive data
     request.on('data', function(d) {
@@ -28,45 +27,50 @@ app.use(function(request, response, next) {
 });
 
 app.use(function(request, response) {
-    // Save information
     var userID = request.get('X-Actor-ID');
     var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
-    if (userID !== undefined) {
-        if (map[publicPath] !== undefined) {
-            var user;
-            for (var idx in map[publicPath].users) {
-                if (map[publicPath].users[idx].id === userID &&
-                    map[publicPath].users[idx].API_KEY === API_KEY) {
-                    user = map[publicPath].users[idx];
-                    break;
-                }
-            }
-            if (user === undefined) {
-                console.log("[ERROR] User doesn't have access.");
-                response.status(403).end();
-            } else {
-                var options = {
-                    host: 'localhost',
-                    port: map[publicPath].port,
-                    path: map[publicPath].path,
-                    method: request.method,
-                    headers: proxy.getClientIp(request, request.headers)
-                };
 
-                proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
-                    response.statusCode = status;
-                    for(var idx in headers)
-                        response.setHeader(idx, headers[idx]);
-                    response.send(resp);
-                    user.num++;
-                    db.count(userID, user.API_KEY); // Counter++
-                    // console.log(JSON.stringify(map, null, 2));
-                });
+    if (userID !== undefined) {
+        if (API_KEY !== undefined){
+            if (map[publicPath] !== undefined) {
+                var user = undefined;
+                var us = map[publicPath].users;
+                for (var idx in us) {
+                    if (us[idx].id === userID &&
+                        us[idx].API_KEY === API_KEY) {
+                        user = us[idx];
+                        break;
+                    }
+                }
+                if (user === undefined) {
+                    console.log("[ERROR] User doesn't have access.");
+                    response.status(403).end();
+                } else {
+                    var options = {
+                        host: 'localhost',
+                        port: map[publicPath].port,
+                        path: map[publicPath].path,
+                        method: request.method,
+                        headers: proxy.getClientIp(request, request.headers)
+                    };
+
+                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+                        response.statusCode = status;
+                        for(var idx in headers)
+                            response.setHeader(idx, headers[idx]);
+                        response.send(resp);
+                        user.num++;
+                        db.count(userID, user.API_KEY, user.publicPath, 1); // Counter++
+                    });
+                }
+            } else {
+                console.log("[LOG] Invalid resurce");
+                response.status(404).end();
             }
         } else {
-            console.log("[LOG] Invalid resurce");
-            response.status(404).end();
+            console.log("[LOG] Undefined API_KEY");
+            response.status(401).end();
         }
     } else {
         console.log("[LOG] Undefined username");

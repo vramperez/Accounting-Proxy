@@ -64,9 +64,11 @@ app.use(function(request, response) {
                     // console.log(JSON.stringify(map, null, 2));
                 });
             }
+        } else {
+            console.log("[LOG] Invalid resurce");
+            response.status(404).end();
         }
-    }
-    else {
+    } else {
         console.log("[LOG] Undefined username");
         response.status(401).end();
     }

@@ -222,6 +222,7 @@ exports.getApiKey = function(user, offer, reference, callback) {
            });
 };
 
+// TODO: Update for new information structure
 exports.addUser = function(user, reference, resource, offer, api, callback) {
     var res;
     for (var i in resource) {
@@ -277,6 +278,8 @@ exports.addUser = function(user, reference, resource, offer, api, callback) {
     }
 };
 
+// TODO: Is it necessary??
+// TODO: Update for new information structure
 exports.getPublicPaths = function(resource, callback) {
     db.all('SELECT publicPath \
             FROM public \
@@ -355,7 +358,7 @@ exports.getInfo = function(user, callback) {
            {
                $user: user
            }, function(err, row) {
-               console.log(row);
+               // console.log(row);
                if (err)
                    callback(err, undefined);
                else if (row.length === 0)

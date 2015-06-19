@@ -1,21 +1,4 @@
 {
-    "app_host": "google.com",
-    "app_port": "80",
-    "accounting_host": "test.com",
-    "accounting_port": "80",
-    "sql": {
-        "user": "jesus",
-        "password": "conwet",
-        "host": "localhost",
-        "port": "3306"
-    },
-    "resource": {
-        "name": "resource1",
-        "version": "1.0",
-        "content_type": "",
-        "url": "http: //www.resource1.org/"
-    },
-    "record_type": "event",
-    "unit": "calls",
-    "component_label": "callusage"
+    "accounting_host": "localhost",
+    "accounting_port": "9010",
 }

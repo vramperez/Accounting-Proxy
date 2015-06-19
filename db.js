@@ -84,7 +84,7 @@ exports.loadFromDB = function(setData) {
     db.all('SELECT * \
             FROM offerAccount',
            function(err, row) {
-               console.log(row);
+               // console.log(row);
                var counter = row.length;
                if (row.length !== 0)
                    for (i in row) {
@@ -101,7 +101,7 @@ exports.loadFromDB = function(setData) {
 };
 
 function loadResources(data, offer, callback) {
-    db.all('SELECT accounting.num as num, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, resources.unit as unit \
+    db.all('SELECT accounting.num as num, accounting.correlation_number as correlation_number, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, resources.unit as unit \
             FROM accounting, public, resources \
             WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=resources.publicPath',
            { $api_key: offer.API_KEY },
@@ -115,18 +115,18 @@ function loadResources(data, offer, callback) {
                        organization: offer.organization,
                        name: offer.name,
                        version: offer.version,
-                       accounting: undefined,
+                       accounting: {},
                        reference: offer.reference
                    };
                }
-               data.accounting = {};
+
                for (var i in row) {
                    var res = row[i];
-                   data.accounting[res.publicPath] = {
+                   data[id].accounting[res.publicPath] = {
                        privatePath: res.privatePath,
                        port: res.port,
                        num: res.num,
-                       // correlation_number: res.correlation_number,
+                       correlation_number: res.correlation_number,
                        unit: res.unit
                    };
                }
@@ -171,7 +171,7 @@ exports.count = function(actorID, API_KEY, publicPath, amount) {
 
 exports.resetCount = function(actorID, API_KEY, publicPath) {
     db.run('UPDATE accounting \
-            SET num=0 \
+            SET num=0, correlation_number=correlation_number+1 \
             WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
            {
             $actorID: actorID,

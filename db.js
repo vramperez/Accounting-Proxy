@@ -181,7 +181,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath) {
 };
 
 exports.getResources = function(org, name, version, callback) {
-    db.all('SELECT provider, resourceName as name, resourceVersion as version \
+    db.all('SELECT publicPath \
            FROM offerResource \
            WHERE organization=$org AND offerName=$name AND offerVersion=$version',
            {
@@ -197,7 +197,7 @@ exports.getResources = function(org, name, version, callback) {
 };
 
 exports.loadResources = function(callback) {
-    db.all('SELECT provider, name, version FROM resources', function(err, row) {
+    db.all('SELECT publicPath  FROM resources', function(err, row) {
         callback(row);
     });
 };

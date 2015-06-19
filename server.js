@@ -69,11 +69,11 @@ app.use(function(request, response) {
             }
         } else {
             console.log("[LOG] user has not access");
-            response.status(401).end();
+            response.status(403).end();
         }
     } else {
         console.log("[LOG] Invalid API_KEY");
-        response.status(400).end();
+        response.status(403).end();
     }
 });
 

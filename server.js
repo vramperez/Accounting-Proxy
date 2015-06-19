@@ -8,8 +8,7 @@ var cron = require('node-schedule');
 
 var app = express();
 
-var map = {},
-    users = [];
+var map = {};
 
 app.set('port', 9000);
 
@@ -31,50 +30,50 @@ app.use(function(request, response) {
     var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
 
-    if (userID !== undefined) {
-        if (API_KEY !== undefined){
-            if (map[publicPath] !== undefined) {
-                var user = undefined;
-                var us = map[publicPath].users;
-                for (var idx in us) {
-                    if (us[idx].id === userID &&
-                        us[idx].API_KEY === API_KEY) {
-                        user = us[idx];
-                        break;
-                    }
-                }
-                if (user === undefined) {
-                    console.log("[ERROR] User doesn't have access.");
-                    response.status(403).end();
-                } else {
-                    var options = {
-                        host: 'localhost',
-                        port: map[publicPath].port,
-                        path: map[publicPath].path,
-                        method: request.method,
-                        headers: proxy.getClientIp(request, request.headers)
-                    };
+    if (userID === undefined) {
+        console.log("[LOG] Undefined username");
+        response.status(400).end();
+    }
 
-                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
-                        response.statusCode = status;
-                        for(var idx in headers)
-                            response.setHeader(idx, headers[idx]);
-                        response.send(resp);
-                        user.num++;
-                        db.count(userID, user.API_KEY, user.publicPath, 1); // Counter++
-                    });
-                }
+    if (API_KEY === undefined) {
+        console.log("[LOG] Undefined API_KEY");
+        response.status(400).end();
+    }
+
+    if (map[API_KEY] !== undefined) {
+        var info = map[API_KEY];
+
+        if (info.actorID === userID) {
+            var accounting = info.accounting[publicPath];
+
+            if (accounting !== undefined) {
+                var options = {
+                    host: 'localhost',
+                    port: accounting.port,
+                    path: accounting.privatePath,
+                    method: request.method,
+                    headers: proxy.getClientIp(request, request.headers)
+                };
+
+                proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+                    response.statusCode = status;
+                    for(var idx in headers)
+                        response.setHeader(idx, headers[idx]);
+                    response.send(resp);
+                    accounting.num++;
+                    db.count(userID, API_KEY, publicPath, 1);
+                });
             } else {
                 console.log("[LOG] Invalid resurce");
                 response.status(404).end();
             }
         } else {
-            console.log("[LOG] Undefined API_KEY");
+            console.log("[LOG] user has not access");
             response.status(401).end();
         }
     } else {
-        console.log("[LOG] Undefined username");
-        response.status(401).end();
+        console.log("[LOG] Invalid API_KEY");
+        response.status(400).end();
     }
 });
 

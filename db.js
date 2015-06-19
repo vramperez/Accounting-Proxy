@@ -66,10 +66,11 @@ exports.init = function() {
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
-                    actorID         TEXT, \
-                    API_KEY         TEXT, \
-                    num             INT,  \
-                    publicPath      TEXT, \
+                    actorID             TEXT, \
+                    API_KEY             TEXT, \
+                    num                 INT,  \
+                    publicPath          TEXT, \
+                    correlation_number  INT,  \
                     PRIMARY KEY (actorID, API_KEY, publicPath), \
                     FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
@@ -79,66 +80,55 @@ exports.init = function() {
 };
 
 exports.loadFromDB = function(setData) {
-    var data  = {},
-        users = [];
-    db.all('SELECT servicies.privatePath, servicies.port, public.publicPath \
-            FROM servicies \
-            INNER JOIN public \
-            WHERE public.privatePath=servicies.privatePath AND public.port=servicies.port',
-            function(err, row) {
-                var counter = row.length;
-                if (row.length !== 0)
-                    for (i in row) {
-                        loadUsers(data, users, row[i], function() {
-                            counter--;
-                            if (counter === 0)
-                                setData(null, data, users);
-                        });
-                    }
-                else
-                    setData(null, data, users);
-            }
-    );
+    var data  = {};
+    db.all('SELECT * \
+            FROM offerAccount',
+           function(err, row) {
+               console.log(row);
+               var counter = row.length;
+               if (row.length !== 0)
+                   for (i in row) {
+                       loadResources(data, row[i], function() {
+                           counter--;
+                           if (counter === 0)
+                               setData(null, data);
+                       });
+                   }
+               else
+                   setData(null, data);
+           }
+          );
 };
 
-function loadUsers(data, users, row, callback) {
-    db.all('SELECT actorID, API_KEY, num \
-            FROM accounting \
-            WHERE publicPath=$publicPath',
-           { $publicPath: row.publicPath },
-           function(err, row2) {
-               // console.log(row2);
-               var id = row.publicPath;
+function loadResources(data, offer, callback) {
+    db.all('SELECT accounting.num as num, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, resources.unit as unit \
+            FROM accounting, public, resources \
+            WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=resources.publicPath',
+           { $api_key: offer.API_KEY },
+           function(err, row) {
+               // console.log(offer.API_KEY ,row);
+               var id = offer.API_KEY;
+
                if (data[id] === undefined) {
                    data[id] =  {
-                       path: row.privatePath,
-                       port: row.port,
-                       users: []
+                       actorID: offer.actorID,
+                       organization: offer.organization,
+                       name: offer.name,
+                       version: offer.version,
+                       accounting: undefined,
+                       reference: offer.reference
                    };
                }
-
-               for (var j in row2) {
-
-                   // Search in users vector
-                   var user = undefined;
-                   for (var index in users)
-                       if (users[index].API_KEY === row2[j].API_KEY &&
-                           users[index].publicPath === row.publicPath) {
-                           user = users[index];
-                           break;
-                       }
-
-                   if (user === undefined) {
-                       user = {
-                           publicPath: row.publicPath,
-                           API_KEY: row2[j].API_KEY,
-                           id: row2[j].actorID,
-                           num: row2[j].num
-                       };
-                       users.push(user);
-                   }
-
-                   data[id].users.push(user);
+               data.accounting = {};
+               for (var i in row) {
+                   var res = row[i];
+                   data.accounting[res.publicPath] = {
+                       privatePath: res.privatePath,
+                       port: res.port,
+                       num: res.num,
+                       // correlation_number: res.correlation_number,
+                       unit: res.unit
+                   };
                }
                callback();
            }

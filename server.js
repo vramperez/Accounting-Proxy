@@ -107,30 +107,17 @@ exports.newUser = function(user, apiKey, paths) {
 
 db.init();
 
-db.loadFromDB(function(err, data, usr) {
+db.loadFromDB(function(err, data) {
     if (err)
         console.log('Something went wrong');
     else {
         map = data;
-        users = usr;
         if (Object.getOwnPropertyNames(data).length === 0)
             console.log("[LOG] No data avaliable");
         else {
-            console.log(map);
+            // console.log(map);
             console.log(JSON.stringify(map, null, 2));
-            for (var user in users) {
-                if (users[user].num != 0) {
-                    db.getReference(users[user].API_KEY, function(ref) {
-                        if (ref !== undefined) {
-                            notifier.notify(users[user].id, users[user].API_KEY, ref, users[user].num, function(user, API_KEY, num) {
-                                users[API_KEY].num = num;
-                                // console.log(JSON.stringify(map, null, 2));
-                            });
-                        } else
-                            console.log('[LOG] No reference information.');
-                    });
-                }
-            }
+            // TODO: Notify pending accounting
         }
         app.listen(app.get('port'));
         // Start API Server
@@ -144,7 +131,7 @@ db.loadFromDB(function(err, data, usr) {
  * DEPRECATED
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
-    console.log('[LOG] Sending accouting information...');
+    console.log('[LOG] Sending accounting information...');
     // variable i is unused in this invocation.
     for (userID in map) {
         notifier.notify(0, map[userID], userID, function(i, user_id, requests, correlation_number) {

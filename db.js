@@ -24,7 +24,7 @@ exports.init = function() {
 
         db.run('CREATE TABLE IF NOT EXISTS resources ( \
                     publicPath      TEXT, \
-                    recorde_type    TEXT, \
+                    record_type     TEXT, \
                     unit            TEXT, \
                     component_label TEXT, \
                     PRIMARY KEY (publicPath), \

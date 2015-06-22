@@ -115,9 +115,26 @@ db.loadFromDB(function(err, data) {
         if (Object.getOwnPropertyNames(data).length === 0)
             console.log("[LOG] No data avaliable");
         else {
-            // console.log(map);
+
             console.log(JSON.stringify(map, null, 2));
-            // TODO: Notify pending accounting
+
+            for (var apiKey in map)
+                for (var publicPath in map[apiKey].accounting)
+                    if (map[apiKey].accounting[publicPath].num !== 0)
+                        notifier.notify({
+                            "actorID": map[apiKey].actorID,
+                            "API_KEY": apiKey,
+                            "publicPath": publicPath,
+                            "organization": map[apiKey].organization,
+                            "name": map[apiKey].name,
+                            "version": map[apiKey].version,
+                            "correlation_number": map[apiKey].accounting[publicPath].correlation_number,
+                            "num": map[apiKey].accounting[publicPath].num,
+                            "reference": map[apiKey].reference
+                        }, function (API_KEY, puPath, num) {
+                            map[API_KEY].accounting[puPath].num = num;
+                            if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
+                        });
         }
         app.listen(app.get('port'));
         // Start API Server

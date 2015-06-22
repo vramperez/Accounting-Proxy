@@ -222,6 +222,20 @@ exports.getApiKey = function(user, offer, reference, callback) {
            });
 };
 
+exports.getAccountingInfo = function(publicPath, callback) {
+    console.log(publicPath);
+    db.all('SELECT record_type, unit, component_label \
+            FROM resources \
+            WHERE publicPath=$publicPath',
+           { $publicPath: publicPath },
+           function(err, row) {
+               if (err || row.length === 0)
+                   callback(undefined);
+               else
+                   callback(row[0]);
+           });
+};
+
 // TODO: Update for new information structure
 exports.addUser = function(user, reference, resource, offer, api, callback) {
     var res;

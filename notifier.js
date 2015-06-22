@@ -11,7 +11,7 @@ exports.notify = function(data, callback) {
     } else {
         console.log('[LOG] Request needed.');
         db.getAccountingInfo(data.publicPath, function(acc) {
-            console.log(acc);
+
             if (acc === undefined)
                 callback(data.API_KEY, data.publicPath, data.num);
 

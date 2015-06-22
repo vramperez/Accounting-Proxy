@@ -142,18 +142,28 @@ db.loadFromDB(function(err, data) {
     }
 });
 
-/* Create daemon to update WStore every day */
-/* Cron format:
+/* Create daemon to update WStore every day
+ * Cron format:
  * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
- * DEPRECATED
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
     console.log('[LOG] Sending accounting information...');
     // variable i is unused in this invocation.
-    for (userID in map) {
-        notifier.notify(0, map[userID], userID, function(i, user_id, requests, correlation_number) {
-            map[user_id].requests = requests;
-            map[user_id].correlation_number = correlation_number;
-        });
-    }
+    for (var apiKey in map)
+        for (var publicPath in map[apiKey].accounting)
+            if (map[apiKey].accounting[publicPath].num !== 0)
+                notifier.notify({
+                    "actorID": map[apiKey].actorID,
+                    "API_KEY": apiKey,
+                    "publicPath": publicPath,
+                    "organization": map[apiKey].organization,
+                    "name": map[apiKey].name,
+                    "version": map[apiKey].version,
+                    "correlation_number": map[apiKey].accounting[publicPath].correlation_number,
+                    "num": map[apiKey].accounting[publicPath].num,
+                    "reference": map[apiKey].reference
+                }, function (API_KEY, puPath, num) {
+                    map[API_KEY].accounting[puPath].num = num;
+                    if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
+                });
 });

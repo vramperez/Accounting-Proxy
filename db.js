@@ -217,7 +217,7 @@ exports.loadResources = function(callback) {
     });
 };
 
-exports.getApiKey = function(user, offer, reference, callback) {
+exports.getApiKey = function(user, offer, callback) {
 
     db.all('SELECT API_KEY \
             FROM offerAccount \
@@ -226,8 +226,7 @@ exports.getApiKey = function(user, offer, reference, callback) {
                $org: offer.organization,
                $name: offer.name,
                $version: offer.version,
-               $actorID: user,
-               $ref: reference
+               $actorID: user
            },
            function(err, row) {
                if (row.length === 1)

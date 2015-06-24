@@ -88,7 +88,7 @@ exports.loadFromDB = function(setData) {
                var counter = row.length;
                if (row.length !== 0)
                    for (i in row) {
-                       loadResources(data, row[i], function() {
+                       loadResourcesAux(data, row[i], function() {
                            counter--;
                            if (counter === 0)
                                setData(null, data);
@@ -100,7 +100,7 @@ exports.loadFromDB = function(setData) {
           );
 };
 
-function loadResources(data, offer, callback) {
+function loadResourcesAux(data, offer, callback) {
     db.all('SELECT accounting.num as num, accounting.correlation_number as correlation_number, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, resources.unit as unit \
             FROM accounting, public, resources \
             WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=resources.publicPath',

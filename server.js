@@ -77,32 +77,13 @@ app.use(function(request, response) {
     }
 });
 
-exports.newUser = function(user, apiKey, paths) {
+exports.newBuy = function(api_key, data) {
+    map[api_key] = data;
+    // console.log("PROXY MAP: \n", map);
+};
 
-    // Add user if not exist.
-    if (users[apiKey] === undefined)
-        console.log("New user found!!");
-        users[apiKey] = {
-            API_KEY: api,
-            id: user,
-            num: 0
-        };
-
-    // Add user to paths
-    for (var i in paths) {
-        var found = false;
-        for (var j in map[paths[i].publicPath].users) {
-            if (map[paths[i].publicPath].users[j].id === user &&
-                map[paths[i].publicPath].users[j].API_KEY === apiKey) {
-                found = true;
-                break;
-            }
-        }
-        if (!found)
-            map[paths[i].publicPath].users.push(users[apiKey]);
-    }
-
-    // console.log(JSON.stringify(map, null, 2));
+exports.getMap = function(callback) {
+    callback(map);
 };
 
 db.init();
@@ -138,7 +119,7 @@ db.loadFromDB(function(err, data) {
         }
         app.listen(app.get('port'));
         // Start API Server
-        api.run();
+        api.run(map);
     }
 });
 

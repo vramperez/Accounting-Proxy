@@ -197,8 +197,23 @@ exports.getResources = function(org, name, version, callback) {
 };
 
 exports.loadResources = function(callback) {
-    db.all('SELECT publicPath  FROM resources', function(err, row) {
-        callback(row);
+    db.all('SELECT p.publicPath as publicPath, privatePath, port, record_type, unit, component_label \
+            FROM public as p, resources as r \
+            WHERE p.publicPath=r.publicPath',
+           function(err, row) {
+               var l = row.length;
+               var toReturn = {};
+
+               for (var i=0; i<l; i++) {
+                   toReturn[row[i].publicPath] = {
+                       privatePath: row[i].privatePath,
+                       port: row[i].port,
+                       record_type: row[i].record_type,
+                       unit: row[i].unit,
+                       component_label: row[i].component_label
+                   };
+               }
+               callback(toReturn);
     });
 };
 

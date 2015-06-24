@@ -1,19 +1,22 @@
 var express = require('express');
 var crypto = require('crypto');
-var mainSrv = require('./server');
+var url = require('url');
+var proxy = require('./server.js');
 var resource = require('./config').resource;
 var db = require('./db.js');
 
 var app = express(),
     router = express.Router(),
-    resources = [];
+    resources = {},
+    map;
 
 app.set('port', 9001);
 
-exports.run = function(){
-    db.loadResources(function(res) {
-        resources = res;
-        // console.log(JSON.stringify(resources, null, 2));
+exports.run = function(d){
+    map = d;
+    db.loadResources(function(d) {
+        resources = d;
+        console.log(resources);
         app.listen(app.get('port'));
     });
 };
@@ -25,10 +28,12 @@ router.post('/users', function(req, res) {
 
     var body = '';
 
-    if (req.get('Content-Type') === 'application/json') {
-        req.on('data', function(data) {
-            body += data;
+    if (req.get('Content-Type').indexOf('application/json') > -1) {
+
+        req.on('data', function(d) {
+            body += d;
         });
+
         req.on('end', function() {
 
             body = JSON.parse(body);
@@ -38,56 +43,52 @@ router.post('/users', function(req, res) {
                 user  = body.customer,
                 ref   = body.reference,
                 temRes = [],
-                apiKey;
-
-            db.getResources(offer.organization, offer.name, offer.version, function(data) {
-                if (data) {
-                    for (i in data) {
-                        for (j in resrc) {
-                            if (data[i].provider === resrc[j].provider &&
-                                data[i].name === resrc[j].name &&
-                                data[i].version === resrc[j].version) {
-                                temRes.push(resrc[j]);
-                            }
-                        }
-                    }
-                } else {
-                    console.log("New offer!!");
-                    for (i in resources) {
-                        for (j in resrc) {
-                            if (resources[i].provider === resrc[j].provider &&
-                                resources[i].name === resrc[j].name &&
-                                resources[i].version == resrc[j].version) {
-                                temRes.push(resrc[j]);
-                            }
-                        }
-                    }
-                }
-
-                db.getApiKey(user, offer, ref, function(API_KEY) {
-                    if (API_KEY === undefined){
+                addOffer = false;
+            proxy.getMap(function(m) {
+                map = m;
+                db.getApiKey(user, offer, function(api_key) {
+                    if (api_key === undefined) {
+                        // Generate API_KEY
                         var apiKeyBase = user + offer.organization + offer.name + offer.version;
                         var sha1 = crypto.createHash('sha1');
                         sha1.update(apiKeyBase);
-                        apiKey = sha1.digest('hex');
-                        console.log("Type: " + typeof(apiKey));
+                        api_key = sha1.digest('hex');
+                        addOffer = true;
                     }
-                    else
-                        apiKey = API_KEY;
-                    // console.log("API_KEY: " + apiKey);
-                    db.addUser(user, ref, temRes, offer, apiKey);
+
+                    if (map[api_key] === undefined) {
+                        map[api_key] = {
+                            actorID: user,
+                            organization: offer.organization,
+                            name: offer.name,
+                            version: offer.version,
+                            accounting: {},
+                            reference: ref
+                        };
+                    }
+
+                    for (var i in resrc) {
+                        var publicPath = url.parse(resrc[i].url).pathname;
+
+                        if (resources[publicPath] !== undefined &&
+                            map[api_key].accounting[publicPath] === undefined) {
+                            map[api_key].accounting[publicPath] = {
+                                privatePath: resources[publicPath].privatePath,
+                                port: resources[publicPath].port,
+                                num: 0,
+                                correlation_number: 0,
+                                unit: resources[publicPath].unit
+                            };
+                        }
+                    }
+                    db.addInfo(api_key, map[api_key]);
+                    proxy.newBuy(api_key, map[api_key]);
+                    res.status(201).send();
                 });
-
-                for (var i in temRes) {
-                    db.getPublicPaths(temRes[i], function(paths) {
-                        mainSrv.newUser(user, apiKey, paths);
-                    });
-                }
             });
-
-            res.send("API Server Woking!");
         });
-    }
+    } else
+        res.status(400).send();
 });
 
 router.post('/resources', function(req, res) {

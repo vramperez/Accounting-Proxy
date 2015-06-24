@@ -250,60 +250,61 @@ exports.getAccountingInfo = function(publicPath, callback) {
            });
 };
 
-// TODO: Update for new information structure
-exports.addUser = function(user, reference, resource, offer, api, callback) {
-    var res;
-    for (var i in resource) {
-        res = resource[i];
+exports.addInfo = function(API_KEY, data, callback) {
+    var acc;
 
-        db.serialize(function() {
+    db.serialize(function() {
+
+        for (var p in data.accounting) {
+        acc = data.accounting[p];
+
             // Add user if not exists
             db.run('INSERT OR REPLACE INTO accounts \
-                VALUES ($user)',
-                   {$user: user});
+                    VALUES ($actorID)',
+                   { $actorID: data.actorID });
 
             // Add offer it not existes
             db.run('INSERT OR REPLACE INTO offers \
                     VALUES ($org, $name, $version)',
                    {
-                       $org: offer.organization,
-                       $name: offer.name,
-                       $version: offer.version
+                       $org: data.organization,
+                       $name: data.name,
+                       $version: data.version
                    });
 
             // Add reference: OVERWRITE REFERENCE!!
             db.run('INSERT OR REPLACE INTO offerAccount \
                     VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
                    {
-                       $org: offer.organization,
-                       $name: offer.name,
-                       $version: offer.version,
-                       $actorID: user,
-                       $API_KEY: api,
-                       $ref: reference
+                       $org: data.organization,
+                       $name: data.name,
+                       $version: data.version,
+                       $actorID: data.actorID,
+                       $API_KEY: API_KEY,
+                       $ref: data.reference
                    });
 
             // Add resource link to offer
             db.run('INSERT OR REPLACE INTO offerResource \
-                    VALUES ($pro, $resName, $resVersion, $org, $offerName, $offerVersion)',
+                    VALUES ($publicPath, $org, $offerName, $offerVersion)',
                    {
-                       $pro: res.provider,
-                       $resName: res.name,
-                       $resVersion: res.version,
-                       $org: offer.organization,
-                       $offerName: offer.name,
-                       $offerVersion: offer.version
+                       $publicPath: p,
+                       $org: data.organization,
+                       $offerName: data.name,
+                       $offerVersion: data.version
                    });
             // Add accounting
-            // TODO: What if it exists?
             db.run('INSERT OR REPLACE INTO accounting \
-                    VALUES ($actorID, $API_KEY, 0)',
+                    VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
                    {
-                       $actorID: user,
-                       $API_KEY: api
+                       $actorID: data.actorID,
+                       $API_KEY: API_KEY,
+                       $num: acc.num,
+                       $publicPath: p,
+                       $correlation_number: acc.correlation_number
                    });
-        });
-    }
+        }
+    });
 };
 
 // TODO: Is it necessary??

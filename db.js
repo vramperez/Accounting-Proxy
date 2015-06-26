@@ -1,5 +1,4 @@
 var sqlite = require('sqlite3').verbose(); // Debug enable
-var async = require('async');
 
 var db = new sqlite.Database('accountingDB.sqlite');
 
@@ -215,6 +214,19 @@ exports.loadResources = function(callback) {
                }
                callback(toReturn);
     });
+};
+
+exports.getService = function(publicPath, callback) {
+    db.all('SELECT privatePath, port \
+            FROM public \
+            WHERE publicPath=$publiPath',
+           { $publicPath: publicPath },
+           function(err, row) {
+               if (err || row.length === 0)
+                   callback(undefined);
+               else
+                   callback(row[0]);
+           });
 };
 
 exports.getApiKey = function(user, offer, callback) {

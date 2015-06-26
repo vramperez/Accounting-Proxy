@@ -363,6 +363,19 @@ exports.getOffer = function(API_KEY, callback) {
            });
 };
 
+exports.addResource = function(data, callback) {
+    db.run('INSERT OR REPLACE INTO resources \
+            VALUES ($p, $r, $u, $c)',
+           {
+               $p: data.publicPath,
+               $r: data.record_type,
+               $u: data.unit,
+               $c: data.component_label
+           }, function (err) {
+               callback(err);
+           });
+};
+
 // CLI: addService [path] [port]
 exports.newService = function(path, port, callback) {
     db.run('INSERT OR REPLACE INTO servicies \

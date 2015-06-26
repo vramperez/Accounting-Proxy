@@ -99,17 +99,42 @@ router.post('/resources', function(req, res) {
     var body = '';
 
     if (req.get('Content-Type') === 'application/json') {
-        req.on('data', function(data) {
-            body += data;
+        req.on('data', function(d) {
+            body += d;
         });
 
         req.on('end', function() {
             body = JSON.parse(body);
-            // TODO: Treat new resource
-            console.log(JSON.stringify(body, null, 2));
-        });
+            console.log(body);
+            var publicPath = url.parse(body.url).pathname;
+            console.log(publicPath);
+            db.getService(publicPath, function(data) {
+                if (data === undefined || body.record_type === undefined ||
+                    body.unit === undefined || body.component_label === undefined)
+                    res.status(400).send();
+                if (resources[publicPath] === undefined) {
+                    resources[publicPath] = {
+                        privatePath: data.privatePath,
+                        port: data.port,
+                        record_type: body.record_type,
+                        unit: body.unit,
+                        component_label: body.component_label
+                    };
+                }
+                db.addResource({
+                    publicPath: publicPath,
+                    record_type: body.record_type,
+                    unit: body.unit,
+                    component_label: body.component_label
+                }, function(err) {
+                    if (err !== undefined)
+                        res.status(400).send();
+                    else
+                        res.status(201).send();
+                });
+            });
 
-        res.end();
+        });
     }
 });
 

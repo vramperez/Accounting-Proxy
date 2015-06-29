@@ -55,16 +55,18 @@ router.post('/users', function(req, res) {
                 ref   = body.reference,
                 temRes = [],
                 addOffer = false;
+
             proxy.getMap(function(m) {
                 map = m;
                 db.getApiKey(user, offer, function(api_key) {
+
                     if (api_key === undefined) {
                         // Generate API_KEY
                         var apiKeyBase = user + offer.organization + offer.name + offer.version;
                         var sha1 = crypto.createHash('sha1');
                         sha1.update(apiKeyBase);
                         api_key = sha1.digest('hex');
-                        addOffer = true;
+                        addOffer = true; // UNUSED??
                     }
 
                     if (map[api_key] === undefined) {
@@ -81,20 +83,33 @@ router.post('/users', function(req, res) {
                     for (var i in resrc) {
                         var publicPath = url.parse(resrc[i].url).pathname;
 
+                        var offerResourceBase = publicPath + offer.organization + offer.name + offer.version;
+                        var sha1 = crypto.createHash('sha1');
+                        sha1.update(offerResourceBase);
+                        var id = sha1.digest('hex');
+
                         if (resources[publicPath] !== undefined &&
+                            offerResource[id] !== undefined &&
                             map[api_key].accounting[publicPath] === undefined) {
                             map[api_key].accounting[publicPath] = {
                                 privatePath: resources[publicPath].privatePath,
                                 port: resources[publicPath].port,
                                 num: 0,
                                 correlation_number: 0,
-                                unit: resources[publicPath].unit
+                                unit: offerResource[id]
                             };
                         }
                     }
-                    db.addInfo(api_key, map[api_key]);
-                    proxy.newBuy(api_key, map[api_key]);
-                    res.status(201).send();
+
+                    db.addInfo(api_key, map[api_key], function(err) {
+                        if (err)
+                            res.status(400).send();
+                        else {
+                            proxy.newBuy(api_key, map[api_key]);
+                            res.status(201).send();
+                        }
+                    });
+
                 });
             });
         });

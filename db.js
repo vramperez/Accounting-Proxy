@@ -273,16 +273,17 @@ exports.addInfo = function(API_KEY, data, callback) {
             // Add user if not exists
             db.run('INSERT OR REPLACE INTO accounts \
                     VALUES ($actorID)',
-                   { $actorID: data.actorID });
+                   { $actorID: data.actorID },
+                   function(err) { if (err) callback(err); });
 
             // Add offer it not existes
-            db.run('INSERT OR REPLACE INTO offers \
-                    VALUES ($org, $name, $version)',
-                   {
-                       $org: data.organization,
-                       $name: data.name,
-                       $version: data.version
-                   });
+            // db.run('INSERT OR REPLACE INTO offers \
+            //         VALUES ($org, $name, $version)',
+            //        {
+            //            $org: data.organization,
+            //            $name: data.name,
+            //            $version: data.version
+            //        });
 
             // Add reference: OVERWRITE REFERENCE!!
             db.run('INSERT OR REPLACE INTO offerAccount \
@@ -294,17 +295,18 @@ exports.addInfo = function(API_KEY, data, callback) {
                        $actorID: data.actorID,
                        $API_KEY: API_KEY,
                        $ref: data.reference
-                   });
+                   },
+                   function(err) { if (err) callback(err); });
 
             // Add resource link to offer
-            db.run('INSERT OR REPLACE INTO offerResource \
-                    VALUES ($publicPath, $org, $offerName, $offerVersion)',
-                   {
-                       $publicPath: p,
-                       $org: data.organization,
-                       $offerName: data.name,
-                       $offerVersion: data.version
-                   });
+            // db.run('INSERT OR REPLACE INTO offerResource \
+            //         VALUES ($publicPath, $org, $offerName, $offerVersion)',
+            //        {
+            //            $publicPath: p,
+            //            $org: data.organization,
+            //            $offerName: data.name,
+            //            $offerVersion: data.version
+            //        });
             // Add accounting
             db.run('INSERT OR REPLACE INTO accounting \
                     VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
@@ -314,7 +316,8 @@ exports.addInfo = function(API_KEY, data, callback) {
                        $num: acc.num,
                        $publicPath: p,
                        $correlation_number: acc.correlation_number
-                   });
+                   },
+                   function(err) { if (err) callback(err); else callback(); });
         }
     });
 };

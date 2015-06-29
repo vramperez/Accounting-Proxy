@@ -363,6 +363,14 @@ exports.getOffer = function(API_KEY, callback) {
            });
 };
 
+exports.loadUnits = function(callback) {
+    db.all('SELECT publicPath, organization, name, version, unit \
+            FROM offerResource',
+           function(err, row) {
+               callback(row);
+           });
+};
+
 exports.addResource = function(data, callback) {
 
     db.serialize(function() {

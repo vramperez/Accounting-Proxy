@@ -173,4 +173,31 @@ router.post('/resources', function(req, res) {
     }
 });
 
+router.get('/users/keys', function(req, res) {
+    var userID = req.get('X-Actor-ID');
+
+    if (userID === undefined)
+        res.status(400).end();
+
+    db.getInfo(userID, function(err, data) {
+
+        if (err || data.length === 0)
+            res.status(400).end();
+
+        var msg = [];
+        for (var i in data) {
+            msg.push({
+                offering: {
+                    organization: data[i].organization,
+                    name: data[i].name,
+                    version: data[i].version
+                },
+                API_KEY: data[i].API_KEY
+            });
+        }
+
+        res.json(msg);
+    });
+});
+
 app.use('/api', router);

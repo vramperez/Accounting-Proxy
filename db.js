@@ -230,7 +230,6 @@ exports.getService = function(publicPath, callback) {
 };
 
 exports.getApiKey = function(user, offer, callback) {
-
     db.all('SELECT API_KEY \
             FROM offerAccount \
             WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
@@ -248,12 +247,16 @@ exports.getApiKey = function(user, offer, callback) {
            });
 };
 
-exports.getAccountingInfo = function(publicPath, callback) {
-    console.log(publicPath);
+exports.getAccountingInfo = function(publicPath, offer, callback) {
     db.all('SELECT record_type, unit, component_label \
-            FROM resources \
-            WHERE publicPath=$publicPath',
-           { $publicPath: publicPath },
+            FROM offerResource \
+            WHERE publicPath=$publicPath AND organization=$org AND name=$name AND version=$v',
+           {
+               $publicPath: publicPath,
+               $org: offer.organization,
+               $name: offer.name,
+               $v: offer.version
+           },
            function(err, row) {
                if (err || row.length === 0)
                    callback(undefined);

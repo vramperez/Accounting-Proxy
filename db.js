@@ -217,9 +217,9 @@ exports.loadResources = function(callback) {
 };
 
 exports.getService = function(publicPath, callback) {
-    db.all('SELECT privatePath, port \
+    db.all("SELECT privatePath, port \
             FROM public \
-            WHERE publicPath=$publiPath',
+            WHERE publicPath=$publicPath",
            { $publicPath: publicPath },
            function(err, row) {
                if (err || row.length === 0)
@@ -367,16 +367,44 @@ exports.getOffer = function(API_KEY, callback) {
 };
 
 exports.addResource = function(data, callback) {
-    db.run('INSERT OR REPLACE INTO resources \
-            VALUES ($p, $r, $u, $c)',
-           {
-               $p: data.publicPath,
-               $r: data.record_type,
-               $u: data.unit,
-               $c: data.component_label
-           }, function (err) {
-               callback(err);
-           });
+
+    db.serialize(function() {
+
+        db.run('INSERT OR REPLACE INTO offers \
+                VALUES ($org, $name, $version)',
+               {
+                   $org: data.offering.organization,
+                   $name: data.offering.name,
+                   $version: data.offering.version
+               }, function (err) {
+                   if (err) callback(err);
+               });
+
+        db.run('INSERT OR REPLACE INTO resources \
+                VALUES ($p)',
+               {
+                   $p: data.publicPath
+               }, function (err) {
+                   if (err) callback(err);
+               });
+
+        db.run("INSERT OR REPLACE INTO offerResource \
+                VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)",
+               {
+                   $publicPath: data.publicPath,
+                   $org: data.offering.organization,
+                   $name: data.offering.name,
+                   $version: data.offering.version,
+                   $record_type: data.record_type,
+                   $unit: data.unit,
+                   $component_label: data.component_label
+               }, function (err) {
+                   if (err)
+                       callback(err);
+                   else
+                       callback(undefined);
+               });
+    });
 };
 
 // CLI: addService [path] [port]

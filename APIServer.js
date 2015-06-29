@@ -98,30 +98,30 @@ router.post('/resources', function(req, res) {
 
     var body = '';
 
-    if (req.get('Content-Type') === 'application/json') {
+    if (req.get('Content-Type').indexOf('application/json') > -1) {
         req.on('data', function(d) {
             body += d;
         });
 
         req.on('end', function() {
             body = JSON.parse(body);
-            console.log(body);
+
             var publicPath = url.parse(body.url).pathname;
-            console.log(publicPath);
+
             db.getService(publicPath, function(data) {
+
                 if (data === undefined || body.record_type === undefined ||
                     body.unit === undefined || body.component_label === undefined)
                     res.status(400).send();
                 if (resources[publicPath] === undefined) {
                     resources[publicPath] = {
                         privatePath: data.privatePath,
-                        port: data.port,
-                        record_type: body.record_type,
-                        unit: body.unit,
-                        component_label: body.component_label
+                        port: data.port
                     };
                 }
+
                 db.addResource({
+                    offering: body.offering,
                     publicPath: publicPath,
                     record_type: body.record_type,
                     unit: body.unit,

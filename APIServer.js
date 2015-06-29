@@ -2,12 +2,13 @@ var express = require('express');
 var crypto = require('crypto');
 var url = require('url');
 var proxy = require('./server.js');
-var resource = require('./config').resource;
+var config = require('./config.json');
 var db = require('./db.js');
 
 var app = express(),
     router = express.Router(),
     resources = {},
+    offerResource = {},
     map;
 
 app.set('port', 9001);
@@ -16,8 +17,18 @@ exports.run = function(d){
     map = d;
     db.loadResources(function(d) {
         resources = d;
-
-        app.listen(app.get('port'));
+        db.loadUnits(function(data) {
+            for (var i in data) {
+                var offerResourceBase = data[i].publicPath + data[i].organization + data[i].name + data[i].version;
+                var sha1 = crypto.createHash('sha1');
+                sha1.update(offerResourceBase);
+                var id = sha1.digest('hex');
+                offerResource[id] = data[i].unit;
+            }
+            // console.log(offerResource);
+            // console.log(resources);
+            app.listen(app.get('port'));
+        });
     });
 };
 
@@ -113,6 +124,7 @@ router.post('/resources', function(req, res) {
                 if (data === undefined || body.record_type === undefined ||
                     body.unit === undefined || body.component_label === undefined)
                     res.status(400).send();
+
                 if (resources[publicPath] === undefined) {
                     resources[publicPath] = {
                         privatePath: data.privatePath,

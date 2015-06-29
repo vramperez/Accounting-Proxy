@@ -196,7 +196,7 @@ exports.getResources = function(org, name, version, callback) {
 };
 
 exports.loadResources = function(callback) {
-    db.all('SELECT p.publicPath as publicPath, privatePath, port, record_type, unit, component_label \
+    db.all('SELECT p.publicPath as publicPath, privatePath, port \
             FROM public as p, resources as r \
             WHERE p.publicPath=r.publicPath',
            function(err, row) {

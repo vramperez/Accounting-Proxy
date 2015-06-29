@@ -100,12 +100,12 @@ exports.loadFromDB = function(setData) {
 };
 
 function loadResourcesAux(data, offer, callback) {
-    db.all('SELECT accounting.num as num, accounting.correlation_number as correlation_number, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, resources.unit as unit \
-            FROM accounting, public, resources \
-            WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=resources.publicPath',
+    db.all('SELECT accounting.num as num, accounting.correlation_number as correlation_number, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, offerResource.unit as unit \
+            FROM accounting, public, offerResource \
+            WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=offerResource.publicPath',
            { $api_key: offer.API_KEY },
            function(err, row) {
-               // console.log(offer.API_KEY ,row);
+               // console.log(offer.API_KEY, row, err);
                var id = offer.API_KEY;
 
                if (data[id] === undefined) {
@@ -135,26 +135,26 @@ function loadResourcesAux(data, offer, callback) {
 }
 
 // UNUSED
-exports.checkRequest = function(actorID, publicPath, callback) {
-    db.all('SELECT privatePath, port \
-            FROM public \
-            WHERE publicPath=$publicPath AND EXISTS ( \
-              SELECT privatePath, port \
-              FROM resources \
-              WHERE public.privatePath=privatePath AND public.port=port AND EXISTS ( \
-                SELECT provider, resourceName, resourceVersion, organization, offerName, offerVersion \
-                FROM offerResource \
-                WHERE resources.provider=provider AND resources.name=resourceName AND resources.version=resourceVersion AND EXISTS ( \
-                  SELECT organization, name, version \
-                  FROM offerAccount \
-                  WHERE actorID=$actorID AND offerResource.organization=organization AND offerResource.offerName=name AND offerResource.offerVersion=version)))',
-        {$actorID: actorID, $publicPath: publicPath}, function(error, row) {
-            if (row.length === 1)
-                callback(null, row[0].privatePath, row[0].port);
-            else
-                callback("User doesn't have access", null, null);
-    });
-};
+// exports.checkRequest = function(actorID, publicPath, callback) {
+//     db.all('SELECT privatePath, port \
+//             FROM public \
+//             WHERE publicPath=$publicPath AND EXISTS ( \
+//               SELECT privatePath, port \
+//               FROM resources \
+//               WHERE public.privatePath=privatePath AND public.port=port AND EXISTS ( \
+//                 SELECT provider, resourceName, resourceVersion, organization, offerName, offerVersion \
+//                 FROM offerResource \
+//                 WHERE resources.provider=provider AND resources.name=resourceName AND resources.version=resourceVersion AND EXISTS ( \
+//                   SELECT organization, name, version \
+//                   FROM offerAccount \
+//                   WHERE actorID=$actorID AND offerResource.organization=organization AND offerResource.offerName=name AND offerResource.offerVersion=version)))',
+//         {$actorID: actorID, $publicPath: publicPath}, function(error, row) {
+//             if (row.length === 1)
+//                 callback(null, row[0].privatePath, row[0].port);
+//             else
+//                 callback("User doesn't have access", null, null);
+//     });
+// };
 
 exports.count = function(actorID, API_KEY, publicPath, amount) {
     db.run('UPDATE accounting \

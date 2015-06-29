@@ -206,10 +206,7 @@ exports.loadResources = function(callback) {
                for (var i=0; i<l; i++) {
                    toReturn[row[i].publicPath] = {
                        privatePath: row[i].privatePath,
-                       port: row[i].port,
-                       record_type: row[i].record_type,
-                       unit: row[i].unit,
-                       component_label: row[i].component_label
+                       port: row[i].port
                    };
                }
                callback(toReturn);

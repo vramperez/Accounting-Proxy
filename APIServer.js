@@ -147,6 +147,14 @@ router.post('/resources', function(req, res) {
                     };
                 }
 
+                // Save unit for the offerResource
+                var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
+                var sha1 = crypto.createHash('sha1');
+                sha1.update(offerResourceBase);
+                var id = sha1.digest('hex');
+                if (offerResource[id] === undefined)
+                    offerResource[id] = body.unit;
+
                 db.addResource({
                     offering: body.offering,
                     publicPath: publicPath,

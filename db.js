@@ -23,9 +23,6 @@ exports.init = function() {
 
         db.run('CREATE TABLE IF NOT EXISTS resources ( \
                     publicPath      TEXT, \
-                    record_type     TEXT, \
-                    unit            TEXT, \
-                    component_label TEXT, \
                     PRIMARY KEY (publicPath), \
                     FOREIGN KEY (publicPath) REFERENCES public (publicPath) ON UPDATE CASCADE \
                )');
@@ -42,6 +39,9 @@ exports.init = function() {
                     organization    TEXT, \
                     name            TEXT, \
                     version         TEXT, \
+                    record_type     TEXT, \
+                    unit            TEXT, \
+                    component_label TEXT, \
                     PRIMARY KEY (publicPath, organization, name, version), \
                     FOREIGN KEY (publicPath) REFERENCES resources (publicPath), \
                     FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version) \

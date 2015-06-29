@@ -16,7 +16,7 @@ exports.run = function(d){
     map = d;
     db.loadResources(function(d) {
         resources = d;
-        console.log(resources);
+
         app.listen(app.get('port'));
     });
 };

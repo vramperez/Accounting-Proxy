@@ -8,7 +8,8 @@ var cron = require('node-schedule');
 
 var app = express();
 
-var map = {};
+var map = {},
+    acc_modules = {};
 
 app.set('port', 9000);
 
@@ -85,6 +86,17 @@ exports.newBuy = function(api_key, data) {
 exports.getMap = function(callback) {
     callback(map);
 };
+
+// Load accounting modules
+for (var u in config.units) {
+    try {
+        acc_modules[config.units[u]] = require("./acc_modules/" + config.units[u] + ".js").count;
+    } catch (e) {
+        console.log("[ERROR] No accounting module for unit '" + config.units[u] + "': missing file " +
+                    "'acc_module\\" +  config.units[u] + ".js'");
+        process.exit(1);
+    }
+}
 
 db.init();
 

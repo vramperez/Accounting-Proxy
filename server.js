@@ -61,8 +61,12 @@ app.use(function(request, response) {
                     for(var idx in headers)
                         response.setHeader(idx, headers[idx]);
                     response.send(resp);
-                    accounting.num++;
-                    db.count(userID, API_KEY, publicPath, 1);
+                    acc_modules[accounting.unit](request, response, function(err, amount) {
+                        if (!err) {
+                            accounting.num += amount;
+                            db.count(userID, API_KEY, publicPath, amount);
+                        }
+                    });
                 });
             } else {
                 console.log("[LOG] Invalid resurce");

@@ -147,6 +147,9 @@ router.post('/resources', function(req, res) {
                     };
                 }
 
+                if (config.units.indexOf(body.unit) === -1)
+                    res.status(400).send("Unsupported accounting unit.");
+
                 // Save unit for the offerResource
                 var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
                 var sha1 = crypto.createHash('sha1');
@@ -170,7 +173,8 @@ router.post('/resources', function(req, res) {
             });
 
         });
-    }
+    } else
+        res.status(415).send();
 });
 
 router.get('/users/keys', function(req, res) {

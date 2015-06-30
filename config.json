@@ -1,4 +1,6 @@
 {
     "accounting_host": "localhost",
-    "accounting_port": "9010"
+    "accounting_port": "9010",
+
+    "units": ["call"]
 }

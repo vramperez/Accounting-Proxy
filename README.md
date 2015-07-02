@@ -3,7 +3,7 @@
 #### Software Requirements:
 - NodeJS: [Homepage](http://nodejs.org/).
     + Express Framework: [Homepage](http://expressjs.com/).
-    + SQLite3 for NodeJS: [GitHub](https://github.com/felixge/node-mysql).
+    + SQLite3 for NodeJS: [GitHub](https://github.com/mapbox/node-sqlite3).
     + Node Schedule: [GitHub](https://github.com/node-schedule/node-schedule).
     + Commander: [GitHub](https://github.com/tj/commander.js).
 
@@ -32,6 +32,37 @@ To manage servicies, use 'cli' tool. See more executing: `./cli -h`
 ```
 node server
 ```
+
+# Proxy API
+
+Proxy's api is in port **9001** and root path **/api/..**.
+
+## POST ../users
+
+Use by the store to notify a offer purchase.
+
+## POST ../resources
+
+Use by the store to notify a new resource include in an offer.
+
+## GET ../users/keys
+
+Retrieve the user's API_KEYs in a json:
+
+```json
+[
+    {
+        " offering": {
+            "organization": "...",
+            "name": "...",
+            "version": "..."
+        },
+        "API_KEY": "..."
+    },
+    ...
+]
+```
+
 # Development
 
 ## Accounting module

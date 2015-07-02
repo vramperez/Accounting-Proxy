@@ -56,5 +56,66 @@ The function *count* receives three parameters:
   + *error* string, with a description of the error if there is one. Otherwise, `undefined`.
   + *ammount* number, with the amount to add to the accounting.
 
+## Database module
+
+Database modules should be implemented following the next code:
+
+```js
+// Initialize database
+exports.init = function() {...};
+
+// Load all avaliable data from database
+exports.loadFromDB = function(setData) {...};
+
+// Update database accounting
+exports.count = function(actorID, API_KEY, publicPath, amount) {...};
+
+// Reset accounting to 0
+exports.resetCount = function(actorID, API_KEY, publicPath) {...};
+
+// Retrieve resources from an offer
+exports.getResources = function(org, name, version, callback) {...};
+
+// Retrieve all resources avaiable in the proxy
+exports.loadResources = function(callback) {...};
+
+// Get service from a resource public path
+exports.getService = function(publicPath, callback) {...};
+
+// Get API_KEY
+exports.getApiKey = function(user, offer, callback) {...};
+
+// Get get price component from a resource in an offer
+exports.getAccountingInfo = function(publicPath, offer, callback) {...};
+
+// Add new buy information
+exports.addInfo = function(API_KEY, data, callback) {...};
+
+// Get buying reference
+exports.getReference = function(API_KEY, callback) {...};
+
+// Get offer information
+exports.getOffer = function(API_KEY, callback) {...};
+
+// Get all accounting units information
+exports.loadUnits = function(callback) {...};
+
+// Add new resource from resource notification
+exports.addResource = function(data, callback) {...};
+
+// CLI: addService [path] [port]
+// Add new service
+exports.newService = function(path, port, callback) {...};
+
+// CLI: deleteService [path] [port]
+// Delete a service
+exports.deleteService = function(path, port, callback) {...};
+
+// CLI: getInfo [user]
+// Get information about an user
+exports.getInfo = function(user, callback) {...};
+
+```
+
 ---
 Last updated: _02/07/2015_

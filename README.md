@@ -15,7 +15,7 @@ npm install
 
 ## Configuration
 To configure it, edit 'config.json':
-```
+```json
 {
     // Endpoint for accounting notifications.
     "accounting_host": "localhost",
@@ -32,6 +32,29 @@ To manage servicies, use 'cli' tool. See more executing: `./cli -h`
 ```
 node server
 ```
+# Development
+
+## Accounting module
+
+Accounting modules should be implemented following the next code:
+
+```js
+/** Accounting module for unit: XXXXXX */
+
+exports.count = function(request, response, callback) {
+    // Code to do the accounting goes here
+    // .....
+
+    callback(error, amount);
+}
+```
+
+The function *count* receives three parameters:
+- *request* object.
+- *response* object.
+- *callback* function, which is use to retrieve the amount to count or the error. The function has 2 parameters:
+  + *error* string, with a description of the error if there is one. Otherwise, `undefined`.
+  + *ammount* number, with the amount to add to the accounting.
 
 ---
 Last updated: _02/07/2015_

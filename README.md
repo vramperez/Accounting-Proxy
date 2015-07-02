@@ -1,49 +1,37 @@
 # Accounting proxy
 ## Installation
 #### Software Requirements:
-- NodeJS with npm: [Homepage](http://nodejs.org/).
+- NodeJS: [Homepage](http://nodejs.org/).
     + Express Framework: [Homepage](http://expressjs.com/).
-    + MySQL for NodeJS: [GitHub](https://github.com/felixge/node-mysql).
+    + SQLite3 for NodeJS: [GitHub](https://github.com/felixge/node-mysql).
     + Node Schedule: [GitHub](https://github.com/node-schedule/node-schedule).
-- MySQL server.
+    + Commander: [GitHub](https://github.com/tj/commander.js).
 
-#### Configuration:
+
 To install NodeJS dependencies, execute in the accounting-proxy folder:
 ```
 npm install
 ```
 
-To configure it, open 'config' and complete the fields with your configuration:
+## Configuration
+To configure it, edit 'config.json':
 ```
-config.app_host = 'google.com';         // Hostname to forward request
-config.app_port = '80';                 // Port where is running
+{
+    // Endpoint for accounting notifications.
+    "accounting_host": "localhost",
+    "accounting_port": "9010",
 
-config.accounting_host = 'test.com';    // Accounting information destination host
-config.accounting_port = '80';          // Accounting information destination port
-
-config.sql = {
-    user: 'user1',                      // SQL Database user
-    password: 'psswd',                  // SQL Database password
-    host: 'localhost',                  // SQL Database server hostname
-    port: '1234'                        // SQL Database server pot
-};
-
-config.resource = {
-    name: 'resource',                   // Resource name
-    version: '1.0',                     // Resource version
-    content_type: '',                   // Resource content-type
-    url: 'http://example.org'           // Resource URL
-};
-
-config.record_type = 'type1';
-config.unit = 'unit';
-config.component_label = 'component';
+    // Supported accounting units.
+    "units": ["call"]
+}
 ```
 
-#### Running proxy server:
+To manage servicies, use 'cli' tool. See more executing: `./cli -h`
+
+## Running
 ```
 node server
 ```
 
 ---
-Last updated: _05/03/2015_
+Last updated: _02/07/2015_

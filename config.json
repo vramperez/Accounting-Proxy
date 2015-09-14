@@ -2,5 +2,5 @@
     "accounting_host": "localhost",
     "accounting_port": "9010",
 
-    "units": ["call"]
+    "units": ["call", "megabyte"]
 }

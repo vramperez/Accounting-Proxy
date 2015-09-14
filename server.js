@@ -61,7 +61,7 @@ app.use(function(request, response) {
                     for(var idx in headers)
                         response.setHeader(idx, headers[idx]);
                     response.send(resp);
-                    acc_modules[accounting.unit](request, response, function(err, amount) {
+                    acc_modules[accounting.unit](request, resp, headers, function(err, amount) {
                         if (!err) {
                             accounting.num += amount;
                             db.count(userID, API_KEY, publicPath, amount);
@@ -97,7 +97,7 @@ for (var u in config.units) {
         acc_modules[config.units[u]] = require("./acc_modules/" + config.units[u] + ".js").count;
     } catch (e) {
         console.log("[ERROR] No accounting module for unit '" + config.units[u] + "': missing file " +
-                    "'acc_module\\" +  config.units[u] + ".js'");
+                    "'acc_modules\\" +  config.units[u] + ".js'");
         process.exit(1);
     }
 }

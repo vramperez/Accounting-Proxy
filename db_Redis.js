@@ -1,18 +1,18 @@
 var redis = require('redis');
-var client = redis.createClient();
+var db = redis.createClient();
 
-client.on('connect', function(){
+db.on('connect', function(){
 	console.log('connected');
 });
 
-client.on('error', function(err){
+db.on('error', function(err){
 	console.log("Error" + err);
 });
 
 
 exports.newService = function(path, port, callback) {
 
-	client.sadd(path, port, function(err, reply) {
+	db.sadd(path, port, function(err, reply) {
 		if(err)
 			callback(err);
 	});
@@ -20,22 +20,43 @@ exports.newService = function(path, port, callback) {
 
 exports.getService = function(publicPath, callback) {
 
-	client.smembers(publicPath, function(err, obj) {
+	db.hgetall(publicPath, function(err, obj) {
 		if(err)
 			callback(err);
 		else
 			callback(obj);
+	})
+};
+
+exports.mapService = function(publicPath, privatePath, port, callback){
+
+	db.smembers(privatePath, function(err, reply) {
+		if(err)
+			callback(err);
+		else {
+			if (reply[reply.indexOf(port)] === undefined)
+				callback(undefined)
+			else
+				db.hmset(publicPath, {
+				'privatePath': privatePath,
+				'port': port,
+			}, function(err) {
+				if(err)
+					callback(err);
+			});
+		}
 	});
+
 };
 
 
-exports.addResource = function(data, callback) {
+/*exports.addResource = function(data, callback) {
 
-	client.sadd('resources', data.publicPath, function(err, reply){
+	db.sadd('resources', data.publicPath, function(err, reply){
 		console.log(reply);
 	});
 
-	client.hmset(data.publicPath, { //Similar to offerResource
+	db.hmset(data.publicPath, { //Similar to offerResource
 		'organization': data.offering.organization,
 		'name': data.offering.name,
 		'version': data.offering.version,
@@ -45,4 +66,4 @@ exports.addResource = function(data, callback) {
 	}, function(err){
 		console.log(err);
 	});
-};
+};*/

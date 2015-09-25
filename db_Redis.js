@@ -14,14 +14,22 @@ exports.loadFromDB = function(setData) {
 };
 
 
+// CLI: newService [path] [port]
 exports.newService = function(path, port, callback) {
 
 	db.sadd(path, port, function(err, reply) {
 		if(err)
 			callback(err);
+		callback();
 	});
 };
 
+// CLI: deleteService [path] [port]
+exports.deleteService = function(path, port, callback) {
+
+};
+
+// CLI: getService [publicPath]
 exports.getService = function(publicPath, callback) {
 
 	db.hgetall(publicPath, function(err, obj) {
@@ -32,6 +40,7 @@ exports.getService = function(publicPath, callback) {
 	})
 };
 
+// CLI: mapService [publicPath] [privatePath] [port]
 exports.mapService = function(publicPath, privatePath, port, callback){
 
 	db.smembers(privatePath, function(err, reply) {
@@ -71,6 +80,8 @@ exports.addResource = function(data, callback) {
 				}, function(err){
 					if(err)
 						callback(err);
+					else
+						callback(undefined);
 				});
 		}
 	});
@@ -122,12 +133,12 @@ exports.loadResources = function(callback) {
 								privatePath: obj['privatePath'],
 								port: obj['port']
 							};
-							callback(toReturn);
 						}
 					});
 				}
 			});
 		});
+		callback(toReturn);
 	});
 };
 
@@ -136,17 +147,88 @@ exports.addInfo = function(API_KEY, data, callback) {
 
 	db.hmset(API_KEY, {
 		'organization': data.organization,
-		'name': name: data.name,
-		'version': version: data.version,
-		'actorID': actorID: data.actorID,
+		'name': data.name,
+		'version': data.version,
+		'actorID': data.actorID,
 		'API_KEY': API_KEY,
-		'ref': ref: data.reference
+		'ref': data.reference
 	}, function(err) {
-		if(err)
+		if(err) {
 			callback(err);
-		else{
-			//Añadir a accoun ting
+		} else {
+			db.sadd([data.actorID, API_KEY], function(err){
+				if(err) {
+					callback(err);
+				} else {
+					var acc;
+					for (var p in data.accounting) {
+						acc = data.accounting[p];
+						db.hmset(data.actorID + API_KEY + p, {
+							'actorID': data.actorID,
+							'API_KEY': API_KEY,
+							'num': acc.num,
+							'publicPath': p,
+							'correlation_number': acc.correlation_number
+						}, function(err){
+							if(err)
+								callback(err);
+							else
+								callback();
+						});
+					};
+				}
+			});
 		}
 	});
+};
 
+
+exports.getApiKey = function(user, offer, callback) {
+
+	db.smembers(user, function(err, apiKey) {
+		apiKey.forEach(function(entry) {
+			if(err)
+				callback(err);
+			else {
+				db.hgetall(entry, function(err, offerAcc) {
+					if (offerAcc['organization'] === offer['organization'] &&
+						offerAcc['name'] === offer['name'] &&
+						offerAcc['version'] === offer['version']) {
+						callback(offerAcc['API_KEY']);
+					} else {
+						callback();
+					}
+				});
+			}
+		});
+	});
+
+};
+
+
+// CLI: getInfo [user]
+exports.getInfo = function(user, callback) {
+	
+	db.smembers(user, function(err, acc) {
+		if(err){
+			callback(err, undefined)
+		} else {
+			acc.forEach(function(entry) {
+				var toReturn = {};
+				db.hgetall(entry, function(err, info) {
+					if(err) {
+						callback(err, undefined);
+					} else {
+						toReturn[entry] = {
+							API_KEY: entry,
+							organization: info['organization'],
+							name: info['name'],
+							version: info['version'],
+						}
+					callback(null, toReturn);
+					}
+				});
+			});
+		}
+	});
 };

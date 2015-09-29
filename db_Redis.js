@@ -18,7 +18,7 @@ exports.loadFromDB = function(setData) {
 
 	db.smembers('resources', function(err, resources) {
 		if(err || resources.length === 0)
-			setData(err, null);
+			setData(err, data);
 		else
 			db.smembers('API_KEYS', function(err, api_keys) {
 				if(api_keys.length !== 0){

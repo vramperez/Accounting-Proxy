@@ -10,7 +10,7 @@ db.on('error', function(err){
 });
 
 exports.init = function() {
-
+	//Not necessary
 };
 
 exports.loadFromDB = function(setData) { 
@@ -294,7 +294,6 @@ exports.getApiKey = function(user, offer, callback) {
 			callback();
 		}
 	});
-
 };
 
 
@@ -397,5 +396,19 @@ exports.getResources = function(org, name, version, callback) {
 					data[data.length-1] = p;
 			});
 		});
+	});
+};
+
+exports.addCBSubscription = function(actorID, API_KEY, publicPath, subs_id, reference_url, callback) {
+
+	db.hmset(subs_id, {
+		'actorID': actorID,
+		'API_KEY': API_KEY,
+		'publicPath': publicPath,
+		'subscriptionID': subscriptionID,
+		'reference_url': reference_url
+	}, function(err) {
+		if(err)
+			callback(err);
 	});
 };

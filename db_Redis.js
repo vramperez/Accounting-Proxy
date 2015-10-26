@@ -399,16 +399,32 @@ exports.getResources = function(org, name, version, callback) {
 	});
 };
 
-exports.addCBSubscription = function(actorID, API_KEY, publicPath, subs_id, reference_url, callback) {
+exports.addCBSubscription = function(actorID, API_KEY, publicPath, subscriptionID, reference_url, unit, callback) {
 
-	db.hmset(subs_id, {
+	db.hmset(subscriptionID, {
 		'actorID': actorID,
 		'API_KEY': API_KEY,
 		'publicPath': publicPath,
 		'subscriptionID': subscriptionID,
-		'reference_url': reference_url
+		'reference_url': reference_url,
+		'unit': unit
 	}, function(err) {
 		if(err)
 			callback(err);
 	});
 };
+
+exports.getCBSubscription = function(subscriptionID, callback) {
+
+	db.hgetall(subscriptionID, function(err, res) {
+		callback(res);
+	});
+};
+
+exports.deleteCBSubscription = function(subscriptionID, callback) {
+
+	db.del(subscriptionID, function(err) {
+		if(err)
+			callback(err);
+	});
+}

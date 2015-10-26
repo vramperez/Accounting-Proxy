@@ -5,7 +5,7 @@ var db = require('./db_Redis.js');
 var api = require('./APIServer.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
-var subsUrls = require('./subsUrls');
+var contextBroker = require('./orion_context_broker/cb_handler')
 
 var app = express();
 
@@ -13,6 +13,27 @@ var map = {},
     acc_modules = {};
 
 app.set('port', config.accounting_proxy.port);
+
+
+if(config.resources.contextBroker){
+
+    app.get('/subscriptions', function(req, res) {
+        var subscriptionID = JSON.parse(req).subscriptionID;
+        db.getCBSubscription(subscriptionID, function(subscription) {
+            var API_KEY = subscription.API_KEY;
+            var publicPath = subscription.publicPath;
+            var info = map[API_KEY];
+            var accounting = info.accounting[publicPath];
+            acc_modules[subscription.unit](req.body, function(err, amount) {
+                if (!err) {
+                    accounting.num += amount; //Refactorizar
+                    db.count(userID, API_KEY, publicPath, amount);
+                }
+            });
+        });
+    });
+
+}
 
 app.use(function(request, response, next) {
     var data = '';
@@ -47,7 +68,6 @@ app.use(function(request, response) {
 
         if (info.actorID === userID) {
             var accounting = info.accounting[publicPath];
-            console.log(accounting);
 
             if (accounting !== undefined) {
                 var options = {
@@ -57,19 +77,18 @@ app.use(function(request, response) {
                     method: request.method,
                     headers: proxy.getClientIp(request, request.headers)
                 };
-                  
 
-                if ( /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path) ) // ContextBroker request
-                    CBRequestHandler(request, accounting, options);
+                if(config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path) ) // ContextBroker (un)subscription request
+                    contextBroker.CBRequestHandler(request, response, accounting, options); 
+                    
 
                 else {
-
                     proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
                         response.statusCode = status;
                         for(var idx in headers)
                             response.setHeader(idx, headers[idx]);
                         response.send(resp);
-                        acc_modules[accounting.unit](resp, headers, function(err, amount) {
+                        acc_modules[accounting.unit](resp, function(err, amount) {
                             if (!err) {
                                 accounting.num += amount;
                                 db.count(userID, API_KEY, publicPath, amount);
@@ -91,46 +110,6 @@ app.use(function(request, response) {
     }
 });
 
-function CBRequestHandler (request, response, accounting, options) {
-
-    for (var i = 0; i < subsUrls.length; i++) {
-        if (request.method === subsUrls[i][0] &&
-            accounting.privatePath.toLowerCase().match(subsUrls[i][1])){
-                switch (subsUrls[i][2]) {
-                    case 'subscribe':
-                        var req_body = JSON.parse(request.body);
-                        var reference_url = req_body.reference;
-                        req_body.reference = 'http://localhost:9000/subscriptions';
-                        proxy.sendData('http', options, req_body, response, function(status, resp, headers) {
-                            var subscriptionID = resp.subscribeResponse.subscriptionID;
-                            response.statusCode = status;
-                            for (var i in headers)
-                                response.setHeader(i, headers[i]);
-                            db.addCBSubscription(request.get('X-Actor-ID'), request.get('X-API-KEY'), request.path, subscriptionID, reference_url, function(err){
-                                if(err)
-                                    console.log('[LOG] An error ocurred while processing the subscription');
-                            });
-                            response.send(resp);
-                        });
-                        break;
-
-                    case 'unsubscribe':
-                        var subscriptionID = '';
-                        if (request.method === 'POST') {
-                            subscriptiionID = JSON.parse(request.body).subscriptionID;
-                        } else if (request.method === 'DELETE') {
-                            var pattern = /\/(\w+)$/;
-                            var match = pattern.exec(request.path);
-                            subscriptionID = match[0];
-                        }
-                        db.deleteCBSubscription(subscriptionID, function(err){
-                            if(err)
-                                console.log('[LOG] An error occurred while cancelling the subscription');
-                        });
-                }
-        }      
-    }    
-};
 
 exports.newBuy = function(api_key, data) {
     map[api_key] = data;

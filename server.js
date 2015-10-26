@@ -1,17 +1,18 @@
 var express = require('express');
-var config = require('./config.json');
+var config = require('./config');
 var proxy = require('./HTTP_Client/HTTPClient.js');
-var db = require('./db.js');
+var db = require('./db_Redis.js');
 var api = require('./APIServer.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
+var subsUrls = require('./subsUrls');
 
 var app = express();
 
 var map = {},
     acc_modules = {};
 
-app.set('port', 9000);
+app.set('port', config.accounting_proxy.port);
 
 app.use(function(request, response, next) {
     var data = '';
@@ -46,34 +47,42 @@ app.use(function(request, response) {
 
         if (info.actorID === userID) {
             var accounting = info.accounting[publicPath];
+            console.log(accounting);
 
             if (accounting !== undefined) {
                 var options = {
-                    host: 'localhost',
+                    host: config.resources.host,
                     port: accounting.port,
                     path: accounting.privatePath,
                     method: request.method,
                     headers: proxy.getClientIp(request, request.headers)
                 };
+                  
 
-                proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
-                    response.statusCode = status;
-                    for(var idx in headers)
-                        response.setHeader(idx, headers[idx]);
-                    response.send(resp);
-                    acc_modules[accounting.unit](request, resp, headers, function(err, amount) {
-                        if (!err) {
-                            accounting.num += amount;
-                            db.count(userID, API_KEY, publicPath, amount);
-                        }
+                if ( /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path) ) // ContextBroker request
+                    CBRequestHandler(request, accounting, options);
+
+                else {
+
+                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+                        response.statusCode = status;
+                        for(var idx in headers)
+                            response.setHeader(idx, headers[idx]);
+                        response.send(resp);
+                        acc_modules[accounting.unit](resp, headers, function(err, amount) {
+                            if (!err) {
+                                accounting.num += amount;
+                                db.count(userID, API_KEY, publicPath, amount);
+                            }
+                        });
                     });
-                });
+                }
             } else {
                 console.log("[LOG] Invalid resurce");
                 response.status(404).end();
             }
         } else {
-            console.log("[LOG] user has not access");
+            console.log("[LOG] User has not access");
             response.status(403).end();
         }
     } else {
@@ -81,6 +90,47 @@ app.use(function(request, response) {
         response.status(403).end();
     }
 });
+
+function CBRequestHandler (request, response, accounting, options) {
+
+    for (var i = 0; i < subsUrls.length; i++) {
+        if (request.method === subsUrls[i][0] &&
+            accounting.privatePath.toLowerCase().match(subsUrls[i][1])){
+                switch (subsUrls[i][2]) {
+                    case 'subscribe':
+                        var req_body = JSON.parse(request.body);
+                        var reference_url = req_body.reference;
+                        req_body.reference = 'http://localhost:9000/subscriptions';
+                        proxy.sendData('http', options, req_body, response, function(status, resp, headers) {
+                            var subscriptionID = resp.subscribeResponse.subscriptionID;
+                            response.statusCode = status;
+                            for (var i in headers)
+                                response.setHeader(i, headers[i]);
+                            db.addCBSubscription(request.get('X-Actor-ID'), request.get('X-API-KEY'), request.path, subscriptionID, reference_url, function(err){
+                                if(err)
+                                    console.log('[LOG] An error ocurred while processing the subscription');
+                            });
+                            response.send(resp);
+                        });
+                        break;
+
+                    case 'unsubscribe':
+                        var subscriptionID = '';
+                        if (request.method === 'POST') {
+                            subscriptiionID = JSON.parse(request.body).subscriptionID;
+                        } else if (request.method === 'DELETE') {
+                            var pattern = /\/(\w+)$/;
+                            var match = pattern.exec(request.path);
+                            subscriptionID = match[0];
+                        }
+                        db.deleteCBSubscription(subscriptionID, function(err){
+                            if(err)
+                                console.log('[LOG] An error occurred while cancelling the subscription');
+                        });
+                }
+        }      
+    }    
+};
 
 exports.newBuy = function(api_key, data) {
     map[api_key] = data;
@@ -92,12 +142,12 @@ exports.getMap = function(callback) {
 };
 
 // Load accounting modules
-for (var u in config.units) {
+for (var u in config.modules.accounting) {
     try {
-        acc_modules[config.units[u]] = require("./acc_modules/" + config.units[u] + ".js").count;
+        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u] + ".js").count;
     } catch (e) {
-        console.log("[ERROR] No accounting module for unit '" + config.units[u] + "': missing file " +
-                    "'acc_modules\\" +  config.units[u] + ".js'");
+        console.log("[ERROR] No accounting module for unit '" + config.modules.accounting[u] + "': missing file " +
+                    "'acc_modules\\" +  config.modules.accounting[u] + ".js'");
         process.exit(1);
     }
 }
@@ -138,6 +188,7 @@ db.loadFromDB(function(err, data) {
         api.run(map);
     }
 });
+
 
 /* Create daemon to update WStore every day
  * Cron format:

@@ -1,7 +1,7 @@
 var http = require('http');
-var db = require('./db.js');
+var db = require('./db_Redis.js');
 var info = require('./HTTP_Client/info.json');
-var config = require('./config.json');
+var config = require('./config');
 
 exports.notify = function(data, callback) {
 
@@ -35,9 +35,9 @@ exports.notify = function(data, callback) {
             var body = JSON.stringify(info);
 
             var options = {
-                host: config.accounting_host,
-                port: config.accounting_port,
-                path: '/api/contracting/' + data.reference + '/accounting',
+                host: config.WStore.accounting_host,
+                port: config.WStore.accounting_port,
+                path: config.WStore.accounting_path + data.reference + '/accounting',
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

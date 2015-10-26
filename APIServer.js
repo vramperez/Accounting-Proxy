@@ -2,8 +2,8 @@ var express = require('express');
 var crypto = require('crypto');
 var url = require('url');
 var proxy = require('./server.js');
-var config = require('./config.json');
-var db = require('./db.js');
+var config = require('./config');
+var db = require('./db_Redis.js');
 
 var app = express(),
     router = express.Router(),
@@ -11,7 +11,7 @@ var app = express(),
     offerResource = {},
     map;
 
-app.set('port', 9001);
+app.set('port', config.accounting_proxy.store_port);
 
 exports.run = function(d){
     map = d;
@@ -25,8 +25,6 @@ exports.run = function(d){
                 var id = sha1.digest('hex');
                 offerResource[id] = data[i].unit;
             }
-            // console.log(offerResource);
-            // console.log(resources);
             app.listen(app.get('port'));
         });
     });
@@ -34,7 +32,7 @@ exports.run = function(d){
 
 router.post('/users', function(req, res) {
 
-    console.log("[LOG] WStore notification recieved.");
+    console.log("[LOG] WStore notifsication recieved.");
     req.setEncoding('utf-8');
 
     var body = '';
@@ -147,7 +145,7 @@ router.post('/resources', function(req, res) {
                     };
                 }
 
-                if (config.units.indexOf(body.unit) === -1)
+                if (config.modules.accounting.indexOf(body.unit) === -1)
                     res.status(400).send("Unsupported accounting unit.");
 
                 // Save unit for the offerResource

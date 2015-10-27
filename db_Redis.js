@@ -399,13 +399,11 @@ exports.getResources = function(org, name, version, callback) {
 	});
 };
 
-exports.addCBSubscription = function(actorID, API_KEY, publicPath, subscriptionID, reference_url, unit, callback) {
+exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, reference_url, unit, callback) {
 
 	db.hmset(subscriptionID, {
-		'actorID': actorID,
 		'API_KEY': API_KEY,
-		'publicPath': publicPath,
-		'subscriptionID': subscriptionID,
+		'publicPath': publicPath
 		'reference_url': reference_url,
 		'unit': unit
 	}, function(err) {

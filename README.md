@@ -72,7 +72,7 @@ Accounting modules should be implemented following the next code:
 ```js
 /** Accounting module for unit: XXXXXX */
 
-exports.count = function(request, response, headers, callback) {
+exports.count = function(response, callback) {
     // Code to do the accounting goes here
     // .....
 
@@ -81,9 +81,7 @@ exports.count = function(request, response, headers, callback) {
 ```
 
 The function *count* receives three parameters:
-- *request* object.
 - *response* object.
-- *headers*  reponse headers.
 - *callback* function, which is use to retrieve the amount to count or the error. The function has 2 parameters:
   + *error* string, with a description of the error if there is one. Otherwise, `undefined`.
   + *ammount* number, with the amount to add to the accounting.

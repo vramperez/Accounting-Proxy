@@ -4,10 +4,6 @@ var config = {};
 //--------------------------------------------------
 // Configures the address and ports for the accounting proxy
 config.accounting_proxy = {
-        /**
-         * Accounting proxy host.
-         */
-        host: 'localhost',
 
         /**
          * Port where the accounting proxy server is listening.
@@ -41,12 +37,17 @@ config.resources = {
     */
     contextBroker: true,
 
+    /* *
+    * Port where the accounting proxy server is listening to subscription notifications
+    */
+    notification_port: 9002,
+
     /** 
     * Host that is being accounted
     */
     host: '130.206.114.99'
 
-}
+};
 
 
 // WStore sonfiguration
@@ -69,6 +70,6 @@ config.WStore = {
     */
     accounting_port: 9010
 
-}
+};
 
 module.exports = config;

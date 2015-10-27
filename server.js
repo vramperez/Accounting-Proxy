@@ -5,7 +5,7 @@ var db = require('./db_Redis.js');
 var api = require('./APIServer.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
-var contextBroker = require('./orion_context_broker/cb_handler')
+var contextBroker = require('./orion_context_broker/cb_handler');
 
 var app = express();
 
@@ -15,27 +15,7 @@ var map = {},
 app.set('port', config.accounting_proxy.port);
 
 
-if(config.resources.contextBroker){
-
-    app.get('/subscriptions', function(req, res) {
-        var subscriptionID = JSON.parse(req).subscriptionID;
-        db.getCBSubscription(subscriptionID, function(subscription) {
-            var API_KEY = subscription.API_KEY;
-            var publicPath = subscription.publicPath;
-            var info = map[API_KEY];
-            var accounting = info.accounting[publicPath];
-            acc_modules[subscription.unit](req.body, function(err, amount) {
-                if (!err) {
-                    accounting.num += amount; //Refactorizar
-                    db.count(userID, API_KEY, publicPath, amount);
-                }
-            });
-        });
-    });
-
-}
-
-app.use(function(request, response, next) {
+app.use( function(request, response, next) {
     var data = '';
     // Receive data
     request.on('data', function(d) {
@@ -88,12 +68,10 @@ app.use(function(request, response) {
                         for(var idx in headers)
                             response.setHeader(idx, headers[idx]);
                         response.send(resp);
-                        acc_modules[accounting.unit](resp, function(err, amount) {
-                            if (!err) {
-                                accounting.num += amount;
-                                db.count(userID, API_KEY, publicPath, amount);
-                            }
-                        });
+                        count(API_KEY, publicPath, accounting.unit, resp, function(err){
+                            if(err)
+                                console.log('[LOG] An error ocurred while making the accounting');
+                        })
                     });
                 }
             } else {
@@ -109,6 +87,21 @@ app.use(function(request, response) {
         response.status(403).end();
     }
 });
+
+exports.count = function(API_KEY, publicPath, unit, response, callback) {
+
+    var info = map[API_KEY];
+    var accounting = info.accounting[publicPath];
+    acc_modules[unit](response, function(err, amount) {
+        if(err)
+            callback(err);
+        else{
+            accounting.num += amount; 
+            db.count(info.actorID, API_KEY, publicPath, amount);
+        }
+    });
+
+};
 
 
 exports.newBuy = function(api_key, data) {
@@ -165,6 +158,9 @@ db.loadFromDB(function(err, data) {
         app.listen(app.get('port'));
         // Start API Server
         api.run(map);
+        // Start ContextBroker Server for subscription notifications if it is enabled in the config
+        if(config.resources.contextBroker)
+            contextBroker.run();
     }
 });
 

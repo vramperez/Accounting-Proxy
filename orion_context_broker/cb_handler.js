@@ -10,18 +10,18 @@ var app = express();
 
 app.set('port', config.resources.notification_port);
 
-app.post('/subscriptions', function(req, response) {
+app.post('/subscriptions', function(req, response) { // Probar la contestacion
 
 	var body = '';
 	req.on('data', function(d) {
 		body += d;
 	}).on('end', function(){
 
-	var json_body = JSON.parse(body).subscriptionId;
-	var subscriptionId = json_body.subscriptionId
+	var req_body = JSON.parse(body);
+	var subscriptionId = req_body.subscriptionId
     	db.getCBSubscription(subscriptionId, function(subscription) {
     		if(subscription === null)
-    			console.log('[LOG] An error ocurred while making the accounting'); // Handle that error ??
+    			console.log('[LOG] An error ocurred while making the accounting');
     		else{
     			acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
     				if(err)
@@ -29,17 +29,24 @@ app.post('/subscriptions', function(req, response) {
     			});
 
     			var options = {
-    				url: subscription.reference_url,
+    				host: subscription.ref_host,
+    				port: subscription.ref_port,
+    				path: subscription.ref_path,
     				method: 'POST',
     				headers: {
     					'content-type': 'application/json'
     				}
     			}
     			
-    			http.request( options, function(res) {
-    				if(res.statusCode !== 200)
-    					console.log('[LOG] An error occurred while notifying subscription: ' + res.statusCode + ' ' + res.statusMessage);
-    			})
+    			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
+    				response.statusCode = status;
+    				for (var i in headers)
+    					response.setHeader(i, headers[i]);
+    				response.send(resp);
+    				if( status !== 200)
+    					console.log('[LOG] An error ocurred while notifying the subscription to: http://' + 
+    						subscription.ref_host + ':' + subscription.ref_port + subscription.ref_path + '. Status: ' + status + ' ' + resp.statusMessage);
+    			});
     		}
     	});
 	});
@@ -79,7 +86,8 @@ exports.CBRequestHandler = function(request, response, accounting) {
                                 response.setHeader(i, headers[i]);
                             response.send(resp);
                             if(status === 200){
-								db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, reference_url, accounting.unit, function(err){
+								db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).host, 
+									url.parse(reference_url).port, url.parse(reference_url).pathname, accounting.unit, function(err){
 	                                if(err)
 	                                    console.log('[LOG] An error ocurred while processing the subscription');
                             	});

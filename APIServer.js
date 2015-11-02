@@ -25,14 +25,14 @@ exports.run = function(d){
                 var id = sha1.digest('hex');
                 offerResource[id] = data[i].unit;
             }
-            app.listen(app.get('port'));
         });
     });
+    app.listen(app.get('port'));
 };
 
 router.post('/users', function(req, res) {
 
-    console.log("[LOG] WStore notifsication recieved.");
+    console.log("[LOG] WStore notification recieved.");
     req.setEncoding('utf-8');
 
     var body = '';
@@ -133,6 +133,7 @@ router.post('/resources', function(req, res) {
             var publicPath = url.parse(body.url).pathname;
 
             db.getService(publicPath, function(data) {
+                console.log(data)
 
                 if (data === undefined || body.record_type === undefined ||
                     body.unit === undefined || body.component_label === undefined)
@@ -140,6 +141,7 @@ router.post('/resources', function(req, res) {
 
                 if (resources[publicPath] === undefined) {
                     resources[publicPath] = {
+                    
                         privatePath: data.privatePath,
                         port: data.port
                     };

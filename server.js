@@ -58,11 +58,25 @@ app.use(function(request, response) {
                     headers: proxy.getClientIp(request, request.headers)
                 };
 
-                if(config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path) ) // ContextBroker (un)subscription request
-                    contextBroker.CBRequestHandler(request, response, accounting, options); 
+                if(config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)) // Orion ContextBroker request
+                    contextBroker.CBSubscriptionPath(accounting.privatePath, request, function(operation) {
+                        if( operation === 'subscribe' || operation === 'unsubscribe') // (un)subscription request
+                            contextBroker.CBRequestHandler(request, response, accounting, operation);
+                        else
+                            proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Orion ConextBroker request ( no (un)subscription)
+                                response.statusCode = status;
+                                for(var idx in headers)
+                                    response.setHeader(idx, headers[idx]);
+                                response.send(resp);
+                                count(API_KEY, publicPath, accounting.unit, resp, function(err){
+                                    if(err)
+                                        console.log('[LOG] An error ocurred while making the accounting');
+                                });
+                            });
+                        });
                     
 
-                else {
+                else{
                     proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
                         response.statusCode = status;
                         for(var idx in headers)
@@ -71,7 +85,7 @@ app.use(function(request, response) {
                         count(API_KEY, publicPath, accounting.unit, resp, function(err){
                             if(err)
                                 console.log('[LOG] An error ocurred while making the accounting');
-                        })
+                        });
                     });
                 }
             } else {
@@ -88,14 +102,12 @@ app.use(function(request, response) {
     }
 });
 
-exports.count = function(API_KEY, publicPath, unit, response, callback) {
+count = function(API_KEY, publicPath, unit, response, callback) {
 
     var info = map[API_KEY];
     var accounting = info.accounting[publicPath];
     acc_modules[unit](response, function(err, amount) {
-        if(err)
-            callback(err);
-        else{
+        if(!err){
             accounting.num += amount; 
             db.count(info.actorID, API_KEY, publicPath, amount);
         }
@@ -192,3 +204,6 @@ var job = cron.scheduleJob('00 00 * * *', function() {
                     if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
                 });
 });
+
+
+exports.count = count;

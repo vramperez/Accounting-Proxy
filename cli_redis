@@ -9,13 +9,13 @@ cli
 
 // Add new service command
 cli
-    .command('addService [path] [port]')
+    .command('addService [publicPath] [privatePath] [port]')
     .description('Add new service to proxy database.')
-    .action(function(path, port) {
-        if (/\/((\w+)\/?)*$/.test(path) &&
-            /\/((\w+)\/?)*$/.test(path) &&
+    .action(function(publicPath, privatePath, port) {
+        if (/\/((\w+)\/?)*$/.test(publicPath) &&
+            /\/((\w+)\/?)*$/.test(privatePath) &&
             /^\d*$/.test(port))
-            db.newService(path, port, function(err) {
+            db.newService(publicPath, privatePath, port, function(err) {
                 if (err)
                     console.log(err);
             });
@@ -23,23 +23,6 @@ cli
             console.log("[ERROR] Invalid parameters.");
         }
     });
-
-// Map service command
-cli
-    .command('mapService [publicPath] [privatePath] [port]')
-    .description('Map public path with private path and port')
-    .action(function(publicPath, privatePath, port) {
-        if  (/\/((\w+)\/?)*$/.test(privatePath) && 
-            /^\d*$/.test(port))
-            db.mapService(publicPath, privatePath, port, function(err){
-                if(err)
-                    console.log(err);
-            });
-        else {
-            console.log("[ERROR] Invalid parameters.");
-        }
-    });
-
 
 // Get service information
 cli

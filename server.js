@@ -131,15 +131,16 @@ db.loadFromDB(function(err, data) {
         console.log('Something went wrong');
     else {
         map = data;
+
         if (Object.getOwnPropertyNames(data).length === 0)
-            console.log("[LOG] No data avaliable");
+            console.log('[LOG] No data avaliable');
         else {
 
             console.log(JSON.stringify(map, null, 2));
 
             for (var apiKey in map)
                 for (var publicPath in map[apiKey].accounting)
-                    if (map[apiKey].accounting[publicPath].num !== 0)
+                    if (map[apiKey].accounting[publicPath].num != 0){
                         notifier.notify({
                             "actorID": map[apiKey].actorID,
                             "API_KEY": apiKey,
@@ -154,6 +155,7 @@ db.loadFromDB(function(err, data) {
                             map[API_KEY].accounting[puPath].num = num;
                             if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
                         });
+                    }
         }
         app.listen(app.get('port'));
         // Start API Server

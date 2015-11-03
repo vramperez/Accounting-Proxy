@@ -108,7 +108,7 @@ count = function(API_KEY, publicPath, unit, response, callback) {
     var accounting = info.accounting[publicPath];
     acc_modules[unit](response, function(err, amount) {
         if(!err){
-            accounting.num += amount; 
+            accounting.num += amount;
             db.count(info.actorID, API_KEY, publicPath, amount);
         }
     });

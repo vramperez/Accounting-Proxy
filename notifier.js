@@ -45,6 +45,7 @@ exports.notify = function(data, callback) {
                 }
             };
 
+
             var request = http.request(options, function(res) {
                 if (200 <= res.statusCode && res.statusCode <= 299) {
                     console.log('[LOG] Resquest worked!');

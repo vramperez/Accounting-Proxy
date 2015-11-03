@@ -51,8 +51,7 @@ router.post('/users', function(req, res) {
                 resrc = body.resources,
                 user  = body.customer,
                 ref   = body.reference,
-                temRes = [],
-                addOffer = false;
+                temRes = []
 
             proxy.getMap(function(m) {
                 map = m;
@@ -64,7 +63,6 @@ router.post('/users', function(req, res) {
                         var sha1 = crypto.createHash('sha1');
                         sha1.update(apiKeyBase);
                         api_key = sha1.digest('hex');
-                        addOffer = true; // UNUSED??
                     }
 
                     if (map[api_key] === undefined) {
@@ -80,7 +78,6 @@ router.post('/users', function(req, res) {
 
                     for (var i in resrc) {
                         var publicPath = url.parse(resrc[i].url).pathname;
-
                         var offerResourceBase = publicPath + offer.organization + offer.name + offer.version;
                         var sha1 = crypto.createHash('sha1');
                         sha1.update(offerResourceBase);

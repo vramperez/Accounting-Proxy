@@ -73,11 +73,11 @@ app.use(function(request, response) {
                                         console.log('[LOG] An error ocurred while making the accounting');
                                 });
                             });
-                        });
+                    });
                     
 
                 else{
-                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) {
+                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Other requests
                         response.statusCode = status;
                         for(var idx in headers)
                             response.setHeader(idx, headers[idx]);
@@ -109,7 +109,9 @@ count = function(API_KEY, publicPath, unit, response, callback) {
     acc_modules[unit](response, function(err, amount) {
         if(!err){
             accounting.num += amount;
-            db.count(info.actorID, API_KEY, publicPath, amount);
+            db.count(info.actorID, API_KEY, publicPath, amount, function(){
+                callback();
+            });
         }
     });
 

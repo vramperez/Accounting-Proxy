@@ -5,6 +5,7 @@ var subsUrls = require('./subsUrls');
 var config = require('../config');
 var express = require('express');
 var acc_proxy = require('../server');
+var url = require('url');
 
 var app = express();
 
@@ -64,8 +65,8 @@ exports.CBSubscriptionPath = function(privatePath, request, callback) {
 	for (var i = 0; i < subsUrls.length; i++) {
         if (request.method === subsUrls[i][0] &&
             privatePath.toLowerCase().match(subsUrls[i][1])){
-        		break;
         		operation = subsUrls[i][2];
+        		break;
             }
     }
     callback(operation);
@@ -88,7 +89,7 @@ exports.CBRequestHandler = function(request, response, accounting, operation) {
 		case 'subscribe':
 			var req_body = JSON.parse(request.body);
 			var reference_url = req_body.reference;
-			req_body.reference = 'http://localhost:/' + config.accounting_proxy.port + '/subscriptions';
+			req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions';
 
 			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
 				var subscriptionId = JSON.parse(resp).subscribeResponse.subscriptionId;

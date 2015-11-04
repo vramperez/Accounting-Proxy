@@ -130,7 +130,6 @@ router.post('/resources', function(req, res) {
             var publicPath = url.parse(body.url).pathname;
 
             db.getService(publicPath, function(data) {
-                console.log(data)
 
                 if (data === undefined || body.record_type === undefined ||
                     body.unit === undefined || body.component_label === undefined)

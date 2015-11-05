@@ -97,6 +97,7 @@ router.post('/users', function(req, res) {
                     }
 
                     db.addInfo(api_key, map[api_key], function(err) {
+                        console.log(err)
                         if (err)
                             res.status(400).send();
                         else {
@@ -131,41 +132,44 @@ router.post('/resources', function(req, res) {
 
             db.getService(publicPath, function(data) {
 
+
                 if (data === undefined || body.record_type === undefined ||
                     body.unit === undefined || body.component_label === undefined)
                     res.status(400).send();
 
-                if (resources[publicPath] === undefined) {
-                    resources[publicPath] = {
-                    
-                        privatePath: data.privatePath,
-                        port: data.port
-                    };
+                else{
+                    if (resources[publicPath] === undefined) {
+                        resources[publicPath] = {
+                        
+                            privatePath: data.privatePath,
+                            port: data.port
+                        };
+                    }
+
+                    if (config.modules.accounting.indexOf(body.unit) === -1)
+                        res.status(400).send("Unsupported accounting unit.");
+
+                    // Save unit for the offerResource
+                    var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
+                    var sha1 = crypto.createHash('sha1');
+                    sha1.update(offerResourceBase);
+                    var id = sha1.digest('hex');
+                    if (offerResource[id] === undefined)
+                        offerResource[id] = body.unit;
+
+                    db.addResource({
+                        offering: body.offering,
+                        publicPath: publicPath,
+                        record_type: body.record_type,
+                        unit: body.unit,
+                        component_label: body.component_label
+                    }, function(err) {
+                        if (err !== undefined)
+                            res.status(400).send();
+                        else
+                            res.status(201).send();
+                    });
                 }
-
-                if (config.modules.accounting.indexOf(body.unit) === -1)
-                    res.status(400).send("Unsupported accounting unit.");
-
-                // Save unit for the offerResource
-                var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
-                var sha1 = crypto.createHash('sha1');
-                sha1.update(offerResourceBase);
-                var id = sha1.digest('hex');
-                if (offerResource[id] === undefined)
-                    offerResource[id] = body.unit;
-
-                db.addResource({
-                    offering: body.offering,
-                    publicPath: publicPath,
-                    record_type: body.record_type,
-                    unit: body.unit,
-                    component_label: body.component_label
-                }, function(err) {
-                    if (err !== undefined)
-                        res.status(400).send();
-                    else
-                        res.status(201).send();
-                });
             });
 
         });

@@ -215,6 +215,8 @@ exports.loadResources = function(callback) {
 
 exports.addInfo = function(API_KEY, data, callback) {
 
+	console.log(data);
+
 	db.sadd(['API_KEYS', API_KEY], function(err) {
 		if(err)
 			callback(err);
@@ -235,7 +237,6 @@ exports.addInfo = function(API_KEY, data, callback) {
 							callback(err);
 						} else {
 							var acc;
-							console.log(data)
 							for (var p in data.accounting) {
 								acc = data.accounting[p];
 								db.hmset(data.actorID + API_KEY + p, {
@@ -312,14 +313,17 @@ exports.getInfo = function(user, callback) {
 	});
 };
 
-exports.count = function(actorID, API_KEY, publicPath, amount) {
+exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
+
+
     db.hget(actorID + API_KEY + publicPath, 'num', function(err, num) {
     	if(err)
     		console.log(err)
     	else{
-    		num = parseFloat(num) + amount;
     		db.hmset(actorID + API_KEY + publicPath, {
-    			'num' : num
+    			'num' : (parseFloat(num) + amount).toString()
+    		}, function() {
+    			callback();
     		});
     	}
     });
@@ -333,7 +337,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath) {
     		correlation_number = parseInt(correlation_number) + 1;
     		db.hmset(actorID + API_KEY + publicPath, {
     			'correlation_number' : correlation_number,
-    			'num' : 0
+    			'num' : '0'
     		});
     	}
     });

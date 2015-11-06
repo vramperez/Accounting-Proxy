@@ -71,39 +71,19 @@ function loadResourcesAux(api_key, data, callback){
 };
 
 
-// CLI: deleteService [path] [port]
-exports.deleteService = function(path, port, callback) {
+// CLI: deleteService [path]
+exports.deleteService = function(path, callback) {
 	
-	db.srem(path, port, function(err) {
+	db.del(path, function(err) {
 		if(err)
-			callback("[ERROR] Deleting service failed.");
-		else {
-			db.smembers(path, function(err, obj) {
-				if(obj.length === 0)
-					db.del(path, function(err) {
-						if(err)
-							callback("[ERROR] Deleting service failed.");
-						else
-							db.del(path);
-					});
-				db.smembers('public', function(err, publics) {
-					if(publics.length !== 0)
-					publics.forEach(function(entry) {
-						db.hgetall(entry, function(err, service) {
-							if(err)
-								callback(err)
-							else{
-								if(service.privatePath === path &&
-									service.port === port){
-										db.del(entry);
-										db.srem('public', entry);
-								}
-							}
-						});
-					});
-				});
+			callback(err)
+		else
+			db.srem('public', path, function(err) {
+				if(err)
+					callback(err)
+				else
+					callback();
 			});
-		}
 	});
 };
 
@@ -121,18 +101,27 @@ exports.getService = function(publicPath, callback) {
 // CLI: addService [publicPath] [privatePath] [port]
 exports.newService = function(publicPath, privatePath, port, callback){
 
-	db.sadd('public', publicPath, function(err) {
-		if(err)
-			callback(err)
-		else
-			db.hmset(publicPath, {
-				'privatePath': privatePath,
-				'port': port
-			}, function(err) {
-				if(err)
-					callback(err);
-			});
-		});
+	db.hgetall(publicPath, function(err, res) {
+		if(err !== null)
+				callback(err);
+			else if (res !== null)
+				callback('[ERROR] The service already exists.');
+			else
+				db.sadd('public', publicPath, function(err) {
+					if(err)
+						callback(err)
+					else
+						db.hmset(publicPath, {
+							'privatePath': privatePath,
+							'port': port
+						}, function(err) {
+							if(err)
+								callback(err);
+							else
+								callback();
+						});
+				});
+	});
 };
 
 

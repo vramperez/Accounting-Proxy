@@ -3,6 +3,8 @@ var db = require('./db_Redis.js');
 var info = require('./HTTP_Client/info.json');
 var config = require('./config');
 
+
+// Send notifications to the WStore
 exports.notify = function(data, callback) {
 
     if (data.num === 0){

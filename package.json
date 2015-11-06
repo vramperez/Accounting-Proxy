@@ -1,6 +1,6 @@
 {
   "name": "accounting-proxy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Accounting proxy for FI-ware GE services",
   "main": "server.js",
   "author": "FI-WARE",
@@ -14,7 +14,7 @@
     "commander": "2.x.x",
     "express": "4.x",
     "node-schedule": "0.2.x",
-    "sqlite3": "3.x"
+    "node-redis": "2.8.x"
   },
   "repository": {
     "type": "git",
@@ -24,6 +24,10 @@
     {
       "name": "Jesús Martínez-Barquero Herrada",
       "email": "jesusmartinez93@gmail.com"
+    },
+    {
+      "name": "Víctor Rampérez Martín",
+      "email": "vivctor.ramperez.martin@gmail.com" 
     }
   ]
 }

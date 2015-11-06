@@ -11,7 +11,7 @@ var app = express();
 
 app.set('port', config.resources.notification_port);
 
-app.post('/subscriptions', function(req, response) { // Probar la contestacion
+app.post('/subscriptions', function(req, response) { // Receive and manage CB subscribe notifications
 
 	var body = '';
 	req.on('data', function(d) {
@@ -24,6 +24,7 @@ app.post('/subscriptions', function(req, response) { // Probar la contestacion
     		if(subscription === null)
     			console.log('[LOG] An error ocurred while making the accounting: Invalid subscriptionId');
     		else{
+    			// Make accounting
     			acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
     				if(err)
     					console.log('[LOG] An error ocurred while making the accounting');
@@ -39,7 +40,8 @@ app.post('/subscriptions', function(req, response) { // Probar la contestacion
     				}
     			}
     			
-    			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
+    			// Send the response to the client
+    			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) { 
     				response.statusCode = status;
     				for (var i in headers)
     					response.setHeader(i, headers[i]);
@@ -54,6 +56,7 @@ app.post('/subscriptions', function(req, response) { // Probar la contestacion
 
 });	
 
+// Initialize the endpoint
 exports.run = function(){
 	app.listen(app.get('port'));
 };
@@ -72,6 +75,8 @@ exports.CBSubscriptionPath = function(privatePath, request, callback) {
     callback(operation);
 };
 
+
+// Manage the (un)subscribe Context Broker requests
 exports.CBRequestHandler = function(request, response, accounting, operation) {
 
 	var options = {
@@ -89,8 +94,9 @@ exports.CBRequestHandler = function(request, response, accounting, operation) {
 		case 'subscribe':
 			var req_body = JSON.parse(request.body);
 			var reference_url = req_body.reference;
-			req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions';
+			req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
 
+			// Send the request to the CB and redirect the response to the subscriber
 			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
 				var subscriptionId = JSON.parse(resp).subscribeResponse.subscriptionId;
 				response.statusCode = status;
@@ -98,6 +104,7 @@ exports.CBRequestHandler = function(request, response, accounting, operation) {
 					response.setHeader(i, headers[i]);
 				response.send(resp);
 				if(status === 200){
+					// Store the endpoint information of the subscriber to be notified
 					db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).host, 
 						url.parse(reference_url).port, url.parse(reference_url).pathname, accounting.unit, function(err){
 							if(err)
@@ -117,6 +124,7 @@ exports.CBRequestHandler = function(request, response, accounting, operation) {
 				subscriptionId = match[0];
 			}
 
+			// Sends the request to the CB and redirect the response to the subscriber
 			proxy.sendData('http', options, request, response, function(status, resp, headers) {
 				response.statusCode = status;
 				for(var idx in headers)

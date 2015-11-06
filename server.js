@@ -102,6 +102,7 @@ app.use(function(request, response) {
     }
 });
 
+// Auxiliar function for accounting
 count = function(API_KEY, publicPath, unit, response, callback) {
 
     var info = map[API_KEY];
@@ -138,8 +139,15 @@ for (var u in config.modules.accounting) {
     }
 }
 
+// Initialize the DB
 db.init();
 
+/**
+ * Load all the information from the DB and stores in map
+ *
+ * @param {Object} err           DB error.
+ * @param {Object} data          Data loaded from the DB
+ */
 db.loadFromDB(function(err, data) {
     if (err)
         console.log('Something went wrong');

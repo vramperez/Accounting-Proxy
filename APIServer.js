@@ -180,6 +180,7 @@ router.post('/resources', function(req, res) {
 router.get('/users/keys', function(req, res) {
     var userID = req.get('X-Actor-ID');
 
+    console.log(userID)
     if (userID === undefined)
         res.status(400).end();
 

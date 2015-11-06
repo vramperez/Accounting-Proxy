@@ -27,29 +27,6 @@ config.modules = {
 };
 
 
-// Resource configuration
-//--------------------------------------------------
-// Configures the resources accounted by the proxy
-config.resources = {
-
-    /* *
-    * Enabled if the resource accounted is Orion Context Broker
-    */
-    contextBroker: true,
-
-    /* *
-    * Port where the accounting proxy server is listening to subscription notifications
-    */
-    notification_port: 9002,
-
-    /** 
-    * Host that is being accounted
-    */
-    host: '130.206.114.99'
-
-};
-
-
 // WStore sonfiguration
 //--------------------------------------------------
 // Configures the WStore address and port
@@ -69,6 +46,28 @@ config.WStore = {
     * WStore port
     */
     accounting_port: 9010
+
+};
+
+// Resource configuration
+//--------------------------------------------------
+// Configures the resources accounted by the proxy
+config.resources = {
+
+    /* *
+    * Enabled if the resource accounted is Orion Context Broker
+    */
+    contextBroker: true,
+
+    /* *
+    * Port where the accounting proxy server is listening to subscription notifications
+    */
+    notification_port: 9002,
+
+    /** 
+    * Host that is being accounted
+    */
+    host: '130.206.114.99'
 
 };
 

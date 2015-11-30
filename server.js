@@ -6,6 +6,7 @@ var api = require('./APIServer.js');
 var notifier = require('./notifier.js');
 var cron = require('node-schedule');
 var contextBroker = require('./orion_context_broker/cb_handler');
+var url = require('url');
 
 var app = express();
 
@@ -51,15 +52,15 @@ app.use(function(request, response) {
 
             if (accounting !== undefined) {
                 var options = {
-                    host: config.resources.host,
+                    host: url.parse(accounting.url).host,
                     port: accounting.port,
-                    path: accounting.privatePath,
+                    path: url.parse(accounting.url).pathname,
                     method: request.method,
                     headers: proxy.getClientIp(request, request.headers)
                 };
-
+                
                 if(config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)) // Orion ContextBroker request
-                    contextBroker.CBSubscriptionPath(accounting.privatePath, request, function(operation) {
+                    contextBroker.CBSubscriptionPath(accounting.url, request, function(operation) {
                         if( operation === 'subscribe' || operation === 'unsubscribe') // (un)subscription request
                             contextBroker.CBRequestHandler(request, response, accounting, operation);
                         else
@@ -110,8 +111,11 @@ count = function(API_KEY, publicPath, unit, response, callback) {
     acc_modules[unit](response, function(err, amount) {
         if(!err){
             accounting.num += amount;
-            db.count(info.actorID, API_KEY, publicPath, amount, function(){
-                callback();
+            db.count(info.actorID, API_KEY, publicPath, amount, function(err, num){
+                if(err)
+                    callback(err);
+                else
+                    callback();
             });
         }
     });
@@ -138,9 +142,6 @@ for (var u in config.modules.accounting) {
         process.exit(1);
     }
 }
-
-// Initialize the DB
-db.init();
 
 /**
  * Load all the information from the DB and stores in map

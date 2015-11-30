@@ -71,7 +71,7 @@ router.post('/users', function(req, res) {
                             organization: offer.organization,
                             name: offer.name,
                             version: offer.version,
-                            accounting: {},
+                            accountin: {},
                             reference: ref
                         };
                     }
@@ -87,7 +87,7 @@ router.post('/users', function(req, res) {
                             offerResource[id] !== undefined &&
                             map[api_key].accounting[publicPath] === undefined) {
                             map[api_key].accounting[publicPath] = {
-                                privatePath: resources[publicPath].privatePath,
+                                url: resources[publicPath].url,
                                 port: resources[publicPath].port,
                                 num: 0,
                                 correlation_number: 0,
@@ -97,7 +97,6 @@ router.post('/users', function(req, res) {
                     }
 
                     db.addInfo(api_key, map[api_key], function(err) {
-                        console.log(err)
                         if (err)
                             res.status(400).send();
                         else {
@@ -128,50 +127,52 @@ router.post('/resources', function(req, res) {
         req.on('end', function() {
             body = JSON.parse(body);
 
-            var publicPath = url.parse(body.url).pathname;
+            if ( body.record_type === undefined || body.unit === undefined || 
+                body.component_label === undefined || body.url === undefined ){
+                    res.send(400).send();
+            } else {
+                var publicPath = url.parse(body.url).pathname;
 
-            db.getService(publicPath, function(data) {
+                db.getService(publicPath, function(err, data) {
 
+                    if ( data === undefined || err)
+                        res.status(400).send();
 
-                if (data === undefined || body.record_type === undefined ||
-                    body.unit === undefined || body.component_label === undefined)
-                    res.status(400).send();
+                    else{
+                        if (resources[publicPath] === undefined) {
+                            resources[publicPath] = {
+                            
+                                url: data.url,
+                                port: data.port
+                            };
+                        }
 
-                else{
-                    if (resources[publicPath] === undefined) {
-                        resources[publicPath] = {
-                        
-                            privatePath: data.privatePath,
-                            port: data.port
-                        };
+                        if (config.modules.accounting.indexOf(body.unit) === -1)
+                            res.status(400).send("Unsupported accounting unit.");
+
+                        // Save unit for the offerResource
+                        var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
+                        var sha1 = crypto.createHash('sha1');
+                        sha1.update(offerResourceBase);
+                        var id = sha1.digest('hex');
+                        if (offerResource[id] === undefined)
+                            offerResource[id] = body.unit;
+
+                        db.addResource({
+                            offering: body.offering,
+                            publicPath: publicPath,
+                            record_type: body.record_type,
+                            unit: body.unit,
+                            component_label: body.component_label
+                        }, function(err) {
+                            if (err !== undefined)
+                                res.status(400).send();
+                            else
+                                res.status(201).send();
+                        });
                     }
-
-                    if (config.modules.accounting.indexOf(body.unit) === -1)
-                        res.status(400).send("Unsupported accounting unit.");
-
-                    // Save unit for the offerResource
-                    var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
-                    var sha1 = crypto.createHash('sha1');
-                    sha1.update(offerResourceBase);
-                    var id = sha1.digest('hex');
-                    if (offerResource[id] === undefined)
-                        offerResource[id] = body.unit;
-
-                    db.addResource({
-                        offering: body.offering,
-                        publicPath: publicPath,
-                        record_type: body.record_type,
-                        unit: body.unit,
-                        component_label: body.component_label
-                    }, function(err) {
-                        if (err !== undefined)
-                            res.status(400).send();
-                        else
-                            res.status(201).send();
-                    });
-                }
-            });
-
+                });
+            }
         });
     } else
         res.status(415).send();
@@ -180,29 +181,29 @@ router.post('/resources', function(req, res) {
 router.get('/users/keys', function(req, res) {
     var userID = req.get('X-Actor-ID');
 
-    console.log(userID)
     if (userID === undefined)
         res.status(400).end();
+    else
+        db.getInfo(userID, function(err, data) {
 
-    db.getInfo(userID, function(err, data) {
+            if (err || data.length === 0){
+                res.status(400).end();
 
-        if (err || data.length === 0)
-            res.status(400).end();
-
-        var msg = [];
-        for (var i in data) {
-            msg.push({
-                offering: {
-                    organization: data[i].organization,
-                    name: data[i].name,
-                    version: data[i].version
-                },
-                API_KEY: data[i].API_KEY
-            });
-        }
-
-        res.json(msg);
-    });
+            }else{
+                var msg = [];
+                for (var i in data) {
+                    msg.push({
+                        offering: {
+                            organization: data[i].organization,
+                            name: data[i].name,
+                            version: data[i].version
+                        },
+                        API_KEY: data[i].API_KEY
+                    });
+                }
+                res.json(msg);
+            }
+        });
 });
 
 app.use('/api', router);

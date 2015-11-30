@@ -57,17 +57,12 @@ config.resources = {
     /* *
     * Enabled if the resource accounted is Orion Context Broker
     */
-    contextBroker: true,
+    contextBroker: false,
 
     /* *
     * Port where the accounting proxy server is listening to subscription notifications
     */
-    notification_port: 9002,
-
-    /** 
-    * Host that is being accounted
-    */
-    host: '130.206.114.99'
+    notification_port: 9002
 
 };
 

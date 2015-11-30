@@ -13,7 +13,7 @@
 	* [Accounting module](#accountingmodule)
 
 ## <a name="deployment"/> Deployment
-#### <a name="softwarerequirements"/> Software Requirements:
+### <a name="softwarerequirements"/> Software Requirements:
 - NodeJS: [Homepage](http://nodejs.org/).
     + Express Framework: [Homepage](http://expressjs.com/).
     + Redis for NodeJs: [GitHub](https://github.com/NodeRedis/node_redis)
@@ -22,7 +22,7 @@
     + Fiware PEP-Proxy: [GitHub](https://github.com/telefonicaid/fiware-pep-steelskin).
     + Orion Context Broker: [Homepage](http://fiware-orion.readthedocs.org/en/develop/index.html).
 
-#### <a name="installation"/> Installation:
+### <a name="installation"/> Installation:
 
 
 To install NodeJS dependencies, execute in the accounting-proxy folder:
@@ -42,7 +42,7 @@ In order to have the accounting proxy running there are some information to fill
  - `port`: port where the accounting proxy server is listening to client requests.
  - `store_port`:  port where the accounting proxy is listening to WStore notifications.
  
-```js
+- ```
 {
         port: 9000,
         store_port: 9001
@@ -50,7 +50,7 @@ In order to have the accounting proxy running there are some information to fill
 ```
 * `config.modules`:  an array of accounting modules for accounting in different ways.
 
-```js
+- ```
 {
     accounting: [ 'call', 'megabyte']
 }
@@ -60,8 +60,8 @@ In order to have the accounting proxy running there are some information to fill
 	- `accounting_path`: WStore path for accounting notifications.
 	- `accounting_port`: Wstore port.
 
-```js
-config.WStore = {
+- ```
+{
     accounting_host: 'localhost',
     accounting_path: '/api/contracting/',
     accounting_port: 9010
@@ -77,11 +77,11 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 	- `contextBroker`: set `true` this parameter.
 	- `notification_port`: port where the accounting proxy server is listening to subscription notifications.
 	- `host`: Context Broker host that is going to be proxied.
-```js
+	
+- ```
 {
     contextBroker: true,
-    notification_port: 9002,
-    host: 'localhost'
+    notification_port: 9002
 }
 ```
 
@@ -92,7 +92,8 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
 	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
 	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
-```js
+
+* ```
 {
         host: 'localhost',
         port: 9000,
@@ -110,7 +111,22 @@ In order to configure the Accounting Proxy working with other components follow 
 	- `contextBroker`: set `false` this parameter to disable the Context Broker accounting.
 	- The rest of information in `config.resources` is unnecessary in this case.
 
-* Then, configure the PEP-Proxy `config.js` file for generic REST Middleware ( https://github.com/telefonicaid/fiware-pep-steelskin#generic-rest-middleware).
+* After that, copy the `./pep-proxy/config.js` file into your PEP-Proxy folder and overwrite the existing `config.js` file.
+* Then, copy the `./pep-proxy/restAccountingPlugin.js` file into your PEP-Proxy plugins folder (`fiware-pep-steelskin/lib/plugins`).
+* Finally, configure the PEP-Proxy `config.js` file copied in the previous step:
+	- `config.resource.original.host`: the Accounting Proxy host.
+	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
+	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
+	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
+
+* ```
+{
+        host: 'localhost',
+        port: 9000,
+        admin_port: 9001,
+        admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
+}
+```
 
 
 
@@ -126,8 +142,8 @@ node server
 ## <a name="cli"/> CLI
 
 In order to manage servicies, use 'cli' tool. There are four commands available:
-* `./cli addService <publicPath> <privatePath> <port>`: binds the public path with the private path and port specified.
-* `./cli getService <publicPath>`: returns the private path and port associated with the public path.
+* `./cli addService <publicPath> <url> <port>`: binds the public path with the url and port specified.
+* `./cli getService <publicPath>`: returns the url and port associated with the public path.
 * `./cli deleteService <publicPath>`: delete the service associated with the public path.
 * `./cli getInfo <userID>`: returns information associated with the userID.
 
@@ -216,7 +232,7 @@ Retrieve the user's API_KEYs in a json:
 
 Accounting modules should be implemented following the next code:
 
-```js
+```
 /** Accounting module for unit: XXXXXX */
 
 exports.count = function(response, callback) {

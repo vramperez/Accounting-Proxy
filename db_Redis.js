@@ -1,16 +1,11 @@
 var redis = require('redis');
 var db;
 
-exports.init = function() {
-	db = redis.createClient();
-	db.on('connect', function(){
-		console.log('connected');
-	});
+db = redis.createClient();
 
-	db.on('error', function(err){
-		console.log("Error" + err);
-	});
-};
+db.on('error', function(err){
+	console.log("Error" + err);
+});
 
 exports.loadFromDB = function(setData) { 
 	var data = {};
@@ -196,7 +191,6 @@ exports.loadUnits = function(callback) {
 
 exports.loadResources = function(callback) {
 	var toReturn = {};
-
 	db.smembers('public', function(err, resources) {
 		if( ! err && resources.length !== 0){
 			var count = 0;

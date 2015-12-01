@@ -12,6 +12,7 @@ var app = express(),
     map;
 
 app.set('port', config.accounting_proxy.store_port);
+app.use('/api', router);
 
 exports.run = function(d){
     map = d;
@@ -30,8 +31,71 @@ exports.run = function(d){
     app.listen(app.get('port'));
 };
 
-router.post('/users', function(req, res) {
+exports.resourcesHandler = function(req, res) {
+    console.log("[LOG] New resource notification recieved");
+    req.setEncoding('utf-8');
 
+    var body = '';
+    if (req.get('Content-Type').indexOf('application/json') > -1) {
+        req.on('data', function(d) {
+            body += d;
+        });
+
+        req.on('end', function() {
+            console.log(body)
+            body = JSON.parse(body);
+            if ( body.record_type === undefined || body.unit === undefined || 
+                body.component_label === undefined || body.url === undefined ){
+                    res.status(400).send();
+            } else {
+                var publicPath = url.parse(body.url).pathname;
+
+                db.getService(publicPath, function(err, data) {
+
+                    if ( data === undefined || err)
+                        res.status(400).send();
+
+                    else{
+                        if (resources[publicPath] === undefined) {
+                            resources[publicPath] = {
+                            
+                                url: data.url,
+                                port: data.port
+                            };
+                        }
+
+                        if (config.modules.accounting.indexOf(body.unit) === -1)
+                            res.status(400).send("Unsupported accounting unit.");
+
+                        // Save unit for the offerResource
+                        var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
+                        var sha1 = crypto.createHash('sha1');
+                        sha1.update(offerResourceBase);
+                        var id = sha1.digest('hex');
+                        if (offerResource[id] === undefined)
+                            offerResource[id] = body.unit;
+
+                        db.addResource({
+                            offering: body.offering,
+                            publicPath: publicPath,
+                            record_type: body.record_type,
+                            unit: body.unit,
+                            component_label: body.component_label
+                        }, function(err) {
+                            if (err !== undefined)
+                                res.status(400).send();
+                            else
+                                res.status(201).send();
+                        });
+                    }
+                });
+            }
+        });
+    } else
+        res.status(415).send();
+};
+
+exports.usersHandler = function(req, res){
     console.log("[LOG] WStore notification recieved.");
     req.setEncoding('utf-8');
 
@@ -110,75 +174,9 @@ router.post('/users', function(req, res) {
         });
     } else
         res.status(400).send();
-});
+};
 
-router.post('/resources', function(req, res) {
-
-    console.log("[LOG] New resource notification recieved");
-    req.setEncoding('utf-8');
-
-    var body = '';
-
-    if (req.get('Content-Type').indexOf('application/json') > -1) {
-        req.on('data', function(d) {
-            body += d;
-        });
-
-        req.on('end', function() {
-            body = JSON.parse(body);
-
-            if ( body.record_type === undefined || body.unit === undefined || 
-                body.component_label === undefined || body.url === undefined ){
-                    res.send(400).send();
-            } else {
-                var publicPath = url.parse(body.url).pathname;
-
-                db.getService(publicPath, function(err, data) {
-
-                    if ( data === undefined || err)
-                        res.status(400).send();
-
-                    else{
-                        if (resources[publicPath] === undefined) {
-                            resources[publicPath] = {
-                            
-                                url: data.url,
-                                port: data.port
-                            };
-                        }
-
-                        if (config.modules.accounting.indexOf(body.unit) === -1)
-                            res.status(400).send("Unsupported accounting unit.");
-
-                        // Save unit for the offerResource
-                        var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
-                        var sha1 = crypto.createHash('sha1');
-                        sha1.update(offerResourceBase);
-                        var id = sha1.digest('hex');
-                        if (offerResource[id] === undefined)
-                            offerResource[id] = body.unit;
-
-                        db.addResource({
-                            offering: body.offering,
-                            publicPath: publicPath,
-                            record_type: body.record_type,
-                            unit: body.unit,
-                            component_label: body.component_label
-                        }, function(err) {
-                            if (err !== undefined)
-                                res.status(400).send();
-                            else
-                                res.status(201).send();
-                        });
-                    }
-                });
-            }
-        });
-    } else
-        res.status(415).send();
-});
-
-router.get('/users/keys', function(req, res) {
+exports.keysHandler = function(req, res){
     var userID = req.get('X-Actor-ID');
 
     if (userID === undefined)
@@ -204,6 +202,8 @@ router.get('/users/keys', function(req, res) {
                 res.json(msg);
             }
         });
-});
+};
 
-app.use('/api', router);
+router.post('/resources', module.exports.resourcesHandler);
+router.post('/users', module.exports.usersHandler);
+router.get('/users/keys', module.exports.keysHandler);

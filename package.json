@@ -29,5 +29,10 @@
       "name": "Víctor Rampérez Martín",
       "email": "vivctor.ramperez.martin@gmail.com" 
     }
-  ]
+  ],
+  "scripts": {
+    "test": "npm run unit && npm run integration",
+    "unit": "istanbul cover jasmine-node test/unit",
+    "integration": "istanbul cover jasmine-node test/integration"
+  }
 }

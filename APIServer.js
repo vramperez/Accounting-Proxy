@@ -42,51 +42,48 @@ exports.resourcesHandler = function(req, res) {
         });
 
         req.on('end', function() {
-            console.log(body)
             body = JSON.parse(body);
             if ( body.record_type === undefined || body.unit === undefined || 
                 body.component_label === undefined || body.url === undefined ){
                     res.status(400).send();
             } else {
                 var publicPath = url.parse(body.url).pathname;
-
                 db.getService(publicPath, function(err, data) {
-
-                    if ( data === undefined || err)
+                    if ( data === undefined || err !== undefined)
                         res.status(400).send();
 
                     else{
-                        if (resources[publicPath] === undefined) {
+                        if (resources[publicPath] === undefined)
                             resources[publicPath] = {
-                            
                                 url: data.url,
                                 port: data.port
                             };
-                        }
 
-                        if (config.modules.accounting.indexOf(body.unit) === -1)
+
+                        if (config.modules.accounting.indexOf(body.unit) === -1){
                             res.status(400).send("Unsupported accounting unit.");
+                        } else {
+                            // Save unit for the offerResource
+                            var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
+                            var sha1 = crypto.createHash('sha1');
+                            sha1.update(offerResourceBase);
+                            var id = sha1.digest('hex');
+                            if (offerResource[id] === undefined)
+                                offerResource[id] = body.unit;
 
-                        // Save unit for the offerResource
-                        var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
-                        var sha1 = crypto.createHash('sha1');
-                        sha1.update(offerResourceBase);
-                        var id = sha1.digest('hex');
-                        if (offerResource[id] === undefined)
-                            offerResource[id] = body.unit;
-
-                        db.addResource({
-                            offering: body.offering,
-                            publicPath: publicPath,
-                            record_type: body.record_type,
-                            unit: body.unit,
-                            component_label: body.component_label
-                        }, function(err) {
-                            if (err !== undefined)
-                                res.status(400).send();
-                            else
-                                res.status(201).send();
-                        });
+                            db.addResource({
+                                offering: body.offering,
+                                publicPath: publicPath,
+                                record_type: body.record_type,
+                                unit: body.unit,
+                                component_label: body.component_label
+                            }, function(err) {
+                                if (err !== undefined)
+                                    res.status(400).send();
+                                else
+                                    res.status(201).send();
+                            });
+                        }
                     }
                 });
             }
@@ -100,9 +97,7 @@ exports.usersHandler = function(req, res){
     req.setEncoding('utf-8');
 
     var body = '';
-
     if (req.get('Content-Type').indexOf('application/json') > -1) {
-
         req.on('data', function(d) {
             body += d;
         });
@@ -135,7 +130,7 @@ exports.usersHandler = function(req, res){
                             organization: offer.organization,
                             name: offer.name,
                             version: offer.version,
-                            accountin: {},
+                            accounting: {},
                             reference: ref
                         };
                     }
@@ -173,19 +168,18 @@ exports.usersHandler = function(req, res){
             });
         });
     } else
-        res.status(400).send();
+        res.status(415).send();
 };
 
 exports.keysHandler = function(req, res){
     var userID = req.get('X-Actor-ID');
 
     if (userID === undefined)
-        res.status(400).end();
+        res.status(400).send();
     else
         db.getInfo(userID, function(err, data) {
-
-            if (err || data.length === 0){
-                res.status(400).end();
+            if (data === {} || err != undefined){
+                res.status(400).send();
 
             }else{
                 var msg = [];

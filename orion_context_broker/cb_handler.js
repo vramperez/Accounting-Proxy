@@ -11,55 +11,57 @@ var app = express();
 
 app.set('port', config.resources.notification_port);
 
-app.post('/subscriptions', function(req, response) { // Receive and manage CB subscribe notifications
-
-	var body = '';
-	req.on('data', function(d) {
-		body += d;
-	}).on('end', function(){
-
-	var req_body = JSON.parse(body);
-	var subscriptionId = req_body.subscriptionId
-    	db.getCBSubscription(subscriptionId, function(subscription) {
-    		if(subscription === null)
-    			console.log('[LOG] An error ocurred while making the accounting: Invalid subscriptionId');
-    		else{
-    			// Make accounting
-    			acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
-    				if(err)
-    					console.log('[LOG] An error ocurred while making the accounting');
-    			});
-
-    			var options = {
-    				host: subscription.ref_host,
-    				port: subscription.ref_port,
-    				path: subscription.ref_path,
-    				method: 'POST',
-    				headers: {
-    					'content-type': 'application/json'
-    				}
-    			}
-    			
-    			// Send the response to the client
-    			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) { 
-    				response.statusCode = status;
-    				for (var i in headers)
-    					response.setHeader(i, headers[i]);
-    				response.send(resp);
-    				if( status !== 200)
-    					console.log('[LOG] An error ocurred while notifying the subscription to: http://' + 
-    						subscription.ref_host + ':' + subscription.ref_port + subscription.ref_path + '. Status: ' + status + ' ' + resp.statusMessage);
-    			});
-    		}
-    	});
-	});
-
-});	
-
 // Initialize the endpoint
 exports.run = function(){
 	app.listen(app.get('port'));
 };
+
+exports.notificationHandler = function(req, response) { // Receive and manage CB subscribe notifications
+
+	var body = '';
+	req.on('data', function(d) {
+		body += d;
+	});
+	req.on('end', function(){
+		var req_body = JSON.parse(body);
+		var subscriptionId = req_body.subscriptionId;
+		db.getCBSubscription(subscriptionId, function(subscription) {
+			if(subscription === null)
+				console.log('[LOG] An error ocurred while making the accounting: Invalid subscriptionId');
+			else
+	    		// Make accounting
+	    		console.log(subscription.API_KEY)
+	    		acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
+	    			if(err){
+	    				console.log('[LOG] An error ocurred while making the accounting');
+	    			}
+	    			else
+	    				var options = {
+	    					host: subscription.ref_host,
+	    					port: subscription.ref_port,
+	    					path: subscription.ref_path,
+	    					method: 'POST',
+	    					headers: {
+	    						'content-type': 'application/json'
+	    					}
+	    				}
+
+			    		// Send the response to the client
+			    		proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) { 
+			    			response.statusCode = status;
+			    			for (var i in headers)
+			    				response.setHeader(i, headers[i]);
+			    			response.send(resp);
+			    			if( status !== 200)
+			    				console.log('[LOG] An error ocurred while notifying the subscription to: http://' + 
+			    					subscription.ref_host + ':' + subscription.ref_port + subscription.ref_path + '. Status: ' + status + ' ' + resp.statusMessage);
+			    		});
+			    });
+		});
+	});
+};
+
+app.post('/subscriptions', module.exports.notificationHandler);
 
 exports.CBSubscriptionPath = function(privatePath, request, callback) {
 

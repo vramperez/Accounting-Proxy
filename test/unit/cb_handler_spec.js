@@ -9,8 +9,9 @@ var config_mock = {
 }
 
 var proxy_mock = {
-	sendData: function(protocol, option, body, response, callback){
-
+	sendData: function(protocol, options, body, response, callback){
+		if(options.host === 'err_notifying')
+			callback(400, { statusMessage: 'Error notifying the subscriptor'}, ['header1'])
 	}
 }
 
@@ -59,20 +60,37 @@ var db_mock = {
 				break;
 			case 'err_count':
 				callback({
-					api_key: 'err_count',
+					API_KEY: 'err_count',
 					publicPath: '/public',
 					unit: 'unit'
 				});
 				break;
+			case 'err_notifying':
+				callback({
+					API_KEY: 'err_notifying',
+					publicPath: '/public',
+					unit: 'unit',
+					ref_host: 'err_notifying',
+					ref_port: 9000,
+					ref_path: '/public'
+				});
 		}
+	},
+	addCBSubscription: function(api_key, path, subsId, host, port, path, unit, callback){
+
 	}
 }
 
 var acc_proxy_mock = {
 	count: function(api_key, path, unit, body, callback){
-		console.log(api_key)
-		if(api_key === 'err_count')
-			callback('Error');
+		switch(api_key){
+			case 'err_count':
+				callback('Error');
+				break;
+			case 'err_notifying':
+				callback();
+				break;
+		}
 	}
 }
 
@@ -81,6 +99,7 @@ describe("Testing db_handler", function(){
 	cb_handler.__set__('app', app_mock);
 	cb_handler.__set__('db', db_mock);
 	cb_handler.__set__('acc_proxy', acc_proxy_mock);
+	cb_handler.__set__('proxy', proxy_mock);
 
 	describe("run", function(){
 
@@ -119,6 +138,8 @@ describe("Testing db_handler", function(){
 			req_mock.resetBody();
 			spyOn(db_mock, 'getCBSubscription').andCallThrough();
 			spyOn(acc_proxy_mock, 'count').andCallThrough();
+			spyOn(proxy_mock, 'sendData').andCallThrough();
+			spyOn(resp_mock, 'send').andCallThrough();
 		});
 
 		it('error while obtaining the subscriptionId', function(){
@@ -128,10 +149,43 @@ describe("Testing db_handler", function(){
 		});
 
 		it('error while making the accounting', function(){
-			req_mock.body.subscriptionId = 'subscriptionId';
+			req_mock.body.subscriptionId = 'err_count';
 			cb_handler.notificationHandler(req_mock, resp_mock);
 			expect(db_mock.getCBSubscription.callCount).toEqual(1);
 			expect(acc_proxy_mock.count.callCount).toEqual(1);
 		});
+
+		it('error while notifying the subscriptor', function(){
+			req_mock.body.subscriptionId = 'err_notifying';
+			cb_handler.notificationHandler(req_mock, resp_mock);
+			expect(db_mock.getCBSubscription.callCount).toEqual(1);
+			expect(acc_proxy_mock.count.callCount).toEqual(1);
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+		});
+
+		it('correct notification to the subscriber', function(){
+			req_mock.body.subscriptionId = 'err_notifying';
+			cb_handler.notificationHandler(req_mock, resp_mock);
+			expect(db_mock.getCBSubscription.callCount).toEqual(1);
+			expect(acc_proxy_mock.count.callCount).toEqual(1);
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+		});
+	});
+
+	describe("(un)subscribe request handler;", function() {
+
+		beforeEach(function() {
+			req_mock.resetBody();
+			spyOn(proxy_mock, 'sendData').andCallThrough();
+		});
+
+		it('[subscription] response to the client or CB fail', function() {
+			this.accounting = {
+				port: 9000,
+				privatePath: 'err_response_subs'
+			}
+		})
 	});
 });

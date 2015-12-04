@@ -30,12 +30,10 @@ exports.notificationHandler = function(req, response) { // Receive and manage CB
 				console.log('[LOG] An error ocurred while making the accounting: Invalid subscriptionId');
 			else
 	    		// Make accounting
-	    		console.log(subscription.API_KEY)
 	    		acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
-	    			if(err){
+	    			if(err)
 	    				console.log('[LOG] An error ocurred while making the accounting');
-	    			}
-	    			else
+	    			else{
 	    				var options = {
 	    					host: subscription.ref_host,
 	    					port: subscription.ref_port,
@@ -45,7 +43,7 @@ exports.notificationHandler = function(req, response) { // Receive and manage CB
 	    						'content-type': 'application/json'
 	    					}
 	    				}
-
+	    				
 			    		// Send the response to the client
 			    		proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) { 
 			    			response.statusCode = status;
@@ -56,6 +54,7 @@ exports.notificationHandler = function(req, response) { // Receive and manage CB
 			    				console.log('[LOG] An error ocurred while notifying the subscription to: http://' + 
 			    					subscription.ref_host + ':' + subscription.ref_port + subscription.ref_path + '. Status: ' + status + ' ' + resp.statusMessage);
 			    		});
+	    			}
 			    });
 		});
 	});

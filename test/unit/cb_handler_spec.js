@@ -11,7 +11,11 @@ var config_mock = {
 var proxy_mock = {
 	sendData: function(protocol, options, body, response, callback){
 		if(options.host === 'err_notifying')
-			callback(400, { statusMessage: 'Error notifying the subscriptor'}, ['header1'])
+			return callback(400, { statusMessage: 'Error notifying the subscriptor'}, ['header1'])
+		else if (options.path === 'err_response_subs')
+			return callback(400, JSON.stringify({ subscribeResponse: {subscriptionId: 'subscriptionId'} }), ['header1'])
+		else
+			return callback(200, JSON.stringify({ subscribeResponse: {subscriptionId: 'err_deleteCBSubs'} }), ['header1']);
 	}
 }
 
@@ -22,7 +26,10 @@ var req_mock = {
 		}
 	},
 	on: function(event, callback){
-		callback(JSON.stringify(this.body));
+		return callback(JSON.stringify(this.body));
+	},
+	get: function(header){
+		return this[header];
 	}
 }
 
@@ -56,17 +63,15 @@ var db_mock = {
 	getCBSubscription: function(subscriptionId, callback){
 		switch(subscriptionId){
 			case 'err_getCBSubscription':
-				callback(null);
-				break;
+				return callback(null);
 			case 'err_count':
-				callback({
+				return callback({
 					API_KEY: 'err_count',
 					publicPath: '/public',
 					unit: 'unit'
 				});
-				break;
 			case 'err_notifying':
-				callback({
+				return callback({
 					API_KEY: 'err_notifying',
 					publicPath: '/public',
 					unit: 'unit',
@@ -77,7 +82,15 @@ var db_mock = {
 		}
 	},
 	addCBSubscription: function(api_key, path, subsId, host, port, path, unit, callback){
-
+		if(api_key == 'err_addCBSubs'){
+			return callback('Error')
+		}
+	},
+	deleteCBSubscription: function(subscriptionId, callback){
+		if(subscriptionId === 'err_deleteCBSubs')
+			return callback('Error');
+		else
+			return callback();
 	}
 }
 
@@ -85,11 +98,9 @@ var acc_proxy_mock = {
 	count: function(api_key, path, unit, body, callback){
 		switch(api_key){
 			case 'err_count':
-				callback('Error');
-				break;
+				return callback('Error');
 			case 'err_notifying':
-				callback();
-				break;
+				return callback();
 		}
 	}
 }
@@ -179,13 +190,91 @@ describe("Testing db_handler", function(){
 		beforeEach(function() {
 			req_mock.resetBody();
 			spyOn(proxy_mock, 'sendData').andCallThrough();
+			spyOn(resp_mock, 'send').andCallThrough();
+			spyOn(db_mock, 'addCBSubscription').andCallThrough();
+			spyOn(db_mock, 'deleteCBSubscription').andCallThrough();
+			this.accounting = {
+				port: 9000,
+				privatePath: '/path'
+			}
 		});
 
 		it('[subscription] response to the client or CB fail', function() {
-			this.accounting = {
-				port: 9000,
-				privatePath: 'err_response_subs'
-			}
-		})
+			this.accounting.privatePath = 'err_response_subs';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.addCBSubscription.callCount).toEqual(0);
+		});
+
+		it('[subscription] add subscription to the db fail', function() {
+			req_mock['X-API-KEY'] = 'err_addCBSubs';
+			req_mock.path = '/private';
+			req_mock.body.reference = 'http://subscriptor:9000/notify';
+			this.accounting.unit = 'unit';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.addCBSubscription.callCount).toEqual(1);
+		});
+
+		it('[subscription] add subscription to the db correct', function() {
+			req_mock['X-API-KEY'] = 'api_key';
+			req_mock.path = '/private';
+			req_mock.body.reference = 'http://subscriptor:9000/notify';
+			this.accounting.unit = 'unit';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.addCBSubscription.callCount).toEqual(1);
+			expect(db_mock.addCBSubscription.calls[0].args[0]).toEqual('api_key');
+		});
+
+		it('[unsubscribe | POST ] response to the client or CB fail', function() {
+			req_mock.method = 'POST';
+			this.accounting = 
+			privatePath = 'err_response_subs';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.addCBSubscription.callCount).toEqual(0);
+		});
+
+		it('[unsubscribe | DELETE ] response to the client or CB fail', function() {
+			req_mock.method = 'DELETE';
+			req_mock.path = '/path'
+			this.accounting.privatePath = 'err_response_subs';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.deleteCBSubscription.callCount).toEqual(0);
+		});
+
+		it('[unsubscribe | POST ] delete subscription from DB fail', function() {
+			req_mock.method = 'POST';
+			req_mock.body.subscriptionId = 'err_deleteCBSubs';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.deleteCBSubscription.callCount).toEqual(1);
+			expect(db_mock.deleteCBSubscription.calls[0].args[0]).toEqual('err_deleteCBSubs');
+		});
+
+		it('[unsubscribe | POST ] delete subscription correct', function() {
+			req_mock.method = 'POST';
+			req_mock.body.subscriptionId = 'subscriptionId';
+			req_mock.body = JSON.stringify(req_mock.body);
+			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(resp_mock.send.callCount).toEqual(1);
+			expect(db_mock.deleteCBSubscription.callCount).toEqual(1);
+			expect(db_mock.deleteCBSubscription.calls[0].args[0]).toEqual('subscriptionId');
+		});
 	});
 });

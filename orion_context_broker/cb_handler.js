@@ -47,8 +47,9 @@ exports.notificationHandler = function(req, response) { // Receive and manage CB
 			    		// Send the response to the client
 			    		proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) { 
 			    			response.statusCode = status;
-			    			for (var i in headers)
+			    			for (var i in headers){
 			    				response.setHeader(i, headers[i]);
+			    			}
 			    			response.send(resp);
 			    			if( status !== 200)
 			    				console.log('[LOG] An error ocurred while notifying the subscription to: http://' + 
@@ -113,12 +114,12 @@ exports.CBRequestHandler = function(request, response, accounting, operation) {
 						});
 				}
 			});
-		break;
+			break;
 
 		case 'unsubscribe':
 			var subscriptionId = '';
 			if (request.method === 'POST') {
-				subscriptiionID = JSON.parse(request.body).subscriptionId;
+				subscriptionId = JSON.parse(request.body).subscriptionId;
 			} else if (request.method === 'DELETE') {
 				var pattern = /\/(\w+)$/;
 				var match = pattern.exec(request.path);

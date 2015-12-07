@@ -216,5 +216,4 @@ var job = cron.scheduleJob('00 00 * * *', function() {
                 });
 });
 
-
 exports.count = count;

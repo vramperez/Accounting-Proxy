@@ -1,15 +1,14 @@
 var express = require('express');
 var config = require('./config');
-var proxy = require('./HTTP_Client/HTTPClient.js');
-var db = require('./db_Redis.js');
-var api = require('./APIServer.js');
-var notifier = require('./notifier.js');
+var proxy = require('./HTTP_Client/HTTPClient');
+var db = require('./db_Redis');
+var api = require('./APIServer');
+var notifier = require('./notifier');
 var cron = require('node-schedule');
 var contextBroker = require('./orion_context_broker/cb_handler');
 var url = require('url');
 
 var app = express();
-
 var map = {},
     acc_modules = {};
 
@@ -29,7 +28,7 @@ app.use( function(request, response, next) {
     });
 });
 
-app.use(function(request, response) {
+app.use( function(request, response) {
     var userID = request.get('X-Actor-ID');
     var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
@@ -69,7 +68,7 @@ app.use(function(request, response) {
                                 for(var idx in headers)
                                     response.setHeader(idx, headers[idx]);
                                 response.send(resp);
-                                count(API_KEY, publicPath, accounting.unit, resp, function(err){
+                                this.count(API_KEY, publicPath, accounting.unit, resp, function(err){
                                     if(err)
                                         console.log('[LOG] An error ocurred while making the accounting');
                                 });
@@ -83,7 +82,7 @@ app.use(function(request, response) {
                         for(var idx in headers)
                             response.setHeader(idx, headers[idx]);
                         response.send(resp);
-                        count(API_KEY, publicPath, accounting.unit, resp, function(err){
+                        this.count(API_KEY, publicPath, accounting.unit, resp, function(err){
                             if(err)
                                 console.log('[LOG] An error ocurred while making the accounting');
                         });
@@ -109,7 +108,9 @@ count = function(API_KEY, publicPath, unit, response, callback) {
     var info = map[API_KEY];
     var accounting = info.accounting[publicPath];
     acc_modules[unit](response, function(err, amount) {
-        if(!err){
+        if(err)
+            return callback('Error');
+        else{
             accounting.num += amount;
             db.count(info.actorID, API_KEY, publicPath, amount, function(err, num){
                 if(err)
@@ -125,11 +126,10 @@ count = function(API_KEY, publicPath, unit, response, callback) {
 
 exports.newBuy = function(api_key, data) {
     map[api_key] = data;
-    // console.log("PROXY MAP: \n", map);
 };
 
 exports.getMap = function(callback) {
-    callback(map);
+    return callback(map);
 };
 
 // Load accounting modules
@@ -143,6 +143,7 @@ for (var u in config.modules.accounting) {
     }
 }
 
+
 /**
  * Load all the information from the DB and stores in map
  *
@@ -150,20 +151,19 @@ for (var u in config.modules.accounting) {
  * @param {Object} data          Data loaded from the DB
  */
 db.loadFromDB(function(err, data) {
-    if (err)
+    if (err){ 
         console.log('Something went wrong');
-    else {
+    } else {
         map = data;
-
-        if (Object.getOwnPropertyNames(data).length === 0)
+        if (Object.getOwnPropertyNames(data).length === 0){
             console.log('[LOG] No data avaliable');
-        else {
+        } else {
 
             console.log(JSON.stringify(map, null, 2));
 
             for (var apiKey in map)
-                for (var publicPath in map[apiKey].accounting)
-                    if (map[apiKey].accounting[publicPath].num != 0){
+                for (var publicPath in map[apiKey].accounting){
+                     if (map[apiKey].accounting[publicPath].num != 0){
                         notifier.notify({
                             "actorID": map[apiKey].actorID,
                             "API_KEY": apiKey,
@@ -179,6 +179,7 @@ db.loadFromDB(function(err, data) {
                             if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
                         });
                     }
+                }
         }
         app.listen(app.get('port'));
         // Start API Server
@@ -215,5 +216,3 @@ var job = cron.scheduleJob('00 00 * * *', function() {
                     if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
                 });
 });
-
-exports.count = count;

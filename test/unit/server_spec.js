@@ -2,22 +2,24 @@ var proxyquire = require('proxyquire');
 
 
 var db_mock = {
-	err: false,
+	err_load: false,
+	err_count: false,
 	map: {},
 	count: function(actoriId, api_key, path, amount, callback){
-		if(this.err)
+		if(this.err_count)
 			callback('Error')
 		else
 			callback(undefined, undefined);
 	},
 	loadFromDB: function(callback){
-		if(this.err)
+		if(this.err_load)
 			return callback('Error', undefined);
 		else
 			return callback(undefined, this.map);
 	},
 	reset: function(){
-		this.err = false;
+		this.err_load = false;
+		this.err_count = false;
 		this.map = {};
 	}
 }
@@ -37,7 +39,10 @@ var notifier_mock = {
 }
 
 var contextBroker_mock = {
-	DBSubscriptionPath: function(url, request, callback){
+	CBSubscriptionPath: function(url, request, callback){
+
+	},
+	CBRequestHandler: function(request, response, accounting, operation){
 
 	},
 	run: function(){}
@@ -65,6 +70,30 @@ var config_mock = {
 	}
 }
 
+var req_mock = {
+	on: function(){},
+	get: function(header){
+		return this[header];
+	},
+	reset: function(){
+
+	}
+}
+
+var resp_mock = {
+	statusCode: undefined,
+	status: function(status){
+		this.statusCode = status;
+		return this;
+	},
+	end: function(){},
+	send: function(resp){},
+	setHeader: function(header, value){},
+	reset: function() {
+		this.statusCode = undefined;
+	}
+}
+
 var app_mock = {
 	set: function(prop, value){},
 	listen: function(port){},
@@ -72,19 +101,17 @@ var app_mock = {
 		return 0;
 	},
 	use: function(callback){
-		return callback(this.req, this.resp);
+		return callback(req_mock, resp_mock);
 	}
 }
 
-var req_mock = {
-	on: function(){},
-	get: function(header){
-		
+var proxy_mock = {
+	getClientIp: function(request, headers){
+		return ['header'];
+	},
+	sendData: function(protocol, options, body, response, callback){
+		return callback(200, {}, ['header']);
 	}
-}
-
-var resp_mock = {
-
 }
 
 describe('Testing accounting-proxy server', function() {
@@ -104,7 +131,7 @@ describe('Testing accounting-proxy server', function() {
 		});
 
 		it('error loading from DB', function() {
-			db_mock.err = true;
+			db_mock.err_load = true;
 			this.server = proxyquire('../../server', {'./db_Redis': db_mock});
 			expect(notifier_mock.notify.callCount).toEqual(0);
 			expect(app_mock.listen.callCount).toEqual(0);
@@ -170,7 +197,7 @@ describe('Testing accounting-proxy server', function() {
 
 		it('get map', function(done) {
 			db_mock.map = {
-				'fielf1': 'value1'
+				'field1': 'value1'
 			}
 			var server = proxyquire('../../server', {
 				'./db_Redis': db_mock,
@@ -187,20 +214,132 @@ describe('Testing accounting-proxy server', function() {
 	describe("'use' express", function() {
 
 		beforeEach(function() {
-
+			spyOn(resp_mock, 'status').andCallThrough();
+			spyOn(resp_mock, 'end').andCallThrough();
+			spyOn(proxy_mock, 'getClientIp').andCallThrough();
+			spyOn(proxy_mock, 'sendData').andCallThrough();
+			spyOn(db_mock, 'count').andCallThrough();
+			spyOn(contextBroker_mock, 'CBRequestHandler').andCallThrough();
 		});
 
 		afterEach(function() {
-
+			db_mock.reset();
+			req_mock.reset();
+			resp_mock.reset();
+			config_mock.reset();
 		});
 
 		it('userID not defined, should return 400', function() {
-			app_mock.req.userID = undefined;
 			var server = proxyquire('../../server', { 
 				express:  function(){
 					return app_mock;
 				} 
 			});
+			expect(resp_mock.status.callCount).toEqual(1);
+			expect(resp_mock.statusCode).toEqual(400);
+			expect(resp_mock.end.callCount).toEqual(1);
+			expect(proxy_mock.getClientIp.callCount).toEqual(0);
+		});
+
+		it('API-KEY not defined, should return 400', function() {
+			req_mock['X-Actor-ID'] = 'userID';
+			var server = proxyquire('../../server', { 
+				express:  function(){
+					return app_mock;
+				} 
+			});
+			expect(resp_mock.status.callCount).toEqual(1);
+			expect(resp_mock.statusCode).toEqual(400);
+			expect(resp_mock.end.callCount).toEqual(1);
+			expect(proxy_mock.getClientIp.callCount).toEqual(0);
+		});
+
+
+		it('wrong userID, should return 403', function() {
+			req_mock['X-Actor-ID'] = 'actorID';
+			req_mock['X-API-KEY'] = 'api-key';
+			var server = proxyquire('../../server', {
+				express:  function(){
+					return app_mock;
+				}
+			});
+			expect(resp_mock.status.callCount).toEqual(1);
+			expect(resp_mock.statusCode).toEqual(403);
+			expect(resp_mock.end.callCount).toEqual(1);
+			expect(proxy_mock.getClientIp.callCount).toEqual(0);
+		});
+
+		it('wrong userID, should return 403', function() {
+			req_mock['X-Actor-ID'] = 'actorID';
+			req_mock['X-API-KEY'] = 'api-key';
+			db_mock.map = { 
+				'api-key': {
+					actorID: 'other_user'
+				} 
+			};
+			var server = proxyquire('../../server', {
+				'./db_Redis': db_mock,
+				express:  function(){
+					return app_mock;
+				}
+			});
+			expect(resp_mock.status.callCount).toEqual(1);
+			expect(resp_mock.statusCode).toEqual(403);
+			expect(resp_mock.end.callCount).toEqual(1);
+			expect(proxy_mock.getClientIp.callCount).toEqual(0);
+		});
+
+		it('no accounting info, should return 404', function() {
+			req_mock['X-Actor-ID'] = 'actorID';
+			req_mock['X-API-KEY'] = 'api-key';
+			db_mock.map = { 
+				'api-key': {
+					actorID: 'actorID',
+					accounting: { }
+				} 
+			};
+			var server = proxyquire('../../server', {
+				'./db_Redis': db_mock,
+				express:  function(){
+					return app_mock;
+				}
+			});
+			expect(resp_mock.status.callCount).toEqual(1);
+			expect(resp_mock.statusCode).toEqual(404);
+			expect(resp_mock.end.callCount).toEqual(1);
+			expect(proxy_mock.getClientIp.callCount).toEqual(0);
+		});
+
+		it('no CB, error while making the accounting', function() {
+			// Falta test que falle en count del módulo 
+			req_mock['X-Actor-ID'] = 'actorID';
+			req_mock['X-API-KEY'] = 'api-key';
+			req_mock.path = '/public';
+			db_mock.err_count = true;
+			db_mock.map = { 
+				'api-key': {
+					actorID: 'actorID',
+					accounting: { 
+						'/public': {
+							port: 9000,
+							url: "http://localhost:9000/path",
+							unit: 'megabyte'
+						}
+					}
+				} 
+			};
+			var server = proxyquire('../../server', {
+				'./db_Redis': db_mock,
+				'./HTTP_Client/HTTPClient': proxy_mock,
+				express:  function() {
+					return app_mock;
+				}
+			});
+			expect(resp_mock.status.callCount).toEqual(0);
+			expect(resp_mock.end.callCount).toEqual(0);
+			expect(proxy_mock.getClientIp.callCount).toEqual(1);
+			expect(proxy_mock.sendData.callCount).toEqual(1);
+			expect(db_mock.count.callCount).toEqual(1);
 		});
 	});
 });

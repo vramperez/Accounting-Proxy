@@ -1,5 +1,5 @@
 /** Accounting module for unit: CALL */
 
 exports.count = function(response, callback) {
-    callback(undefined, 1);
+    callback(null, 1);
 };

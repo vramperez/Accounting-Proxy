@@ -27,7 +27,6 @@ var mock = {
 				callback('Error');
 				break;
 			case 'correct':
-				break;
 			default:
 				callback();
 		}
@@ -402,8 +401,9 @@ describe(" Testing database ", function() {
 				callback('Error');
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err){
-				expect(err).toEqual({});
+			db.loadUnits(function(err, data){
+				expect(err).not.toBeNull();
+				expect(data).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -415,8 +415,9 @@ describe(" Testing database ", function() {
 				callback(undefined, []);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err) {
-				expect(err).toEqual({});
+			db.loadUnits(function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toEqual({});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -428,8 +429,9 @@ describe(" Testing database ", function() {
 				callback(undefined, ['err_hgetall']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err) {
-				expect(err).toEqual({});
+			db.loadUnits(function(err, data) {
+				expect(err).not.toBeNull();
+				expect(data).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -441,8 +443,9 @@ describe(" Testing database ", function() {
 				callback(undefined, ['no_exist']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err, obj) {
-				expect(err).toEqual({});
+			db.loadUnits(function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toEqual({});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -454,8 +457,9 @@ describe(" Testing database ", function() {
 				callback(undefined, ['unit1']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err) {
-				expect(err).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' } });
+			db.loadUnits(function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' } });
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -467,8 +471,9 @@ describe(" Testing database ", function() {
 				callback(undefined, ['unit1', 'unit2']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err) {
-				expect(err).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' }, 
+			db.loadUnits(function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' }, 
 										'/public2' : { publicPath : '/public2', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' } });
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(2);
@@ -481,8 +486,9 @@ describe(" Testing database ", function() {
 				callback(undefined, ['unit1', 'no_exist']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadUnits(function(err) {
-				expect(err).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' },});
+			db.loadUnits(function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toEqual({ '/public1' : { publicPath : '/public1', organization : 'org1', name : 'name1', version : '1', unit : 'megabyte' },});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(2);
 				done();
@@ -676,13 +682,13 @@ describe(" Testing database ", function() {
 						callback('Error');
 						break;
 					case 'no_apiKey':
-						callback(undefined, []);
+						callback(null, []);
 						break;
 					case 'one_apiKey':
-						callback(undefined, ['one_apiKey']);
+						callback(null, ['one_apiKey']);
 						break;
 					case 'two_apiKey':
-						callback(undefined, ['one_apiKey', 'two_apiKey']);
+						callback(null, ['one_apiKey', 'two_apiKey']);
 				}
 			};
 			spyOn(mock, 'smembers').andCallThrough();
@@ -690,8 +696,9 @@ describe(" Testing database ", function() {
 		});
 
 		it('smembers fail', function(done) {
-			db.getApiKey('err_smembers', offer, function(err) {
-				expect(err).toBe('Error');
+			db.getApiKey('err_smembers', offer, function(err, data) {
+				expect(err).not.toBeNull();
+				expect(data).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -699,8 +706,9 @@ describe(" Testing database ", function() {
 		});
 
 		it('smembers return empy list', function(done) {
-			db.getApiKey('no_apiKey', offer, function(err) {
-				expect(err).toBe(undefined);
+			db.getApiKey('no_apiKey', offer, function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -708,22 +716,15 @@ describe(" Testing database ", function() {
 		});
 
 		it('return no apiKey', function(done) {
-			db.getApiKey('one_apiKey', offer.offering, function(err) {
-				expect(err).toBe(undefined);
+			db.getApiKey('one_apiKey', offer.offering, function(err, data) {
+				expect(err).toBeNull();
+				expect(data).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
 		});
-
-		it('return apiKey, two apiKeys possible', function(done) {
-			db.getApiKey('two_apiKey', offer.offering, function(err) {
-				expect(err).toBe("ok");
-				expect(mock.smembers.callCount).toEqual(1);
-				expect(mock.hgetall.callCount).toEqual(2);
-				done();
-			});
-		});
+		
 	});
 
 	describe("getInfo", function() {
@@ -869,21 +870,25 @@ describe(" Testing database ", function() {
 		});
 
 		it('correlation number no exist', function(done) {
-			db.resetCount('no_', 'correlation', 'Number');
-			expect(mock.hget.callCount).toEqual(1);
-			expect(mock.hmset.callCount).toEqual(0);
-			expect(mock.hget.calls[0].args[0]).toEqual('no_correlationNumber');
-			expect(mock.hget.calls[0].args[1]).toEqual('correlation_number');
-			done();
+			db.resetCount('no_', 'correlation', 'Number', function(err) {
+				expect(err).toBeNull();
+				expect(mock.hget.callCount).toEqual(1);
+				expect(mock.hmset.callCount).toEqual(0);
+				expect(mock.hget.calls[0].args[0]).toEqual('no_correlationNumber');
+				expect(mock.hget.calls[0].args[1]).toEqual('correlation_number');
+				done();
+			});
 		});
 
 		it('correlation number exists', function(done) {
-			db.resetCount('co', 'rre', 'ct');
-			expect(mock.hget.callCount).toEqual(1);
-			expect(mock.hmset.callCount).toEqual(1);
-			expect(mock.hmset.calls[0].args[0]).toEqual('correct');
-			expect(mock.hmset.calls[0].args[1]).toEqual({'correlation_number': 2, 'num': '0'});
-			done();
+			db.resetCount('co', 'rre', 'ct', function(err) {
+				expect(err).toBeNull();
+				expect(mock.hget.callCount).toEqual(1);
+				expect(mock.hmset.callCount).toEqual(1);
+				expect(mock.hmset.calls[0].args[0]).toEqual('correct');
+				expect(mock.hmset.calls[0].args[1]).toEqual({'correlation_number': 2, 'num': '0'});
+				done();
+			});
 		});
 	});
 
@@ -894,15 +899,17 @@ describe(" Testing database ", function() {
 		});
 
 		it('resource doesn\'t exist', function(done) {
-			db.getAccountingInfo('', {organization: 'no', name: '_', version: 'exist'}, function(res){
-				expect(res).toBe(undefined);
+			db.getAccountingInfo('', {organization: 'no', name: '_', version: 'exist'}, function(err, res){
+				expect(res).toBeNull();
+				expect(res).toBeNull();
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
 		});
 
 		it('return correct info', function(done) {
-			db.getAccountingInfo('/public', offer, function(res){
+			db.getAccountingInfo('/public', offer, function(err, res){
+				expect(err).toBeNull();
 				expect(res).toEqual(acc_info);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();

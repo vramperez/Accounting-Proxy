@@ -9,13 +9,24 @@ var contextBroker = require('./orion_context_broker/cb_handler');
 var url = require('url');
 
 var app = express();
-var map = {},
+var accounting_info = {},
     acc_modules = {};
 
 app.set('port', config.accounting_proxy.port);
 
+// Load accounting modules
+for (var u in config.modules.accounting) {
+    try {
+        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u] + ".js").count;
+    } catch (e) {
+        console.log("[ERROR] No accounting module for unit '" + config.modules.accounting[u] + "': missing file " +
+                    "'acc_modules\\" +  config.modules.accounting[u] + ".js'");
+        process.exit(1);
+    }
+}
+
 /**
- * Load all the information from the DB and stores in map
+ * Load all the information from the DB and stores in accounting_info
  *
  * @param {Object} err           DB error.
  * @param {Object} data          Data loaded from the DB
@@ -24,39 +35,42 @@ db.loadFromDB(function(err, data) {
     if (err){ 
         console.log('Something went wrong');
     } else {
-        map = data;
-        if (Object.getOwnPropertyNames(data).length === 0){
+        accounting_info = data;
+        if (Object.getOwnPropertyNames(data).length === 0) {
             console.log('[LOG] No data avaliable');
         } else {
+            console.log(JSON.stringify(accounting_info, null, 2));
 
-            console.log(JSON.stringify(map, null, 2));
-
-            for (var apiKey in map)
-                for (var publicPath in map[apiKey].accounting){
-                     if (map[apiKey].accounting[publicPath].num != 0){
-                        notifier.notify({
-                            "actorID": map[apiKey].actorID,
+            for (var apiKey in accounting_info) {
+                for (var publicPath in accounting_info[apiKey].accounting) {
+                     if (accounting_info[apiKey].accounting[publicPath].num != 0) {
+                        notifier.notify( { // Sacar a funcion
+                            "actorID": accounting_info[apiKey].actorID,
                             "API_KEY": apiKey,
                             "publicPath": publicPath,
-                            "organization": map[apiKey].organization,
-                            "name": map[apiKey].name,
-                            "version": map[apiKey].version,
-                            "correlation_number": map[apiKey].accounting[publicPath].correlation_number,
-                            "num": map[apiKey].accounting[publicPath].num,
-                            "reference": map[apiKey].reference
+                            "organization": accounting_info[apiKey].organization,
+                            "name": accounting_info[apiKey].name,
+                            "version": accounting_info[apiKey].version,
+                            "correlation_number": accounting_info[apiKey].accounting[publicPath].correlation_number,
+                            "num": accounting_info[apiKey].accounting[publicPath].num,
+                            "reference": accounting_info[apiKey].reference
                         }, function (API_KEY, puPath, num) {
-                            map[API_KEY].accounting[puPath].num = num;
-                            if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
+                            accounting_info[API_KEY].accounting[puPath].num = num;
+                            if (num === 0) {
+                                accounting_info[API_KEY].accounting[puPath].correlation_number += 1;
+                            }
                         });
                     }
                 }
+            }
         }
         app.listen(app.get('port'));
         // Start API Server
-        api.run(map);
+        api.run(accounting_info);
         // Start ContextBroker Server for subscription notifications if it is enabled in the config
-        if(config.resources.contextBroker)
+        if (config.resources.contextBroker) {
             contextBroker.run();
+        }
     }
 });
 
@@ -80,15 +94,13 @@ app.use( function(request, response) {
     if (userID === undefined) {
         console.log("[LOG] Undefined username");
         response.status(400).end();
-    }
 
-    else if (API_KEY === undefined) {
+    } else if (API_KEY === undefined) {
         console.log("[LOG] Undefined API_KEY");
         response.status(400).end();
-    }
 
-    else if (map[API_KEY] !== undefined) {
-        var info = map[API_KEY];
+    } else if (accounting_info[API_KEY] !== undefined) {
+        var info = accounting_info[API_KEY];
 
         if (info.actorID === userID) {
             var accounting = info.accounting[publicPath];
@@ -102,32 +114,37 @@ app.use( function(request, response) {
                     headers: proxy.getClientIp(request, request.headers)
                 };
 
-                if(config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)){ // Orion ContextBroker request
+                if (config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)) { // Orion ContextBroker request
                     contextBroker.CBSubscriptionPath(accounting.url, request, function(operation) {
-                        if( operation === 'subscribe' || operation === 'unsubscribe') // (un)subscription request
+                        if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
                             contextBroker.CBRequestHandler(request, response, accounting, operation);
-                        else
+                        } else {
                             proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Orion ConextBroker request ( no (un)subscription)
                                 response.statusCode = status;
-                                for(var idx in headers)
+                                for(var idx in headers) {
                                     response.setHeader(idx, headers[idx]);
+                                }
                                 response.send(resp);
                                 count(API_KEY, publicPath, accounting, resp, function(err){
-                                    if(err)
+                                    if(err) {
                                         console.log('[LOG] An error ocurred while making the accounting');
+                                    }
                                 });
                             });
+                        }
                     });
                     
                 } else {
                     proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Other requests
                         response.statusCode = status;
-                        for(var idx in headers)
+                        for (var idx in headers) {
                             response.setHeader(idx, headers[idx]);
+                        }
                         response.send(resp);
                         count(API_KEY, publicPath, accounting, resp, function(err){
-                            if(err)
+                            if (err){
                                 console.log('[LOG] An error ocurred while making the accounting');
+                            }
                         });
                     });
                 }
@@ -149,38 +166,29 @@ app.use( function(request, response) {
 count = function(API_KEY, publicPath, accounting, response, callback) {
 
     acc_modules[accounting.unit](response, function(err, amount) {
-        if(err){
-            return callback('Error');
-        }else{
+        if (err) {
+            return callback(err);
+        } else {
             accounting.num += amount;
-            db.count(map[API_KEY].actorID, API_KEY, publicPath, amount, function(err, num){
-                if(err)
+            db.count(accounting_info[API_KEY].actorID, API_KEY, publicPath, amount, function(err, num){
+                if (err) {
                     callback(err);
-                else
-                    callback();
+                } else {
+                    callback(null);
+                }
             });
         }
     });
 };
 
-exports.newBuy = function(api_key, data) {
-    map[api_key] = data;
+exports.newBuy = function(api_key, data, callback) {
+    accounting_info[api_key] = data;
+    return callback(null);
 };
 
 exports.getMap = function(callback) {
-    return callback(map);
+    return callback(null, accounting_info);
 };
-
-// Load accounting modules
-for (var u in config.modules.accounting) {
-    try {
-        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u] + ".js").count;
-    } catch (e) {
-        console.log("[ERROR] No accounting module for unit '" + config.modules.accounting[u] + "': missing file " +
-                    "'acc_modules\\" +  config.modules.accounting[u] + ".js'");
-        process.exit(1);
-    }
-}
 
 /* Create daemon to update WStore every day
  * Cron format:
@@ -189,21 +197,26 @@ for (var u in config.modules.accounting) {
 var job = cron.scheduleJob('00 00 * * *', function() {
     console.log('[LOG] Sending accounting information...');
     // variable i is unused in this invocation.
-    for (var apiKey in map)
-        for (var publicPath in map[apiKey].accounting)
-            if (map[apiKey].accounting[publicPath].num !== 0)
-                notifier.notify({
-                    "actorID": map[apiKey].actorID,
+    for (var apiKey in accounting_info) {
+        for (var publicPath in accounting_info[apiKey].accounting) {
+            if (accounting_info[apiKey].accounting[publicPath].num !== 0) {
+                notifier.notify({ // Sacar a funcion
+                    "actorID": accounting_info[apiKey].actorID,
                     "API_KEY": apiKey,
                     "publicPath": publicPath,
-                    "organization": map[apiKey].organization,
-                    "name": map[apiKey].name,
-                    "version": map[apiKey].version,
-                    "correlation_number": map[apiKey].accounting[publicPath].correlation_number,
-                    "num": map[apiKey].accounting[publicPath].num,
-                    "reference": map[apiKey].reference
+                    "organization": accounting_info[apiKey].organization,
+                    "name": accounting_info[apiKey].name,
+                    "version": accounting_info[apiKey].version,
+                    "correlation_number": accounting_info[apiKey].accounting[publicPath].correlation_number,
+                    "num": accounting_info[apiKey].accounting[publicPath].num,
+                    "reference": accounting_info[apiKey].reference
                 }, function (API_KEY, puPath, num) {
-                    map[API_KEY].accounting[puPath].num = num;
-                    if (num === 0) map[API_KEY].accounting[puPath].correlation_number += 1;
+                    accounting_info[API_KEY].accounting[puPath].num = num;
+                    if (num === 0) {
+                        accounting_info[API_KEY].accounting[puPath].correlation_number += 1;  
+                    }
                 });
+            }
+        }
+    }
 });

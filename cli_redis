@@ -14,33 +14,36 @@ cli
     .action(function(publicPath, privatePath, port) {
         if (/\/((\w+)\/?)*$/.test(publicPath) &&
             /\/((\w+)\/?)*$/.test(privatePath) &&
-            /^\d*$/.test(port))
-            db.newService(publicPath, privatePath, port, function(err) {
-                if (err)
-                    console.log(err);
-            });
-        else {
+            /^\d*$/.test(port)) {
+                db.newService(publicPath, privatePath, port, function(err) {
+                    if (err) {
+                        console.log(err);
+                    }
+                });
+        } else {
             console.log("[ERROR] Invalid parameters.");
         }
-    });
+});
 
 // Get service information
 cli
     .command('getService [publicPath]')
     .description('Get service information')
     .action(function(publicPath) {
-        if (/\/((\w+)\/?)*$/.test(publicPath))
+        if (/\/((\w+)\/?)*$/.test(publicPath)) {
             db.getService(publicPath, function(err, data) {
-                if(err)
+                if (err) {
                     console.log(err);
-                else if (data === undefined)
+                } else if (data === undefined) {
                     console.log('No data avaliable');
-                else
-                     console.log("Private path: " + data['privatePath'] + "  Port: " + data['port']);
-                });
-        else 
+                } else {
+                    console.log("Private path: " + data['privatePath'] + "  Port: " + data['port']);
+                }
+            });
+        } else {
             console.log("[ERROR] Invalid parameters.");
-    });
+        } 
+});
 
 
 // Delete service command
@@ -49,26 +52,27 @@ cli
     .description('Delete a service from proxy database.')
     .action(function(path, port) {
         if (/\/((\w+)\/?)*$/.test(path) &&
-            /^\d*$/.test(port))
+            /^\d*$/.test(port)) {
             db.deleteService(path, port, function(err) {
-                if (err)
+                if (err) {
                     console.log(err);
+                }
             });
-        else {
+        } else {
             console.log("[ERROR] Invalid parameters.");
         }
-    });
+});
 
 cli
     .command('getInfo [user]')
     .description('Get user\'s information.')
     .action(function(user) {
         db.getInfo(user, function(err, data) {
-            if (err)
+            if (err) {
                 console.log('Error occur in DB.');
-            else if (data === undefined)
+            } else if (data === undefined) {
                 console.log('No data avaliable.');
-            else {
+            } else {
                 console.log("[FORMAT: Organization - Name - Version - API_KEY]");
                 for (i in data) {
                     console.log(data[i].organization + " - " +
@@ -78,6 +82,6 @@ cli
                 }
             }
         });
-    });
+});
 
 cli.parse(process.argv);

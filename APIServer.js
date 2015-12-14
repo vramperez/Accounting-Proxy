@@ -6,25 +6,27 @@ var config = require('./config');
 var db = require('./db_Redis.js');
 
 var app = express(),
-    router = express.Router(),
     resources = {},
     offerResource = {},
-    map;
+    accounting_info;
 
 app.set('port', config.accounting_proxy.store_port);
-app.use('/api', router);
 
 exports.run = function(d){
-    map = d;
+    accounting_info = d;
     db.loadResources(function(d) {
         resources = d;
-        db.loadUnits(function(data) {
-            for (var i in data) {
-                var offerResourceBase = data[i].publicPath + data[i].organization + data[i].name + data[i].version;
-                var sha1 = crypto.createHash('sha1');
-                sha1.update(offerResourceBase);
-                var id = sha1.digest('hex');
-                offerResource[id] = data[i].unit;
+        db.loadUnits(function(err, data) {
+            if (err) {
+                console.log('[ERROR] Error while load information from DB')
+            } else {
+                for (var i in data) {
+                    var offerResourceBase = data[i].publicPath + data[i].organization + data[i].name + data[i].version;
+                    var sha1 = crypto.createHash('sha1');
+                    sha1.update(offerResourceBase);
+                    var id = sha1.digest('hex');
+                    offerResource[id] = data[i].unit;
+                }
             }
         });
     });
@@ -36,7 +38,7 @@ exports.resourcesHandler = function(req, res) {
     req.setEncoding('utf-8');
 
     var body = '';
-    if (req.get('Content-Type').indexOf('application/json') > -1) {
+    if (req.get('Content-Type').indexOf('application/json') > -1) { 
         req.on('data', function(d) {
             body += d;
         });
@@ -49,15 +51,15 @@ exports.resourcesHandler = function(req, res) {
             } else {
                 var publicPath = url.parse(body.url).pathname;
                 db.getService(publicPath, function(err, data) {
-                    if ( data === undefined || err !== undefined)
+                    if ( data === undefined || err !== undefined){
                         res.status(400).send();
-
-                    else{
-                        if (resources[publicPath] === undefined)
+                    } else {
+                        if (resources[publicPath] === undefined){
                             resources[publicPath] = {
                                 url: data.url,
                                 port: data.port
                             };
+                        }
 
 
                         if (config.modules.accounting.indexOf(body.unit) === -1){
@@ -68,8 +70,9 @@ exports.resourcesHandler = function(req, res) {
                             var sha1 = crypto.createHash('sha1');
                             sha1.update(offerResourceBase);
                             var id = sha1.digest('hex');
-                            if (offerResource[id] === undefined)
+                            if (offerResource[id] === undefined){
                                 offerResource[id] = body.unit;
+                            }
 
                             db.addResource({
                                 offering: body.offering,
@@ -78,18 +81,20 @@ exports.resourcesHandler = function(req, res) {
                                 unit: body.unit,
                                 component_label: body.component_label
                             }, function(err) {
-                                if (err !== undefined)
+                                if (err !== undefined) {
                                     res.status(400).send();
-                                else
+                                } else {
                                     res.status(201).send();
+                                }
                             });
                         }
                     }
                 });
             }
         });
-    } else
+    } else {
         res.status(415).send();
+    }
 };
 
 exports.usersHandler = function(req, res){
@@ -113,7 +118,7 @@ exports.usersHandler = function(req, res){
                 temRes = []
 
             proxy.getMap(function(m) {
-                map = m;
+                accounting_info = m;
                 db.getApiKey(user, offer, function(api_key) {
 
                     if (api_key === undefined) {
@@ -124,8 +129,8 @@ exports.usersHandler = function(req, res){
                         api_key = sha1.digest('hex');
                     }
 
-                    if (map[api_key] === undefined) {
-                        map[api_key] = {
+                    if (accounting_info[api_key] === undefined) {
+                        accounting_info[api_key] = {
                             actorID: user,
                             organization: offer.organization,
                             name: offer.name,
@@ -144,8 +149,8 @@ exports.usersHandler = function(req, res){
 
                         if (resources[publicPath] !== undefined &&
                             offerResource[id] !== undefined &&
-                            map[api_key].accounting[publicPath] === undefined) {
-                            map[api_key].accounting[publicPath] = {
+                            accounting_info[api_key].accounting[publicPath] === undefined) {
+                            accounting_info[api_key].accounting[publicPath] = {
                                 url: resources[publicPath].url,
                                 port: resources[publicPath].port,
                                 num: 0,
@@ -155,33 +160,38 @@ exports.usersHandler = function(req, res){
                         }
                     }
 
-                    db.addInfo(api_key, map[api_key], function(err) {
-                        if (err)
+                    db.addInfo(api_key, accounting_info[api_key], function(err) {
+                        if (err) {
                             res.status(400).send();
-                        else {
-                            proxy.newBuy(api_key, map[api_key]);
-                            res.status(201).send();
+                        } else {
+                            proxy.newBuy(api_key, accounting_info[api_key], function(err){
+                                if (err) {
+                                    // Notify the error
+                                } else {
+                                    res.status(201).send();
+                                }
+                            });
                         }
                     });
 
                 });
             });
         });
-    } else
+    } else {
         res.status(415).send();
+    }
 };
 
 exports.keysHandler = function(req, res){
     var userID = req.get('X-Actor-ID');
 
-    if (userID === undefined)
+    if (userID === undefined) {
         res.status(400).send();
-    else
+    } else {
         db.getInfo(userID, function(err, data) {
-            if (data === {} || err != undefined){
+            if (data === {} || err != undefined) {
                 res.status(400).send();
-
-            }else{
+            } else {
                 var msg = [];
                 for (var i in data) {
                     msg.push({
@@ -196,8 +206,9 @@ exports.keysHandler = function(req, res){
                 res.json(msg);
             }
         });
+    }
 };
 
-router.post('/resources', module.exports.resourcesHandler);
-router.post('/users', module.exports.usersHandler);
-router.get('/users/keys', module.exports.keysHandler);
+app.post('/api/resources', module.exports.resourcesHandler);
+app.post('/api/users', module.exports.usersHandler);
+app.get('/api/users/keys', module.exports.keysHandler);

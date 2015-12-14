@@ -11,28 +11,31 @@ exports.loadFromDB = function(setData) {
 	var data = {};
 
 	db.smembers('API_KEYS', function(err, api_keys) {
-		if(err)
+		if (err) {
 			setData(err);
-		else{
+		} else {
 			var counter = api_keys.length;
-			if(api_keys.length !== 0)
-				for(i in api_keys){
+			if (api_keys.length !== 0) {
+				for (i in api_keys) {
 					db.hgetall(api_keys[i], function(err, api_key) {
-						if(api_key !== null)
+						if (api_key !== null) {
 							module.exports.loadResourcesAux(api_key, data, function() {
 								counter--;
-								if(counter === 0)
+								if (counter === 0) {
 									setData(undefined, data);
+								}
 							});
-						else{
+						} else {
 							counter--;
-							if(counter === 0)
+							if (counter === 0) {
 								setData(undefined, data);
+							}
 						}
 					});
 				}
-			else
+			} else {
 				setData(undefined, data);
+			}
 		}
 	});
 };
@@ -40,15 +43,15 @@ exports.loadFromDB = function(setData) {
 exports.loadResourcesAux = function(api_key, data, callback){
 
 	db.smembers('resources', function(err, resources) {
-		if(! err){
+		if (! err) {
 			var counter = resources.length;
-			for(i in resources)
+			for (i in resources) {
 				db.hgetall(resources[i], function(err, res) {
-					if(res !== null && api_key.organization === res.org && api_key.name === res.name && api_key.version === res.version){
+					if (res !== null && api_key.organization === res.org && api_key.name === res.name && api_key.version === res.version) {
 						db.hgetall(api_key.actorID + api_key.API_KEY + res.publicPath, function(err, account) {
 							db.hgetall(res.publicPath, function(err, serv) {
-								if(account !== null && serv !== null){
-									if(counter === resources.length)
+								if (account !== null && serv !== null) {
+									if (counter === resources.length) {
 										data[api_key.API_KEY] = {
 											actorID: api_key.actorID,
 											organization: api_key.organization,
@@ -57,6 +60,7 @@ exports.loadResourcesAux = function(api_key, data, callback){
 											accounting: {},
 											reference: api_key.reference
 										}
+									}
 
 									data[api_key.API_KEY].accounting[res.publicPath]  = {
 										url: serv.url,
@@ -67,18 +71,22 @@ exports.loadResourcesAux = function(api_key, data, callback){
 									}
 								}
 								counter--;
-								if(counter === 0)
+								if (counter === 0) {
 									callback();
+								}
 							});
 						});
-					} else
+					} else {
 						counter--;
-						if(counter === 0)
+						if (counter === 0) {
 							callback();
+						}
+					}
 				});
-		} 
-		else
+			}
+		} else {
 			callback();
+		}
 	});
 };
 
@@ -88,25 +96,28 @@ exports.loadResourcesAux = function(api_key, data, callback){
 exports.deleteService = function(path, callback) {
 	
 	db.del(path, function(err) {
-		if(err)
+		if (err) {
 			callback(err)
-		else
+		} else {
 			db.srem('public', path, function(err) {
-				if(err)
+				if (err) {
 					callback(err);
-				else
+				} else {
 					callback();
+				}
 			});
+		}
 	});
 };
 
 // CLI: getService [publicPath]
 exports.getService = function(publicPath, callback) {
 	db.hgetall(publicPath, function(err, obj) {
-		if(err)
+		if (err) {
 			callback(err, undefined);
-		else
+		} else {
 			callback(undefined, obj);
+		}
 	});
 };
 
@@ -114,25 +125,28 @@ exports.getService = function(publicPath, callback) {
 exports.newService = function(publicPath, url, port, callback){
 
 	db.exists(publicPath, function(err, res) {
-		if(err)
+		if (err) {
 			callback(err);
-		else if (res !== 0)
+		} else if (res !== 0) {
 			callback('[ERROR] The service already exists.');
-		else
+		} else {
 			db.sadd(['public', publicPath], function(err) {
-				if(err)
+				if (err) {
 					callback(err)
-				else
+				} else {
 					db.hmset(publicPath, {
 						'url': url,
 						'port': port
 					}, function(err) {
-						if(err)
+						if (err) {
 							callback(err);
-						else
+						} else {
 							callback();
+						}
 					});
+				}
 			});
+		}
 	});
 };
 
@@ -140,9 +154,9 @@ exports.newService = function(publicPath, url, port, callback){
 exports.addResource = function(data, callback) {
 
 	db.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version], function(err) {
-		if(err)
+		if (err) {
 			callback(err)
-		else
+		} else {
 			db.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
 				'publicPath': data.publicPath,
 				'org': data.offering.organization,
@@ -152,11 +166,13 @@ exports.addResource = function(data, callback) {
 				'unit': data.unit,
 				'component_label': data.component_label
 			}, function(err){
-				if(err)
+				if (err) {
 					callback(err)
-				else
+				} else {
 					callback();
+				}
 			});
+		}
 	});
 };
 
@@ -164,11 +180,15 @@ exports.loadUnits = function(callback) {
 	var toReturn = {};
 
 	db.smembers('resources', function(err, resources) {
-		if(! err && resources.length !== 0){
+		if (err) {
+			return callback(err, null);
+		} else if (resources.length !== 0) {
 			count = 0;
 			resources.forEach(function(entry) {
 				db.hgetall(entry, function(err, obj) {
-					if(obj != null && ! err){
+					if (err) {
+						return callback(err, null);
+					} else if (obj != null) {
 						toReturn[obj['publicPath']] = {
 							publicPath: obj['publicPath'],
 							organization: obj['organization'],
@@ -178,13 +198,13 @@ exports.loadUnits = function(callback) {
 						}
 					}
 					count++;
-					if(count == resources.length){
-						callback(toReturn);
+					if (count == resources.length) {
+						return callback(null, toReturn);
 					}
 				});
 			});
 		} else {
-			callback(toReturn);
+			return callback(null, toReturn);
 		}
 	});
 };
@@ -192,17 +212,18 @@ exports.loadUnits = function(callback) {
 exports.loadResources = function(callback) {
 	var toReturn = {};
 	db.smembers('public', function(err, resources) {
-		if( ! err && resources.length !== 0){
+		if (! err && resources.length !== 0) {
 			var count = 0;
 			resources.forEach(function(entry) {
 				db.hgetall(entry, function(err, res) {
-					if(res != null && ! err)
+					if (res != null && ! err) {
 						toReturn[entry] = {
 							url: res.url,
 							port: res.port
 						}
+					}
 					count ++;
-					if(count == resources.length){
+					if (count == resources.length) {
 						callback(toReturn);
 					}
 				});
@@ -217,9 +238,9 @@ exports.loadResources = function(callback) {
 exports.addInfo = function(API_KEY, data, callback) {
 
 	db.sadd(['API_KEYS', API_KEY], function(err) {
-		if(err)
+		if (err) {
 			callback(err)
-		else
+		} else {
 			db.hmset(API_KEY, {
 				'organization': data.organization,
 				'name': data.name,
@@ -228,14 +249,13 @@ exports.addInfo = function(API_KEY, data, callback) {
 				'API_KEY': API_KEY,
 				'reference': data.reference
 			}, function(err) {
-				if(err){
+				if (err) {
 					callback(err)
-				}
-				else
+				} else {
 					db.sadd([data.actorID, API_KEY], function(err){
-						if(err)
+						if (err) {
 							callback(err)
-						else{
+						} else {
 							var acc,
 								count = 0;
 							for (var p in data.accounting) {
@@ -248,41 +268,38 @@ exports.addInfo = function(API_KEY, data, callback) {
 									'correlation_number': acc.correlation_number
 								}, function(err){
 									count ++;
-									if(err)
+									if (err) {
 										callback(err);
-									else if (count == Object.keys(data.accounting).length)
+									} else if (count == Object.keys(data.accounting).length) {
 										callback();
+									}
 								});
 							};
 						}
 					});
+				}
 			});
+		}
 	});
 };
 
-
 exports.getApiKey = function(user, offer, callback) {
-
 	db.smembers(user, function(err, apiKey) {
-		if(err)
-			callback(err, undefined);
-		else if (apiKey.length !== 0){
+		if (err) {
+			return callback(err, null);
+		} else if (apiKey.length !== 0) {
 			var count = 0;
 			apiKey.forEach(function(entry) {
 				db.hgetall(entry, function(err, offerAcc) {
-					count++;
 					if (offerAcc['organization'] === offer['organization'] &&
 						offerAcc['name'] === offer['name'] &&
-						offerAcc['version'] === offer['version'])
-							callback(offerAcc['API_KEY']);
-					else if( count == apiKey.length){
-						callback();
+						offerAcc['version'] === offer['version']) {
+							return callback(null, offerAcc['API_KEY']);
 					}
 				});
 			});
-		} else {
-			callback();
 		}
+		return callback(null, null);
 	});
 };
 
@@ -292,64 +309,78 @@ exports.getInfo = function(user, callback) {
 	var toReturn = {};
 
 	db.smembers(user, function(err, acc) {
-			if(err)
-				callback(err, undefined);
-			else if (acc.length !== 0){
-				var count = 0;
-				acc.forEach(function(entry) {
-					db.hgetall(entry, function(err, info) {
-						toReturn[entry] = {
-							API_KEY: entry,
-							organization: info['organization'],
-							name: info['name'],
-							version: info['version']
-						}
-						count++;
-						if(acc.length == count){
-							callback(undefined, toReturn);
-						}
-					});
+		if (err) {
+			callback(err, undefined);
+		} else if (acc.length !== 0) {
+			var count = 0;
+			acc.forEach(function(entry) {
+				db.hgetall(entry, function(err, info) {
+					toReturn[entry] = {
+						API_KEY: entry,
+						organization: info['organization'],
+						name: info['name'],
+						version: info['version']
+					}
+					count++;
+					if (acc.length == count) {
+						callback(undefined, toReturn);
+					}
 				});
-			} else
-				callback(undefined, {});
+			});
+		} else {
+			callback(undefined, {});
+		}
 	});
 };
 
 exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
-	if(amount < 0 )
+	if (amount < 0 ) {
 		callback('[ERROR] The aomunt must be greater than 0', undefined)
-	else
+	} else {
 		db.exists(actorID + API_KEY + publicPath, function(err, reply){
-			if (err)
+			if (err) {
 				callback(err)
-			else if(reply === 0)
+			} else if (reply === 0) {
 				callback('[ERROR] The specified resource doesn\'t exist', undefined)
-			else
+			} else {
 				db.hget(actorID + API_KEY + publicPath, 'num', function(err, num) {
-					if(err)
+					if (err) {
 						callback(err);
-					else
+					} else {
 						db.hmset(actorID + API_KEY + publicPath, {
 							'num' : (parseFloat(num) + amount).toString()
 						}, function(err) {
-							if(err)
+							if (err) {
 								callback(err);
-							else{
+							} else {
 								callback(undefined, num + amount);
 							}
 						});
+					}
 	    		});
+			}
 		});
+	}
 };
 
-exports.resetCount = function(actorID, API_KEY, publicPath) {
+exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
 	db.hget(actorID + API_KEY + publicPath, 'correlation_number', function(err, correlation_number) {
-		if(correlation_number !== null){
+		if (err) {
+			return callback(err);
+		} else if (correlation_number !== null) {
 			correlation_number = parseInt(correlation_number) + 1;
 			db.hmset(actorID + API_KEY + publicPath, {
 				'correlation_number' : correlation_number,
 				'num' : '0'
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
 			});
+		} else  {
+			return callback(null);
 		}
 	});
 };
@@ -358,48 +389,40 @@ exports.getAccountingInfo = function(publicPath, offer, callback) {
 	var toReturn = {};
 
 	db.hgetall(publicPath + offer.organization + offer.name + offer.version, function(err, resource) {
-		if(resource !== null){
+		if (err) {
+			callback(err, null);
+		} else if (resource !== null) {
 			toReturn = {
 				recordType: resource.recordType,
 				unit: resource.unit,
 				component: resource.component
 			}
-			callback(toReturn);
+			callback(null, toReturn);
 		} else {
-			callback(undefined);
+			callback(null, null);
 		}
 	});
 };
 
 exports.getOffer = function(API_KEY, callback) {
 	db.hgetall(API_KEY, function(err, offer) {
-		if(offer === null)
+		if (offer === null) {
 			callback(undefined);
-		else
+		} else {
 			callback(offer);
+		}
 	});
 };
 
 exports.getReference = function(API_KEY, callback) {
 	db.hgetall(API_KEY, function(err, offer) {
-		if(offer === null)
+		if (offer === null) {
 			callback(undefined);
-		else
+		} else {
 			callback(offer.reference);
+		}
 	});
 };
-
-/*exports.getResources = function(org, name, version, callback) {
-	var data = [];
-	db.members('public', function(err, publics) {
-		publics.forEach(function(p) {
-			db.hgetall(p + org + name + version, function(err, res) {
-				if(res !== undefined)
-					data[data.length-1] = p;
-			});
-		});
-	});
-};*/
 
 exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
 
@@ -413,9 +436,9 @@ exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_h
 	}, function(err) {
 		if(err){
 			callback(err);
-		}
-		else
+		} else {
 			callback();
+		}
 	});
 };
 
@@ -429,9 +452,10 @@ exports.getCBSubscription = function(subscriptionID, callback) {
 exports.deleteCBSubscription = function(subscriptionID, callback) {
 
 	db.del(subscriptionID, function(err) {
-		if(err)
+		if (err) {
 			callback(err);
-		else
+		} else {
 			callback();
+		}
 	});
 };

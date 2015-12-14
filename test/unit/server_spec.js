@@ -187,12 +187,14 @@ describe('Testing accounting-proxy server', function() {
 			acc_modules_mock.reset();
 		});
 
-		it('new buy', function() {
+		it('new buy', function(done) {
 			var server = proxyquire('../../server', {
 				'./db_Redis': db_mock,
 			});
-			server.newBuy('api_key1', { field1: 'value1', field2: 'value2' });
-			// Can't check
+			server.newBuy('api_key1', { field1: 'value1', field2: 'value2' }, function(err) {
+				expect(err).toEqual(null);
+				done();
+			});
 		});
 
 		it('get map', function(done) {
@@ -202,7 +204,8 @@ describe('Testing accounting-proxy server', function() {
 			var server = proxyquire('../../server', {
 				'./db_Redis': db_mock,
 			});
-			server.getMap(function (data){
+			server.getMap(function (err, data){
+				expect(err).toBeNull;
 				expect(data).toEqual(db_mock.map);
 				done();
 			});

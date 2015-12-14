@@ -5,31 +5,31 @@ var config = require('./config');
 
 
 // Send notifications to the WStore
-exports.notify = function(data, callback) {
+exports.notify = function(accounting_info, callback) {
 
-    if (data.num === 0){
+    if (accounting_info.num === 0){
         console.log('[LOG] NO request needed.');
-        callback(data.API_KEY, data.publicPath, 0);
+        callback(data.API_KEY, accounting_info.publicPath, 0);
     } else {
         console.log('[LOG] Request needed.');
-        db.getAccountingInfo(data.publicPath, {
-            organization: data.organization,
-            name: data.name,
-            version: data.version
-        }, function(acc) {
+        db.getAccountingInfo(accounting_info.publicPath, {
+            organization: accounting_info.organization,
+            name: accounting_info.name,
+            version: accounting_info.version
+        }, function(err, acc) {
 
-            if (acc === undefined)
-                callback(data.API_KEY, data.publicPath, data.num);
-            else{
+            if (err || acc === null) {
+                callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
+            } else {
                 info.offering = {
-                    organization: data.organization,
-                    name: data.name,
-                    version: data.version
+                    organization: accounting_info.organization,
+                    name: accounting_info.name,
+                    version: accounting_info.version
                 };
-                info.customer = data.actorID;
+                info.customer = accounting_info.actorID;
                 info.time_stamp = (new Date()).toISOString();
-                info.value = data.num.toString();
-                info.correlation_number = data.correlation_number;
+                info.value = accounting_info.num.toString();
+                info.correlation_number = accounting_info.correlation_number;
                 info.record_type = acc.record_type;
                 info.unit = acc.unit;
                 info.component_label = acc.component_label;
@@ -39,7 +39,7 @@ exports.notify = function(data, callback) {
                 var options = {
                     host: config.WStore.accounting_host,
                     port: config.WStore.accounting_port,
-                    path: config.WStore.accounting_path + data.reference + '/accounting',
+                    path: config.WStore.accounting_path + accounting_info.reference + '/accounting',
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -50,11 +50,15 @@ exports.notify = function(data, callback) {
                 var request = http.request(options, function(res) {
                     if (200 <= res.statusCode && res.statusCode <= 299) {
                         console.log('[LOG] Resquest worked!');
-                        db.resetCount(data.actorID, data.API_KEY, data.publicPath);
-                        callback(data.API_KEY, data.publicPath, 0);
+                        db.resetCount(accounting_info.actorID, accounting_info.API_KEY, accounting_info.publicPath, function(err) {
+                            if (err) {
+                                console.log('[ERROR] Error while reseting the account')
+                            }
+                        });
+                        callback(accounting_info.API_KEY, accounting_info.publicPath, 0);
                     } else {
                         console.log('[LOG] Resquest failed!');
-                        callback(data.API_KEY, data.publicPath, data.num);
+                        callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
                     }
                 });
                 request.write(body);

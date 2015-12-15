@@ -109,7 +109,7 @@ var mock = {
 				callback(undefined, offer);
 				break;
 			case 'id':
-				callback(undefined, 'correct');
+				callback(null, 'correct');
 				break;
 			case 'apiKey1':
 			case 'apiKey2':
@@ -269,7 +269,7 @@ describe(" Testing database ", function() {
 
 		it('correct', function(done) {
 			db.newService('no_exists', service2[1], service2[2], function(err) {
-				expect(err).toEqual(undefined);
+				expect(err).toBeNull();
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.sadd.callCount).toEqual(1);
 				expect(mock.hmset.callCount).toEqual(1);
@@ -287,7 +287,7 @@ describe(" Testing database ", function() {
 		it('hgetall fail', function(done) {
 			db.getService('err_hgetall', function(err, obj){
 				expect(err).toEqual('Error');
-				expect(obj).toEqual(undefined);
+				expect(obj).toBeNull();
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
@@ -295,8 +295,8 @@ describe(" Testing database ", function() {
 
 		it('hgetall return non service', function(done) {
 			db.getService('no_exist', function(err, obj){
-				expect(err).toEqual(undefined);
-				expect(obj).toEqual(null);
+				expect(err).toBeNull();
+				expect(obj).toBeNull();
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
@@ -304,7 +304,7 @@ describe(" Testing database ", function() {
 
 		it('correct', function(done) {
 			db.getService('/public1_get', function(err, obj){
-				expect(err).toEqual(undefined);
+				expect(err).toBeNull();
 				expect(obj).toEqual({ port : '9100', url : 'http://url1.com/' });
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -339,7 +339,7 @@ describe(" Testing database ", function() {
 
 		it('correct', function(done) {
 			db.deleteService(service1[0], function(err) {
-				expect(err).toEqual();
+				expect(err).toBeNull();
 				expect(mock.del.callCount).toEqual(1);
 				expect(mock.srem.callCount).toEqual(1);
 				done();
@@ -381,7 +381,7 @@ describe(" Testing database ", function() {
 
 		it('add correct resource', function(done) {
 			db.addResource(resource, function(err){
-				expect(err).toEqual();
+				expect(err).toBeNull();
 				expect(mock.sadd.callCount).toEqual(1);
 				expect(mock.hmset.callCount).toEqual(1);
 				done();
@@ -507,8 +507,8 @@ describe(" Testing database ", function() {
 				callback('Error', undefined);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
-				expect(res).toEqual({});
+			db.loadResources(function(err, res) {
+				expect(res).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -520,8 +520,8 @@ describe(" Testing database ", function() {
 				callback('Error', []);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
-				expect(res).toEqual({});
+			db.loadResources(function(err, res) {
+				expect(res).toBeNull();
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
 				done();
@@ -533,7 +533,8 @@ describe(" Testing database ", function() {
 				callback(undefined, ['err']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
+			db.loadResources(function(err, res) {
+				expect(err).toBeNull();
 				expect(res).toEqual({});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
@@ -546,7 +547,8 @@ describe(" Testing database ", function() {
 				callback(undefined, ['no_exist']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
+			db.loadResources(function(err, res) {
+				expect(err).toBeNull();
 				expect(res).toEqual({});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
@@ -559,7 +561,8 @@ describe(" Testing database ", function() {
 				callback(undefined, ['res1']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
+			db.loadResources(function(err, res) {
+				expect(err).toBeNull();
 				expect(res).toEqual({ res1 : { url : 'http://url1.com/', port : '9100' } });
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
@@ -572,7 +575,8 @@ describe(" Testing database ", function() {
 				callback(undefined, ['res1', 'res2']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
+			db.loadResources(function(err, res) {
+				expect(err).toBeNull();
 				expect(res).toEqual({ res1 : { url : 'http://url1.com/', port : '9100' }, res2 : { url : 'http://url2.com/', port : '9200' } });
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(2);
@@ -585,7 +589,8 @@ describe(" Testing database ", function() {
 				callback(undefined, ['res1', 'no_exist']);
 			};
 			spyOn(mock, 'smembers').andCallThrough();
-			db.loadResources(function(res) {
+			db.loadResources(function(err, res) {
+				expect(err).toBeNull();
 				expect(res).toEqual({ res1 : { url : 'http://url1.com/', port : '9100' } });
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(2);
@@ -643,7 +648,7 @@ describe(" Testing database ", function() {
 
 		it('add info correct info, one accounting element', function(done) {
 			db.addInfo(info.API_KEY, info, function(err) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(mock.sadd.callCount).toEqual(2);
 				expect(mock.hmset.callCount).toEqual(2);
 				var i = 1;
@@ -660,7 +665,7 @@ describe(" Testing database ", function() {
 			var info2 = JSON.parse(JSON.stringify(info));
 			info2.accounting[service2[0]] = { num: 5.3, correlation_number: 0 };
 			db.addInfo(info2.API_KEY, info2, function(err) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(mock.sadd.callCount).toEqual(2);
 				expect(mock.hmset.callCount).toEqual(3);
 				expect(mock.hmset.calls[1].args[0]).toBe(info2.actorID + info2.API_KEY + service1[0]);
@@ -763,7 +768,7 @@ describe(" Testing database ", function() {
 
 		it('smembers return empty list', function(done) {
 			db.getInfo('no_user', function(err, res) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(res).toEqual({});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(0);
@@ -773,7 +778,7 @@ describe(" Testing database ", function() {
 
 		it('user with only one apiKey, return correct info', function(done) {
 			db.getInfo('info1', function(err, res) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(res).toEqual({'info1': info1});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(1);
@@ -783,7 +788,7 @@ describe(" Testing database ", function() {
 
 		it('user with two apiKeys, return correct info', function(done) {
 			db.getInfo('info2', function(err, res) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(res).toEqual({'info1': info1, 'info2': info2});
 				expect(mock.smembers.callCount).toEqual(1);
 				expect(mock.hgetall.callCount).toEqual(2);
@@ -802,6 +807,7 @@ describe(" Testing database ", function() {
 
 		it('exists fail', function(done) {
 			db.count('err', '_', 'exists', 1.3, function(err, res) {
+				expect(res).toBeNull();
 				expect(err).toBe('Error');
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.hget.callCount).toEqual(0);
@@ -812,6 +818,7 @@ describe(" Testing database ", function() {
 
 		it('negative amount', function(done) {
 			db.count('actor', 'apiKey', '/public', -1.3, function(err, res) {
+				expect(res).toBeNull();
 				expect(err).toBe('[ERROR] The aomunt must be greater than 0');
 				expect(mock.exists.callCount).toEqual(0);
 				expect(mock.hget.callCount).toEqual(0);
@@ -822,6 +829,7 @@ describe(" Testing database ", function() {
 
 		it('the reource doesn\'t exist', function(done) {
 			db.count('no', '_', 'exists', 1.3, function(err, res) {
+				expect(res).toBeNull();
 				expect(err).toBe('[ERROR] The specified resource doesn\'t exist');
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.hget.callCount).toEqual(0);
@@ -832,6 +840,7 @@ describe(" Testing database ", function() {
 
 		it('hget fail', function(done) {
 			db.count('err', '_', 'hget', 1.3, function(err, res) {
+				expect(res).toBeNull();
 				expect(err).toBe('Error');
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.hget.callCount).toEqual(1);
@@ -842,6 +851,7 @@ describe(" Testing database ", function() {
 
 		it('hmset fail', function(done) {
 			db.count('err', '_', 'hmset', 1.3, function(err, res) {
+				expect(res).toBeNull();
 				expect(err).toBe('Error');
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.hget.callCount).toEqual(1);
@@ -852,7 +862,7 @@ describe(" Testing database ", function() {
 
 		it('correct count', function(done) {
 			db.count('actor', 'apiKey', '/public', 1.3, function(err, res) {
-				expect(err).toBe(undefined);
+				expect(err).toBeNull();
 				expect(res).toBe(21.6);
 				expect(mock.exists.callCount).toEqual(1);
 				expect(mock.hget.callCount).toEqual(1);
@@ -924,15 +934,17 @@ describe(" Testing database ", function() {
 		});
 
 		it('no offer', function(done) {
-			db.getOffer('no_exist', function(res){
-				expect(res).toEqual(undefined);
+			db.getOffer('no_exist', function(err, res){
+				expect(err).toBeNull();
+				expect(res).toBeNull();
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
 		});
 
 		it('return correct offer', function(done) {
-			db.getOffer('apiKey', function(res){
+			db.getOffer('apiKey', function(err, res){
+				expect(err).toBeNull();
 				expect(res).toEqual(offer);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -947,15 +959,17 @@ describe(" Testing database ", function() {
 		});
 
 		it('no reference', function(done) {
-			db.getReference('no_exist', function(res){
-				expect(res).toEqual(undefined);
+			db.getReference('no_exist', function(err, res){
+				expect(err).toBeNull();
+				expect(res).toBeNull();
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
 		});
 
 		it('return correct reference', function(done) {
-			db.getReference('apiKey', function(res){
+			db.getReference('apiKey', function(err, res){
+				expect(err).toBeNull();
 				expect(res).toEqual(offer.reference);
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
@@ -979,7 +993,7 @@ describe(" Testing database ", function() {
 
 		it('subscription add', function(done) {
 			db.addCBSubscription('apiKey', '', '', '', '', '', '', function(res){
-				expect(res).toEqual(undefined);
+				expect(res).toBeNull();
 				expect(mock.hmset.callCount).toEqual(1);
 				done();
 			});
@@ -993,8 +1007,9 @@ describe(" Testing database ", function() {
 		});
 
 		it('hmset fail', function(done) {
-			db.getCBSubscription('id', function(err){
-				expect(err).toEqual('correct');
+			db.getCBSubscription('id', function(err, res){
+				expect(err).toBeNull();
+				expect(res).toEqual('correct');
 				expect(mock.hgetall.callCount).toEqual(1);
 				done();
 			});
@@ -1017,13 +1032,14 @@ describe(" Testing database ", function() {
 
 		it('correct', function(done) {
 			db.deleteCBSubscription('correct', function(err){
-				expect(err).toEqual(undefined);
+				expect(err).toBeNull();
 				expect(mock.del.callCount).toEqual(1);
 				done();
 			});
 		});
 	});
-	describe("loadResourcesAux", function() {
+
+	/*describe("loadResourcesAux", function() {
 		var api_key = {
 				actorID: 'actorID',
 				API_KEY: 'api_key',
@@ -1167,5 +1183,5 @@ describe(" Testing database ", function() {
 				done();
 			});
 		}); 
-	});
+	});*/
 });

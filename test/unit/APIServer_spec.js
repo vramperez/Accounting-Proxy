@@ -48,7 +48,7 @@ var db_mock = {
 	},
 	addInfo: function(api_key, info, callback){
 		switch(api_key){
-			case '00251be6e7b29c4d0c35ef4586d2d7ffb5105ce0':
+			case 'fb4b4b8fc836f8e31ff5f03749d14f1b7ec1d8e9':
 				callback('Error');
 				break;
 			default:
@@ -143,7 +143,9 @@ var proxy_mock = {
 	getMap: function(callback){
 		callback(map);
 	},
-	newBuy: function(api_key, data){}
+	newBuy: function(api_key, data, callback){
+		return callback(null);
+	}
 };
 
 var map = {
@@ -281,10 +283,10 @@ describe("Testing APIServer", function() {
 			expect(resp_mock.status.callCount).toEqual(1);
 			expect(resp_mock.status.calls[0].args[0]).toEqual(201);
 			expect(proxy_mock.newBuy.callCount).toEqual(1);
-			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('0c307d83843ff4c368e3e15bbe6399b09d6ee2f1');
+			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('a6a7ce18edcbf25276b8351b4ed12843ea3cafc5');
 			expect(proxy_mock.newBuy.calls[0].args[1]).toEqual({ actorID: undefined, organization: 'organization', name: 'name', version: 'version', accounting: {}, reference: undefined });
 			expect(db_mock.addInfo.callCount).toEqual(1);
-			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('0c307d83843ff4c368e3e15bbe6399b09d6ee2f1');
+			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('a6a7ce18edcbf25276b8351b4ed12843ea3cafc5');
 			expect(proxy_mock.newBuy.calls[0].args[1]).toEqual({ actorID: undefined, organization: 'organization', name: 'name', version: 'version', accounting: {}, reference: undefined });
 		});
 
@@ -295,8 +297,8 @@ describe("Testing APIServer", function() {
 				'/public2': 'value2'
 			}	
 			var offerResources_mock = {
-				'8fd4fb2427b2470750e8c7a6f2c6f2d6521fccf3': 'megabyte',
-				'5e11d209a20f9535923b3bb5f0f0b5ad632bdb27': 'megabyte'
+				'e2cc039d46075dd6f3cd2f02705cd839691a8ced': 'megabyte',
+				'affbc5111cb202f950c431f178ca93c474482ecc': 'megabyte'
 			}
 			api.__set__("resources", resources_mock);
 			api.__set__("offerResource", offerResources_mock);
@@ -305,10 +307,10 @@ describe("Testing APIServer", function() {
 			expect(resp_mock.status.callCount).toEqual(1);
 			expect(resp_mock.status.calls[0].args[0]).toEqual(201);
 			expect(proxy_mock.newBuy.callCount).toEqual(1);
-			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('0c307d83843ff4c368e3e15bbe6399b09d6ee2f1');
+			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('a6a7ce18edcbf25276b8351b4ed12843ea3cafc5');
 			expect(proxy_mock.newBuy.calls[0].args[1]).toEqual({ actorID : undefined, organization : 'organization', name : 'name', version : 'version', accounting : { '/public1' : { url : undefined, port : undefined, num : 0, correlation_number : 0, unit : 'megabyte' }, '/public2' : { url : undefined, port : undefined, num : 0, correlation_number : 0, unit : 'megabyte' } }, reference : undefined });
 			expect(db_mock.addInfo.callCount).toEqual(1);
-			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('0c307d83843ff4c368e3e15bbe6399b09d6ee2f1');
+			expect(proxy_mock.newBuy.calls[0].args[0]).toEqual('a6a7ce18edcbf25276b8351b4ed12843ea3cafc5');
 			expect(proxy_mock.newBuy.calls[0].args[1]).toEqual({ actorID : undefined, organization : 'organization', name : 'name', version : 'version', accounting : { '/public1' : { url : undefined, port : undefined, num : 0, correlation_number : 0, unit : 'megabyte' }, '/public2' : { url : undefined, port : undefined, num : 0, correlation_number : 0, unit : 'megabyte' } }, reference : undefined });
 		});
 	});

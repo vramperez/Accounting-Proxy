@@ -40,29 +40,11 @@ db.loadFromDB(function(err, data) {
             console.log('[LOG] No data avaliable');
         } else {
             console.log(JSON.stringify(accounting_info, null, 2));
-
-            for (var apiKey in accounting_info) {
-                for (var publicPath in accounting_info[apiKey].accounting) {
-                     if (accounting_info[apiKey].accounting[publicPath].num != 0) {
-                        notifier.notify( { // Sacar a funcion
-                            "actorID": accounting_info[apiKey].actorID,
-                            "API_KEY": apiKey,
-                            "publicPath": publicPath,
-                            "organization": accounting_info[apiKey].organization,
-                            "name": accounting_info[apiKey].name,
-                            "version": accounting_info[apiKey].version,
-                            "correlation_number": accounting_info[apiKey].accounting[publicPath].correlation_number,
-                            "num": accounting_info[apiKey].accounting[publicPath].num,
-                            "reference": accounting_info[apiKey].reference
-                        }, function (API_KEY, puPath, num) {
-                            accounting_info[API_KEY].accounting[puPath].num = num;
-                            if (num === 0) {
-                                accounting_info[API_KEY].accounting[puPath].correlation_number += 1;
-                            }
-                        });
-                    }
+            notify(function(err) {
+                if (err){
+                    console.log('[ERROR] Error while notifying the WStore');
                 }
-            }
+            });
         }
         app.listen(app.get('port'));
         // Start API Server
@@ -196,11 +178,23 @@ exports.getMap = function(callback) {
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
     console.log('[LOG] Sending accounting information...');
-    // variable i is unused in this invocation.
+    notify(function(err) {
+        if (err) {
+
+        } else {
+
+        }
+    });
+});
+
+notify = function(callback) {
+    var count = Object.keys(accounting_info).length;
+
     for (var apiKey in accounting_info) {
+        count --;
         for (var publicPath in accounting_info[apiKey].accounting) {
-            if (accounting_info[apiKey].accounting[publicPath].num !== 0) {
-                notifier.notify({ // Sacar a funcion
+         if (accounting_info[apiKey].accounting[publicPath].num != 0) {
+                notifier.notify( {
                     "actorID": accounting_info[apiKey].actorID,
                     "API_KEY": apiKey,
                     "publicPath": publicPath,
@@ -213,10 +207,11 @@ var job = cron.scheduleJob('00 00 * * *', function() {
                 }, function (API_KEY, puPath, num) {
                     accounting_info[API_KEY].accounting[puPath].num = num;
                     if (num === 0) {
-                        accounting_info[API_KEY].accounting[puPath].correlation_number += 1;  
+                        accounting_info[API_KEY].accounting[puPath].correlation_number += 1;
                     }
                 });
             }
         }
     }
-});
+    return callback(null);
+}

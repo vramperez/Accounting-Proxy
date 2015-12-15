@@ -14,21 +14,27 @@ app.set('port', config.accounting_proxy.store_port);
 
 exports.run = function(d){
     accounting_info = d;
-    db.loadResources(function(d) {
-        resources = d;
-        db.loadUnits(function(err, data) {
-            if (err) {
-                console.log('[ERROR] Error while load information from DB')
-            } else {
-                for (var i in data) {
-                    var offerResourceBase = data[i].publicPath + data[i].organization + data[i].name + data[i].version;
-                    var sha1 = crypto.createHash('sha1');
-                    sha1.update(offerResourceBase);
-                    var id = sha1.digest('hex');
-                    offerResource[id] = data[i].unit;
+    db.loadResources(function(err, d) {
+        if (err) {
+            console.log('[ERROR] Error while load information from DB')
+        } else {
+            resources = d;
+            db.loadUnits(function(err, data) {
+                if (err) {
+                    console.log('[ERROR] Error while load information from DB')
+                } else {
+                    for (var i in data) {
+                        generateHash([data[i].publicPath, data[i].organization, data[i].name, data[i].version], function(err, id) {
+                            if(err) {
+                                console.log('[ERROR] Error generating API_KEY');
+                            } else {
+                                offerResource[id] = data[i].unit;
+                            }
+                        });
+                    }
                 }
-            }
-        });
+            });
+        }
     });
     app.listen(app.get('port'));
 };
@@ -61,18 +67,19 @@ exports.resourcesHandler = function(req, res) {
                             };
                         }
 
-
                         if (config.modules.accounting.indexOf(body.unit) === -1){
                             res.status(400).send("Unsupported accounting unit.");
                         } else {
                             // Save unit for the offerResource
-                            var offerResourceBase = publicPath + body.offering.organization + body.offering.name + body.offering.version;
-                            var sha1 = crypto.createHash('sha1');
-                            sha1.update(offerResourceBase);
-                            var id = sha1.digest('hex');
-                            if (offerResource[id] === undefined){
-                                offerResource[id] = body.unit;
-                            }
+                            generateHash([publicPath, body.offering.organization, body.offering.name, body.offering.version], function(err, id) {
+                                if (err) {
+                                    console.log('[ERROR] Error generating API_KEY');
+                                } else {
+                                    if (offerResource[id] === undefined){
+                                        offerResource[id] = body.unit;
+                                    }
+                                }
+                            });
 
                             db.addResource({
                                 offering: body.offering,
@@ -123,10 +130,13 @@ exports.usersHandler = function(req, res){
 
                     if (api_key === undefined) {
                         // Generate API_KEY
-                        var apiKeyBase = user + offer.organization + offer.name + offer.version;
-                        var sha1 = crypto.createHash('sha1');
-                        sha1.update(apiKeyBase);
-                        api_key = sha1.digest('hex');
+                        generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
+                            if (err) {
+                                console.log('[ERROR] Error generating API_KEY');
+                            } else {
+                                api_key = id;
+                            }
+                        });
                     }
 
                     if (accounting_info[api_key] === undefined) {
@@ -142,22 +152,23 @@ exports.usersHandler = function(req, res){
 
                     for (var i in resrc) {
                         var publicPath = url.parse(resrc[i].url).pathname;
-                        var offerResourceBase = publicPath + offer.organization + offer.name + offer.version;
-                        var sha1 = crypto.createHash('sha1');
-                        sha1.update(offerResourceBase);
-                        var id = sha1.digest('hex');
-
-                        if (resources[publicPath] !== undefined &&
-                            offerResource[id] !== undefined &&
-                            accounting_info[api_key].accounting[publicPath] === undefined) {
-                            accounting_info[api_key].accounting[publicPath] = {
-                                url: resources[publicPath].url,
-                                port: resources[publicPath].port,
-                                num: 0,
-                                correlation_number: 0,
-                                unit: offerResource[id]
-                            };
-                        }
+                        generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
+                            if (err) {
+                                console.log('[ERROR] Error generating API_KEY');
+                            } else {
+                                if (resources[publicPath] !== undefined &&
+                                    offerResource[id] !== undefined &&
+                                    accounting_info[api_key].accounting[publicPath] === undefined) {
+                                        accounting_info[api_key].accounting[publicPath] = {
+                                            url: resources[publicPath].url,
+                                            port: resources[publicPath].port,
+                                            num: 0,
+                                            correlation_number: 0,
+                                            unit: offerResource[id]
+                                        };
+                                }
+                            }
+                        });
                     }
 
                     db.addInfo(api_key, accounting_info[api_key], function(err) {
@@ -173,7 +184,6 @@ exports.usersHandler = function(req, res){
                             });
                         }
                     });
-
                 });
             });
         });
@@ -208,6 +218,26 @@ exports.keysHandler = function(req, res){
         });
     }
 };
+
+generateHash = function(args, callback) {
+    var string,
+        counter = args.length;
+
+    if(counter != 0) {
+        for (i in args) {
+            counter--;
+            string += args[i];
+            if (counter == 0) {
+                var sha1 = crypto.createHash('sha1');
+                sha1.update(string);
+                var id = sha1.digest('hex');
+                return callback(null, id);
+            }
+        }
+    } else {
+        return callback('Error', null);
+    }
+}
 
 app.post('/api/resources', module.exports.resourcesHandler);
 app.post('/api/users', module.exports.usersHandler);

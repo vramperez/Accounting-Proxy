@@ -170,7 +170,7 @@ describe('Testing accounting-proxy server', function() {
 				'./orion_context_broker/cb_handler': contextBroker_mock});
 			expect(app_mock.listen.callCount).toEqual(0);
 			expect(api_mock.run.callCount).toEqual(0);
-			expect(notifier_mock.notify.callCount).toEqual(1);
+			expect(notifier_mock.notify.callCount).toEqual(0);
 			expect(contextBroker_mock.run.callCount).toEqual(1);
 		});
 	});

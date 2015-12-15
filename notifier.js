@@ -19,7 +19,7 @@ exports.notify = function(accounting_info, callback) {
         }, function(err, acc) {
 
             if (err || acc === null) {
-                callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
+                return callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
             } else {
                 info.offering = {
                     organization: accounting_info.organization,

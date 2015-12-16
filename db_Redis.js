@@ -1,15 +1,16 @@
 var redis = require('redis'),
-	async = require('async');
-var db;
+	async = require('async'),
+	db;
 
 db = redis.createClient();
 
-db.on('error', function(err){
+db.on('error', function(err) {
 	console.log("Error" + err);
 });
 
 exports.loadFromDB = function(callback) { 
-	var data = {};
+	var data = {},
+		error;
 
 	db.smembers('API_KEYS', function(err, api_keys) {
 		if (err) {
@@ -17,39 +18,39 @@ exports.loadFromDB = function(callback) {
 		} else {
 			var counter = api_keys.length;
 			if (api_keys.length !== 0) {
-				async.each(api_keys, function(api_key, callback) {
+				async.each(api_keys, function(api_key, callback_task) {
 					db.hgetall(api_key, function(err, api_key) {
 						if (api_key !== null) {
+							data[api_key.API_KEY] = {
+								actorID: api_key.actorID,
+								organization: api_key.organization,
+								name: api_key.name,
+								version: api_key.version,
+								accounting: {},
+								reference: api_key.reference
+							}
 							loadResourcesAux(api_key, data, function(err) {
 								if (err) {
-									callback(err, null);
+									error = err;
+									data = null;
+									callback_task();
 								} else {
-									callback(null, data);
+									error = err;
+									callback_task();
 								}
 							});
 						} else {
-								callback(null, data);
+							error = err;
+							callback_task();
 						}
 					});
+				}, function(err){
+					if (err) {
+						return callback(err, null);
+					} else {
+						return callback(error, data);
+					}
 				});
-				// To delete
-				/*for (i in api_keys) {
-					db.hgetall(api_keys[i], function(err, api_key) {
-						if (api_key !== null) {
-							loadResourcesAux(api_key, data, function() {
-								counter--;
-								if (counter === 0) {
-									setData(undefined, data);
-								}
-							});
-						} else {
-							counter--;
-							if (counter === 0) {
-								setData(undefined, data);
-							}
-						}
-					});
-				}*/
 			} else {
 				return callback(null, data);
 			}
@@ -59,50 +60,39 @@ exports.loadFromDB = function(callback) {
 
 loadResourcesAux = function(api_key, data, callback){
 	db.smembers('resources', function(err, resources) {
-		if (! err) { // mal deberia comprobar el err y sino lanzarlo
+		if (err) {
+			return callback(err);
+		} else {
 			var counter = resources.length;
-			for (i in resources) {
-				db.hgetall(resources[i], function(err, res) { 
+			async.each(resources, function(resource, callback_task) {
+				db.hgetall(resource, function(err, res) {
 					if (res !== null && api_key.organization === res.org && api_key.name === res.name && api_key.version === res.version) {
 						db.hgetall(api_key.actorID + api_key.API_KEY + res.publicPath, function(err, account) {
 							db.hgetall(res.publicPath, function(err, serv) {
 								if (account !== null && serv !== null) {
-									if (counter === resources.length) {
-										data[api_key.API_KEY] = {
-											actorID: api_key.actorID,
-											organization: api_key.organization,
-											name: api_key.name,
-											version: api_key.version,
-											accounting: {},
-											reference: api_key.reference
-										}
-									}
-
-									data[api_key.API_KEY].accounting[res.publicPath]  = {
+									data[api_key.API_KEY].accounting[res.publicPath] = {
 										url: serv.url,
 										port: serv.port,
 										num: account.num,
 										correlation_number: account.correlation_number,
 										unit: res.unit
 									}
-								}
-								counter--;
-								if (counter === 0) {
-									callback();
+									callback_task();
+								} else {
+									callback_task();
 								}
 							});
 						});
-					} else {
-						counter--;
-						if (counter === 0) {
-							callback();
-						}
-					}
+					} 
 				});
-			}
-		} else {
-			callback();
-		}
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
+			});
+		} 
 	});
 };
 
@@ -202,7 +192,7 @@ exports.loadUnits = function(callback) {
 					} else if (obj != null) {
 						toReturn[obj['publicPath']] = {
 							publicPath: obj['publicPath'],
-							organization: obj['organization'],
+							organization: obj['org'],
 							name: obj['name'],
 							version: obj['version'],
 							unit: obj['unit']

@@ -57,7 +57,7 @@ exports.resourcesHandler = function(req, res) {
             } else {
                 var publicPath = url.parse(body.url).pathname;
                 db.getService(publicPath, function(err, data) {
-                    if ( data === undefined || err !== undefined){
+                    if ( data === undefined || err !== null){
                         res.status(400).send();
                     } else {
                         if (resources[publicPath] === undefined){
@@ -88,7 +88,7 @@ exports.resourcesHandler = function(req, res) {
                                 unit: body.unit,
                                 component_label: body.component_label
                             }, function(err) {
-                                if (err !== undefined) {
+                                if (err) {
                                     res.status(400).send();
                                 } else {
                                     res.status(201).send();
@@ -115,7 +115,6 @@ exports.usersHandler = function(req, res){
         });
 
         req.on('end', function() {
-
             body = JSON.parse(body);
 
             var offer = body.offering,
@@ -124,67 +123,72 @@ exports.usersHandler = function(req, res){
                 ref   = body.reference,
                 temRes = []
 
-            proxy.getMap(function(m) {
-                accounting_info = m;
-                db.getApiKey(user, offer, function(api_key) {
-
-                    if (api_key === undefined) {
-                        // Generate API_KEY
-                        generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
-                            if (err) {
-                                console.log('[ERROR] Error generating API_KEY');
-                            } else {
-                                api_key = id;
-                            }
-                        });
-                    }
-
-                    if (accounting_info[api_key] === undefined) {
-                        accounting_info[api_key] = {
-                            actorID: user,
-                            organization: offer.organization,
-                            name: offer.name,
-                            version: offer.version,
-                            accounting: {},
-                            reference: ref
-                        };
-                    }
-
-                    for (var i in resrc) {
-                        var publicPath = url.parse(resrc[i].url).pathname;
-                        generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
-                            if (err) {
-                                console.log('[ERROR] Error generating API_KEY');
-                            } else {
-                                if (resources[publicPath] !== undefined &&
-                                    offerResource[id] !== undefined &&
-                                    accounting_info[api_key].accounting[publicPath] === undefined) {
-                                        accounting_info[api_key].accounting[publicPath] = {
-                                            url: resources[publicPath].url,
-                                            port: resources[publicPath].port,
-                                            num: 0,
-                                            correlation_number: 0,
-                                            unit: offerResource[id]
-                                        };
-                                }
-                            }
-                        });
-                    }
-
-                    db.addInfo(api_key, accounting_info[api_key], function(err) {
+            proxy.getMap(function(err, map) {
+                if (err) {
+                    console.log('Error getting the map');
+                } else {
+                    accounting_info = map;
+                    db.getApiKey(user, offer, function(err, api_key) {
                         if (err) {
-                            res.status(400).send();
-                        } else {
-                            proxy.newBuy(api_key, accounting_info[api_key], function(err){
+                            console.log('[ERROR] Error getting the api_key')
+                        } else if (api_key === null) {
+                            // Generate API_KEY
+                            generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
                                 if (err) {
-                                    // Notify the error
+                                    console.log('[ERROR] Error generating API_KEY');
                                 } else {
-                                    res.status(201).send();
+                                    api_key = id;
                                 }
                             });
                         }
+
+                        if (accounting_info[api_key] === undefined) {
+                            accounting_info[api_key] = {
+                                actorID: user,
+                                organization: offer.organization,
+                                name: offer.name,
+                                version: offer.version,
+                                accounting: {},
+                                reference: ref
+                            };
+                        }
+
+                        for (var i in resrc) {
+                            var publicPath = url.parse(resrc[i].url).pathname;
+                            generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
+                                if (err) {
+                                    console.log('[ERROR] Error generating API_KEY');
+                                } else {
+                                    if (resources[publicPath] !== undefined &&
+                                        offerResource[id] !== undefined &&
+                                        accounting_info[api_key].accounting[publicPath] === undefined) {
+                                            accounting_info[api_key].accounting[publicPath] = {
+                                                url: resources[publicPath].url,
+                                                port: resources[publicPath].port,
+                                                num: 0,
+                                                correlation_number: 0,
+                                                unit: offerResource[id]
+                                            };
+                                    }
+                                }
+                            });
+                        }
+
+                        db.addInfo(api_key, accounting_info[api_key], function(err) {
+                            if (err) {
+                                res.status(400).send();
+                            } else {
+                                proxy.newBuy(api_key, accounting_info[api_key], function(err){
+                                    if (err) {
+                                        // Notify the error
+                                    } else {
+                                        res.status(201).send();
+                                    }
+                                });
+                            }
+                        });
                     });
-                });
+                }
             });
         });
     } else {

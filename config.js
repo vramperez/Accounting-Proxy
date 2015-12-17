@@ -17,6 +17,13 @@ config.accounting_proxy = {
 
 };
 
+// Accounting database configuration
+//--------------------------------------------------
+// Select the database. Possible optrions are: 
+//  * './db_Redis': redis database
+//  * './db': sqlite database
+config.database = './db_Redis';
+
 // Accouning Modules configuration
 //--------------------------------------------------
 // Configures the accounting modules used by the accounting proxy

@@ -1,7 +1,8 @@
-var http = require('http');
-var db = require('./db_Redis.js');
-var info = require('./HTTP_Client/info.json');
-var config = require('./config');
+var http = require('http'),
+    info = require('./HTTP_Client/info.json'),
+    config = require('./config');
+
+var db = require(config.database);
 
 
 // Send notifications to the WStore

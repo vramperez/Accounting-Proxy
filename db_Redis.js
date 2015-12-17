@@ -8,15 +8,12 @@ db.on('error', function(err) {
 	console.log("Error" + err);
 });
 
-exports.loadFromDB = function(callback) { 
-	var data = {},
-		error;
+/*exports.loadFromDB = function(callback) { 
 
 	db.smembers('API_KEYS', function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
 		} else {
-			var counter = api_keys.length;
 			if (api_keys.length !== 0) {
 				async.each(api_keys, function(api_key, callback_task) {
 					db.hgetall(api_key, function(err, api_key) {
@@ -29,7 +26,11 @@ exports.loadFromDB = function(callback) {
 								accounting: {},
 								reference: api_key.reference
 							}
-							loadResourcesAux(api_key, data, function(err) {
+							loadResourcesAux(api_key, data, function(err, accountingInfo) {
+
+								data[API_KEY][accounting] = accountingInfo;
+
+								data[API_KEY].accounting[res]
 								if (err) {
 									error = err;
 									data = null;
@@ -55,41 +56,68 @@ exports.loadFromDB = function(callback) {
 				return callback(null, data);
 			}
 		}
-	});
-};
+	})
+};*/
 
-loadResourcesAux = function(api_key, data, callback){
+exports.checkInfo = function(user, api_key, publicPath, callback) {
+	db.smembers(user, function(err, api_keys) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			async.each(api_keys, function(entry, task_callback) {
+				if (api_key === entry) {
+					checkInfoAux(entry, function(err, unit) {
+						if (err) {
+							task_callback(err, null);
+						} else {
+							task_callback(null, unit);
+						}
+					});
+				} else {
+					task_callback(null, null);
+				}
+			}, function(err, unit){
+				if (err) {
+					return callback(err, null);
+				} else {
+					return callback(null, unit);
+				}
+			});
+		}
+	});
+}
+
+checkInfoAux = function(api_key, publicPath, callback){
 	db.smembers('resources', function(err, resources) {
 		if (err) {
-			return callback(err);
+			return callback(err, null);
 		} else {
-			var counter = resources.length;
-			async.each(resources, function(resource, callback_task) {
+			async.each(resources, function(resource, task_callback) {
 				db.hgetall(resource, function(err, res) {
-					if (res !== null && api_key.organization === res.org && api_key.name === res.name && api_key.version === res.version) {
-						db.hgetall(api_key.actorID + api_key.API_KEY + res.publicPath, function(err, account) {
-							db.hgetall(res.publicPath, function(err, serv) {
-								if (account !== null && serv !== null) {
-									data[api_key.API_KEY].accounting[res.publicPath] = {
-										url: serv.url,
-										port: serv.port,
-										num: account.num,
-										correlation_number: account.correlation_number,
-										unit: res.unit
-									}
-									callback_task();
+					if (err) {
+						task_callback(err, null);
+					} else {
+						db.hgetall(res.publicPath, function(err, serv) {
+							if (err) {
+								task_callback(err, null);
+							} else {
+								if (res !== null && api_key.organization === res.org && 
+									api_key.name === res.name && 
+									api_key.version === res.version &&
+									publicPath === res.publicPath) {
+										task_callback(null, serv.unit);
 								} else {
-									callback_task();
+									task_callback(null, null);
 								}
-							});
+							}
 						});
-					} 
+					}
 				});
-			}, function(err) {
+			}, function(err, unit) {
 				if (err) {
-					return callback(err);
+					return callback(err, null);
 				} else {
-					return callback(null);
+					return callback(null, unit);
 				}
 			});
 		} 
@@ -151,7 +179,6 @@ exports.newService = function(publicPath, url, port, callback){
 		}
 	});
 };
-
 
 exports.addResource = function(data, callback) {
 	db.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version], function(err) {
@@ -238,8 +265,15 @@ exports.loadResources = function(callback) {
 	});
 };
 
+exports.getNotificationInfo = function(callback) {
+	db.smembers('API_KEYS', function(err, api_keys) {
+		async.each(api_keys, function(entry, callback) {
+			
+		})
+	})
+}
 
-exports.addInfo = function(API_KEY, data, callback) {
+exports.addInfo = function(API_KEY, data, publicPath, callback) {
 	db.sadd(['API_KEYS', API_KEY], function(err) {
 		if (err) {
 			return callback(err)
@@ -250,7 +284,8 @@ exports.addInfo = function(API_KEY, data, callback) {
 				'version': data.version,
 				'actorID': data.actorID,
 				'API_KEY': API_KEY,
-				'reference': data.reference
+				'reference': data.reference,
+				'publicPath': publicPath
 			}, function(err) {
 				if (err) {
 					return callback(err)
@@ -305,7 +340,6 @@ exports.getApiKey = function(user, offer, callback) {
 		return callback(null, null);
 	});
 };
-
 
 // CLI: getInfo [user]
 exports.getInfo = function(user, callback) {
@@ -419,7 +453,7 @@ exports.getOffer = function(API_KEY, callback) {
 	});
 };
 
-exports.getReference = function(API_KEY, callback) {
+/*exports.getReference = function(API_KEY, callback) {
 	db.hgetall(API_KEY, function(err, offer) {
 		if (err) {
 			return callback(err, null);
@@ -429,7 +463,7 @@ exports.getReference = function(API_KEY, callback) {
 			return callback(null, offer.reference);
 		}
 	});
-};
+};*/
 
 exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
 	db.hmset(subscriptionID, {

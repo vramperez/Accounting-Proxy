@@ -6,11 +6,9 @@ var db = require(config.database);
 
 
 // Send notifications to the WStore
-exports.notify = function(accounting_info, callback) {
-
+exports.notify = function(accounting_info) {
     if (accounting_info.num === 0){
         console.log('[LOG] NO request needed.');
-        callback(data.API_KEY, accounting_info.publicPath, 0);
     } else {
         console.log('[LOG] Request needed.');
         db.getAccountingInfo(accounting_info.publicPath, {
@@ -20,7 +18,7 @@ exports.notify = function(accounting_info, callback) {
         }, function(err, acc) {
 
             if (err || acc === null) {
-                return callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
+                console.log('[ERROR] Error while notifying')
             } else {
                 info.offering = {
                     organization: accounting_info.organization,
@@ -56,10 +54,8 @@ exports.notify = function(accounting_info, callback) {
                                 console.log('[ERROR] Error while reseting the account')
                             }
                         });
-                        callback(accounting_info.API_KEY, accounting_info.publicPath, 0);
                     } else {
                         console.log('[LOG] Resquest failed!');
-                        callback(accounting_info.API_KEY, accounting_info.publicPath, accounting_info.num);
                     }
                 });
                 request.write(body);

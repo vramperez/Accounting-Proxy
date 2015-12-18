@@ -11,13 +11,12 @@ var app = express(),
     resources = {},
     offerResource = {};
 
-exports.run = function(d){
-    accounting_info = d;
-    db.loadResources(function(err, d) {
+exports.run = function(){
+    db.loadResources(function(err, res) {
         if (err) {
             console.log('[ERROR] Error while load information from DB')
         } else {
-            resources = d;
+            resources = res;
             db.loadUnits(function(err, data) {
                 if (err) {
                     console.log('[ERROR] Error while load information from DB')
@@ -102,66 +101,69 @@ var newBuyHandler = function(req, res){
         resrc = body.resources,
         user  = body.customer,
         ref   = body.reference,
-        temRes = [];
+        accounting_info = {};
 
-    proxy.getMap(function(err, map) { // Eliminar
+    db.getApiKey(user, offer, function(err, api_key) {
         if (err) {
-            console.log('Error getting the map');
-        } else {
-            accounting_info = map;
-            db.getApiKey(user, offer, function(err, api_key) {
+            console.log('[ERROR] Error getting the api_key')
+        } else if (api_key === null) {
+            // Generate API_KEY
+            generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
                 if (err) {
-                    console.log('[ERROR] Error getting the api_key')
-                } else if (api_key === null) {
-                    // Generate API_KEY
-                    generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
-                        if (err) {
-                            console.log('[ERROR] Error generating API_KEY');
-                        } else {
-                            api_key = id;
-                        }
-                    });
-                }
-
-                if (accounting_info[api_key] === undefined) {
+                    console.log('[ERROR] Error generating API_KEY');
+                } else {
+                    api_key = id;
                     accounting_info[api_key] = {
-                        actorID: user,
-                        organization: offer.organization,
-                        name: offer.name,
-                        version: offer.version,
-                        accounting: {},
-                        reference: ref
+                            accounting: {}
                     };
-                }
-
-                for (var i in resrc) {
-                    var publicPath = url.parse(resrc[i].url).pathname;
-                    generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
+                    db.existsApiKey(api_key, function(err, reply) {
                         if (err) {
-                            console.log('[ERROR] Error generating API_KEY');
-                        } else {
-                            if (resources[publicPath] !== undefined &&
-                                offerResource[id] !== undefined &&
-                                accounting_info[api_key].accounting[publicPath] === undefined) {
-                                accounting_info[api_key].accounting[publicPath] = {
-                                    url: resources[publicPath].url,
-                                    port: resources[publicPath].port,
-                                    num: 0,
-                                    correlation_number: 0,
-                                    unit: offerResource[id]
-                                };
-                            }
+                            console.log('[ERROR] Error in db');
+                        } else if (reply == 0) {
+                            accounting_info[api_key] = {
+                                actorID: user,
+                                organization: offer.organization,
+                                name: offer.name,
+                                version: offer.version,
+                                accounting: {},
+                                reference: ref
+                            };
+                        }
+
+                        for (var i in resrc) {
+                            var publicPath = url.parse(resrc[i].url).pathname;
+                            generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
+                                if (err) {
+                                    console.log('[ERROR] Error generating API_KEY');
+                                } else {
+                                    db.checkBuy(api_key, publicPath, function(err, bought) {
+                                        if (err) {
+                                            console.log('[ERROR] Error in db');
+                                        } else if (! bought &&
+                                            resources[publicPath] !== undefined &&
+                                            offerResource[id] !== undefined) {
+                                            accounting_info[api_key].accounting[publicPath] = {
+                                                url: resources[publicPath].url,
+                                                port: resources[publicPath].port,
+                                                num: 0,
+                                                correlation_number: 0,
+                                                unit: offerResource[id]
+                                            };
+                                        }
+
+                                        db.addInfo(api_key, accounting_info[api_key], function(err) { // Modificar
+                                            if (err) {
+                                                res.status(400).send();
+                                            } else {
+                                                res.status(201).send();
+                                            }
+                                        });
+                                    });
+                                }
+                            });
                         }
                     });
                 }
-
-                db.addInfo(api_key, accounting_info[api_key], function(err) { // Modificar
-                    if (err) {
-                        res.status(400).send();
-                    } else {
-                        res.status(201).send();
-                    }
-                });
             });
         }
     });

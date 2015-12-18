@@ -8,57 +8,6 @@ db.on('error', function(err) {
 	console.log("Error" + err);
 });
 
-/*exports.loadFromDB = function(callback) { 
-
-	db.smembers('API_KEYS', function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			if (api_keys.length !== 0) {
-				async.each(api_keys, function(api_key, callback_task) {
-					db.hgetall(api_key, function(err, api_key) {
-						if (api_key !== null) {
-							data[api_key.API_KEY] = {
-								actorID: api_key.actorID,
-								organization: api_key.organization,
-								name: api_key.name,
-								version: api_key.version,
-								accounting: {},
-								reference: api_key.reference
-							}
-							loadResourcesAux(api_key, data, function(err, accountingInfo) {
-
-								data[API_KEY][accounting] = accountingInfo;
-
-								data[API_KEY].accounting[res]
-								if (err) {
-									error = err;
-									data = null;
-									callback_task();
-								} else {
-									error = err;
-									callback_task();
-								}
-							});
-						} else {
-							error = err;
-							callback_task();
-						}
-					});
-				}, function(err){
-					if (err) {
-						return callback(err, null);
-					} else {
-						return callback(error, data);
-					}
-				});
-			} else {
-				return callback(null, data);
-			}
-		}
-	})
-};*/
-
 exports.checkInfo = function(user, api_key, publicPath, callback) {
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
@@ -195,7 +144,7 @@ exports.addResource = function(data, callback) {
 				'component_label': data.component_label
 			}, function(err){
 				if (err) {
-					return callback(err)
+					return callback(err);
 				} else {
 					return callback(null);
 				}
@@ -265,32 +214,139 @@ exports.loadResources = function(callback) {
 	});
 };
 
-exports.getNotificationInfo = function(callback) {
+/*exports.getNotificationInfo = function(callback) {
+	var toReturn = {};
+
 	db.smembers('API_KEYS', function(err, api_keys) {
-		async.each(api_keys, function(entry, callback) {
-			
-		})
+		if (err) {
+			return callback(err, null);
+		} else {
+			async.each(api_keys, function(api_key, callback) {
+				db.hgetall(api_key, function(err, api_key_info){
+					if (err) {
+						callback(err, null);
+					} else {
+						db.smembers('public', function(err, publicPaths) {
+							if (err) {
+								callback(err, null);
+							} else {
+								async.each(publiPaths, function(publicPath, callback) {
+									db.hgetall(api_key_info.actorID + api_key_info.API_KEY 
+										+ publicPath, function(err, res) {
+											if (err) {
+												callback(err, null);
+											} else if (res !== null){
+
+												callback(err, null);
+											} 
+									})
+								})
+							}
+						});
+					}
+				});
+			});
+		}
+	});
+}*/
+
+exports.existsApiKey = function(api_key, callback) {
+	db.exists(api_key, function(err, reply) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			return callback(null, reply);
+		}
+	});
+}
+
+exports.getApiKeys = function(callback){
+	db.smembers('API_KEYS', function(err, api_keys) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			return callback(null, api_keys);
+		}
+	});
+}
+
+exports.getResources = function(api_key, callback) {
+	db.smembers(api_key + '_paths', function(err, paths) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			return callback(null, paths);
+		}
+	});
+}
+
+exports.getNotificationInfo = function(api_key, path, callback) {
+	db.hgetall(api_key, function(err, api_key_info) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			db.hgetall(api_key_info.actorID + api_key + path, function(err, resource) {
+				if (err) {
+					return callback(err, null);
+				}else{
+					return callback(null, {
+						"actorID": api_key_info.actorID, 
+	                    "API_KEY": api_key,
+	                    "publicPath": path,
+	                    "organization": api_key_info.organization,
+	                    "name": api_key_info.name,
+	                    "version": api_key_info.version,
+	                    "correlation_number": resource.correlation_number,
+	                    "num": resource.num,
+	                    "reference": api_key_info.reference
+					});
+				}
+			});
+		}
+	});
+}
+
+exports.checkBuy = function(api_key, path, callback) {
+	var bought = false;
+
+	db.smembers(api_key + '_paths', function(err, paths) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			async.each(paths, function(entry, task_callback) {
+				if (entry === path) {
+					bought = bought || true;
+					task_callback();
+				} else {
+					task_callback();
+				}
+			}, function(err) {
+				if (err) {
+					return callback(err, null);
+				} else {
+					return callback(null, bought);
+				}
+			})
+		}
 	})
 }
 
-exports.addInfo = function(API_KEY, data, publicPath, callback) {
-	db.sadd(['API_KEYS', API_KEY], function(err) {
+exports.addInfo = function(api_key, data, callback) {
+	db.sadd(['API_KEYS', api_key], function(err) {
 		if (err) {
 			return callback(err)
 		} else {
-			db.hmset(API_KEY, {
+			db.hmset(api_key, {
 				'organization': data.organization,
 				'name': data.name,
 				'version': data.version,
 				'actorID': data.actorID,
-				'API_KEY': API_KEY,
-				'reference': data.reference,
-				'publicPath': publicPath
+				'reference': data.reference
 			}, function(err) {
 				if (err) {
 					return callback(err)
 				} else {
-					db.sadd([data.actorID, API_KEY], function(err){
+					db.sadd([data.actorID, api_key], function(err){
 						if (err) {
 							return callback(err)
 						} else {
@@ -298,18 +354,24 @@ exports.addInfo = function(API_KEY, data, publicPath, callback) {
 								count = 0;
 							for (var p in data.accounting) {
 								acc = data.accounting[p];
-								db.hmset(data.actorID + API_KEY + p, {
-									'actorID': data.actorID,
-									'API_KEY': API_KEY,
-									'num': acc.num,
-									'publicPath': p,
-									'correlation_number': acc.correlation_number
-								}, function(err){
-									count ++;
+								db.sadd([api_key + '_paths', p], function(err) {
 									if (err) {
 										return callback(err);
-									} else if (count == Object.keys(data.accounting).length) {
-										return callback(null);
+									} else {
+										db.hmset(data.actorID + api_key + p, {
+											'actorID': data.actorID,
+											'API_KEY': api_key,
+											'num': acc.num,
+											'publicPath': p,
+											'correlation_number': acc.correlation_number
+										}, function(err){
+											count ++;
+											if (err) {
+												return callback(err);
+											} else if (count == Object.keys(data.accounting).length) {
+												return callback(null);
+											}
+										});
 									}
 								});
 							};
@@ -332,7 +394,7 @@ exports.getApiKey = function(user, offer, callback) {
 					if (offerAcc['organization'] === offer['organization'] &&
 						offerAcc['name'] === offer['name'] &&
 						offerAcc['version'] === offer['version']) {
-							return callback(null, offerAcc['API_KEY']);
+							return callback(null, entry);
 					}
 				});
 			});
@@ -372,25 +434,25 @@ exports.getInfo = function(user, callback) {
 
 exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
 	if (amount < 0 ) {
-		return callback('[ERROR] The aomunt must be greater than 0', null)
+		return callback('[ERROR] The aomunt must be greater than 0');
 	} else {
 		db.exists(actorID + API_KEY + publicPath, function(err, reply){
 			if (err) {
-				return callback(err, null)
+				return callback(err)
 			} else if (reply === 0) {
-				return callback('[ERROR] The specified resource doesn\'t exist', null)
+				return callback('[ERROR] The specified resource doesn\'t exist')
 			} else {
 				db.hget(actorID + API_KEY + publicPath, 'num', function(err, num) {
 					if (err) {
-						return callback(err, null);
+						return callback(err);
 					} else {
 						db.hmset(actorID + API_KEY + publicPath, {
 							'num' : (parseFloat(num) + amount).toString()
 						}, function(err) {
 							if (err) {
-								return callback(err, null);
+								return callback(err);
 							} else {
-								return callback(null, num + amount);
+								return callback(null);
 							}
 						});
 					}
@@ -452,18 +514,6 @@ exports.getOffer = function(API_KEY, callback) {
 		}
 	});
 };
-
-/*exports.getReference = function(API_KEY, callback) {
-	db.hgetall(API_KEY, function(err, offer) {
-		if (err) {
-			return callback(err, null);
-		} else if (offer === null) {
-			return callback(null, null);
-		} else {
-			return callback(null, offer.reference);
-		}
-	});
-};*/
 
 exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
 	db.hmset(subscriptionID, {

@@ -3,37 +3,13 @@ var express = require('express');
     url = require('url'),
     proxy = require('./server.js'),
     config = require('./config'),
-    bodyParser = require('body-parser');
+    bodyParser = require('body-parser'),
+    async = require('async');
 
 var db = require(config.database);
-
-var app = express(),
-    resources = {},
-    offerResource = {};
+var app = express();
 
 exports.run = function(){
-    db.loadResources(function(err, res) {
-        if (err) {
-            console.log('[ERROR] Error while load information from DB')
-        } else {
-            resources = res;
-            db.loadUnits(function(err, data) {
-                if (err) {
-                    console.log('[ERROR] Error while load information from DB')
-                } else {
-                    for (var i in data) {
-                        generateHash([data[i].publicPath, data[i].organization, data[i].name, data[i].version], function(err, id) {
-                            if(err) {
-                                console.log('[ERROR] Error generating API_KEY');
-                            } else {
-                                offerResource[id] = data[i].unit;
-                            }
-                        });
-                    }
-                }
-            });
-        }
-    });
     app.listen(app.get('port'));
 };
 
@@ -51,27 +27,9 @@ var newResourceHandler = function(req, res) {
             if ( data === undefined || err !== null){
                 res.status(400).send();
             } else {
-                if (resources[publicPath] === undefined){
-                    resources[publicPath] = {
-                        url: data.url,
-                        port: data.port
-                    };
-                }
-
                 if (config.modules.accounting.indexOf(body.unit) === -1){
                     res.status(400).send("Unsupported accounting unit.");
                 } else {
-                    // Save unit for the offerResource
-                    generateHash([publicPath, body.offering.organization, body.offering.name, body.offering.version], function(err, id) {
-                        if (err) {
-                            console.log('[ERROR] Error generating API_KEY');
-                        } else {
-                            if (offerResource[id] === undefined){
-                                offerResource[id] = body.unit;
-                            }
-                        }
-                    });
-
                     db.addResource({
                         offering: body.offering,
                         publicPath: publicPath,
@@ -113,52 +71,72 @@ var newBuyHandler = function(req, res){
                     console.log('[ERROR] Error generating API_KEY');
                 } else {
                     api_key = id;
+
                     accounting_info[api_key] = {
-                            accounting: {}
-                    };
-                    db.existsApiKey(api_key, function(err, reply) {
-                        if (err) {
-                            console.log('[ERROR] Error in db');
-                        } else if (reply == 0) {
-                            accounting_info[api_key] = {
-                                actorID: user,
-                                organization: offer.organization,
-                                name: offer.name,
-                                version: offer.version,
-                                accounting: {},
-                                reference: ref
-                            };
-                        }
+                        actorID: user,
+                        organization: offer.organization,
+                        name: offer.name,
+                        version: offer.version,
+                        accounting: {},
+                        reference: ref
+                    }
 
-                        for (var i in resrc) {
-                            var publicPath = url.parse(resrc[i].url).pathname;
-                            generateHash([publicPath, offer.organization, offer.name, offer.version], function(err, id) {
-                                if (err) {
-                                    console.log('[ERROR] Error generating API_KEY');
-                                } else {
-                                    db.checkBuy(api_key, publicPath, function(err, bought) {
-                                        if (err) {
-                                            console.log('[ERROR] Error in db');
-                                        } else if (! bought &&
-                                            resources[publicPath] !== undefined &&
-                                            offerResource[id] !== undefined) {
-                                            accounting_info[api_key].accounting[publicPath] = {
-                                                url: resources[publicPath].url,
-                                                port: resources[publicPath].port,
-                                                num: 0,
-                                                correlation_number: 0,
-                                                unit: offerResource[id]
-                                            };
-                                        }
-
-                                        db.addInfo(api_key, accounting_info[api_key], function(err) { // Modificar
+                    async.each(resrc, function(resource, task_callback) {
+                        var publicPath = url.parse(resource.url).pathname;
+                        db.checkBuy(api_key, publicPath, function(err, bought) { // Check if the user already has bought the resource
+                            if (err) {
+                                task_callback('[ERROR] Error in db');
+                            } else {
+                                db.getUnit(publicPath, offer.organization, offer.name, offer.version, function(err, unit) {
+                                    if (err) {
+                                        task_callback('[ERROR] Error in db');
+                                    } else if (unit === null ){ // Incorrect service
+                                        task_callback(null);
+                                    } else {
+                                        db.getService(publicPath, function(err, service) {
                                             if (err) {
-                                                res.status(400).send();
+                                                task_callback('[ERROR] Error in db');
                                             } else {
-                                                res.status(201).send();
+                                                if (! bought) { // Already bought
+                                                    accounting_info[api_key].accounting[publicPath] = {
+                                                        url: service.url,
+                                                        port: service.port,
+                                                        num: 0,
+                                                        correlation_number: 0,
+                                                        unit: unit
+                                                    };
+                                                } else { // New resource for the client
+                                                    db.getNotificationInfo(api_key, publicPath, function(err, info) {
+                                                        if (err) {
+                                                            task_callback('[ERROR] Error in db');
+                                                        } else {
+                                                            accounting_info[api_key].accounting[publicPath] = {
+                                                                url: service.url,
+                                                                port: service.port,
+                                                                num: info.num,
+                                                                correlation_number: info.correlation_number,
+                                                                unit: unit
+                                                            }
+                                                        }
+                                                    });
+                                                }
                                             }
                                         });
-                                    });
+                                    }
+                                });
+                            }
+                        });
+                    }, function(err) {
+                        if (err) {
+                            res.status(500).send();
+                        } else {
+                            db.addInfo(api_key, accounting_info[api_key], function(err) { // Save the information in db 
+                                if (err) {
+                                    res.status(400).send();
+                                    task_callback(null);
+                                } else {
+                                    res.status(201).send();
+                                    task_callback(null);
                                 }
                             });
                         }

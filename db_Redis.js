@@ -75,17 +75,16 @@ checkInfoAux = function(api_key, publicPath, callback){
 
 // CLI: deleteService [path]
 exports.deleteService = function(path, callback) {
-	db.del(path, function(err) {
-		if (err) {
-			return callback(err)
+	var multi = redis.createClient();
+
+	multi.del(path);
+	multi.srem('public', path);
+
+	multi.exec(function(err, replies) {
+		if (replies != undefined) {
+			return callback(replies[0]);
 		} else {
-			db.srem('public', path, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-			});
+			return callback(null);
 		}
 	});
 };
@@ -103,38 +102,25 @@ exports.getService = function(publicPath, callback) {
 
 // CLI: addService [publicPath] [url] [port]
 exports.newService = function(publicPath, url, port, callback){
-	db.exists(publicPath, function(err, res) {
-		if (err) {
-			return callback(err);
-		} else if (res !== 0) {
-			callback('[ERROR] The service already exists.');
+	var multi = redis.createClient();
+
+	multi.sadd(['public', publicPath]);
+	multi.hmset(publicPath, { 'url': url, 'port': port });
+
+	multi.exec(function(err, replies) {
+		if (replies != undefined) {
+			return callback(replies[0]);
 		} else {
-			db.sadd(['public', publicPath], function(err) {
-				if (err) {
-					return callback(err)
-				} else {
-					db.hmset(publicPath, {
-						'url': url,
-						'port': port
-					}, function(err) {
-						if (err) {
-							return callback(err);
-						} else {
-							return callback(null);
-						}
-					});
-				}
-			});
+			return callback(null);
 		}
 	});
 };
 
 exports.addResource = function(data, callback) {
-	db.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version], function(err) {
-		if (err) {
-			return callback(err)
-		} else {
-			db.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
+	var multi = redis.createClient();
+
+	multi.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version]);
+	multi.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
 				'publicPath': data.publicPath,
 				'org': data.offering.organization,
 				'name': data.offering.name,
@@ -142,113 +128,28 @@ exports.addResource = function(data, callback) {
 				'record_type': data.record_type,
 				'unit': data.unit,
 				'component_label': data.component_label
-			}, function(err){
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-			});
+	});
+
+	multi.exec(function(err, replies) {
+		if (replies != undefined) {
+			return callback(replies[0]);
+		} else {
+			return callback(null);
 		}
 	});
 };
 
-exports.loadUnits = function(callback) {
-	var toReturn = {};
-
-	db.smembers('resources', function(err, resources) {
+exports.getUnit = function(path, organization, name, version, callback) {
+	db.hgetall(path + organization + name + version, function(err, resource) {
 		if (err) {
 			return callback(err, null);
-		} else if (resources.length !== 0) {
-			count = 0;
-			resources.forEach(function(entry) {
-				db.hgetall(entry, function(err, obj) {
-					if (err) {
-						return callback(err, null);
-					} else if (obj != null) {
-						toReturn[obj['publicPath']] = {
-							publicPath: obj['publicPath'],
-							organization: obj['org'],
-							name: obj['name'],
-							version: obj['version'],
-							unit: obj['unit']
-						}
-					}
-					count++;
-					if (count == resources.length) {
-						return callback(null, toReturn);
-					}
-				});
-			});
+		} else if (resource == null) { // Service no created in db
+			return callback(null, null);
 		} else {
-			return callback(null, toReturn);
+			return callback(null, resource.unit);
 		}
 	});
-};
-
-exports.loadResources = function(callback) {
-	var toReturn = {};
-
-	db.smembers('public', function(err, resources) {
-		if (err) {
-			return callback(err, null);
-		} else if (resources.length !== 0) {
-			var count = 0;
-			resources.forEach(function(entry) {
-				db.hgetall(entry, function(err, res) {
-					if (res != null && ! err) {
-						toReturn[entry] = {
-							url: res.url,
-							port: res.port
-						}
-					}
-					count ++;
-					if (count == resources.length) {
-						return callback(null, toReturn);
-					}
-				});
-			});
-		} else {
-			return callback(null, toReturn);
-		}
-	});
-};
-
-/*exports.getNotificationInfo = function(callback) {
-	var toReturn = {};
-
-	db.smembers('API_KEYS', function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(api_keys, function(api_key, callback) {
-				db.hgetall(api_key, function(err, api_key_info){
-					if (err) {
-						callback(err, null);
-					} else {
-						db.smembers('public', function(err, publicPaths) {
-							if (err) {
-								callback(err, null);
-							} else {
-								async.each(publiPaths, function(publicPath, callback) {
-									db.hgetall(api_key_info.actorID + api_key_info.API_KEY 
-										+ publicPath, function(err, res) {
-											if (err) {
-												callback(err, null);
-											} else if (res !== null){
-
-												callback(err, null);
-											} 
-									})
-								})
-							}
-						});
-					}
-				});
-			});
-		}
-	});
-}*/
+}
 
 exports.existsApiKey = function(api_key, callback) {
 	db.exists(api_key, function(err, reply) {
@@ -332,6 +233,38 @@ exports.checkBuy = function(api_key, path, callback) {
 }
 
 exports.addInfo = function(api_key, data, callback) {
+	/*var multi = redis.createClient();
+
+	multi.sadd(['API_KEYS', api_key]);
+	multi.hmset(api_key, {
+				'organization': data.organization,
+				'name': data.name,
+				'version': data.version,
+				'actorID': data.actorID,
+				'reference': data.reference
+	});
+
+	var acc,
+		count = 0;
+		for (var p in data.accounting) {
+			acc = data.accounting[p];
+			multi.sadd([api_key + '_paths', p]);
+			multi.hmset(data.actorID + api_key + p, {
+											'actorID': data.actorID,
+											'API_KEY': api_key,
+											'num': acc.num,
+											'publicPath': p,
+											'correlation_number': acc.correlation_number
+			});
+	}
+
+	multi.exec(function(err, replies) {
+		if (replies != undefined) {
+			return callback(replies[0]);
+		} else {
+			return callback(null);
+		}
+	});*/
 	db.sadd(['API_KEYS', api_key], function(err) {
 		if (err) {
 			return callback(err)

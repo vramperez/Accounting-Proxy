@@ -204,7 +204,6 @@ function extractCBAction(req, res, callback) {
 function adminPath(req, callback) {
 
     if(req.port === config.resources.original.admin_port){
-        
         callback(false);
     }
 

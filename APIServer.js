@@ -91,7 +91,7 @@ var newBuyHandler = function(req, res){
                                     if (err) {
                                         task_callback('[ERROR] Error in db');
                                     } else if (unit === null ){ // Incorrect service
-                                        task_callback(null);
+                                        task_callback('[ERROR] Wrong path in the offer'); // If one path in the offer is wrong, send 400
                                     } else {
                                         db.getService(publicPath, function(err, service) {
                                             if (err) {
@@ -105,6 +105,7 @@ var newBuyHandler = function(req, res){
                                                         correlation_number: 0,
                                                         unit: unit
                                                     };
+                                                    task_callback(null);
                                                 } else { // New resource for the client
                                                     db.getNotificationInfo(api_key, publicPath, function(err, info) {
                                                         if (err) {
@@ -117,6 +118,7 @@ var newBuyHandler = function(req, res){
                                                                 correlation_number: info.correlation_number,
                                                                 unit: unit
                                                             }
+                                                            task_callback(null);
                                                         }
                                                     });
                                                 }
@@ -127,16 +129,16 @@ var newBuyHandler = function(req, res){
                             }
                         });
                     }, function(err) {
-                        if (err) {
-                            res.status(500).send();
+                        if (err == '[ERROR] Wrong path in the offer') {
+                            res.status(400).send(); // Wrong path in the offer
+                        } else if (err) {
+                            res.status(500).send(); // Internal server error 
                         } else {
                             db.addInfo(api_key, accounting_info[api_key], function(err) { // Save the information in db 
                                 if (err) {
                                     res.status(400).send();
-                                    task_callback(null);
                                 } else {
                                     res.status(201).send();
-                                    task_callback(null);
                                 }
                             });
                         }
@@ -176,7 +178,7 @@ var keysHandler = function(req, res){
 
 var generateHash = function(args, callback) {
     var string,
-    counter = args.length;
+        counter = args.length;
 
     if(counter != 0) {
         for (i in args) {

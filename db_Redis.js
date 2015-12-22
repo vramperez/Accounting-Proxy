@@ -25,7 +25,7 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
 				} else {
 					task_callback(null, null);
 				}
-			}, function(err, unit){
+			}, function(err, unit) {
 				if (err) {
 					return callback(err, null);
 				} else {
@@ -233,7 +233,7 @@ exports.checkBuy = function(api_key, path, callback) {
 }
 
 exports.addInfo = function(api_key, data, callback) {
-	/*var multi = redis.createClient();
+	var multi = redis.createClient();
 
 	multi.sadd(['API_KEYS', api_key]);
 	multi.hmset(api_key, {
@@ -244,18 +244,17 @@ exports.addInfo = function(api_key, data, callback) {
 				'reference': data.reference
 	});
 
-	var acc,
-		count = 0;
-		for (var p in data.accounting) {
-			acc = data.accounting[p];
-			multi.sadd([api_key + '_paths', p]);
-			multi.hmset(data.actorID + api_key + p, {
-											'actorID': data.actorID,
-											'API_KEY': api_key,
-											'num': acc.num,
-											'publicPath': p,
-											'correlation_number': acc.correlation_number
-			});
+	for (var p in data.accounting) {
+		console.log(p)
+		acc = data.accounting[p];
+		multi.sadd([api_key + '_paths', p]);
+		multi.hmset(data.actorID + api_key + p, {
+			'actorID': data.actorID,
+			'API_KEY': api_key,
+			'num': acc.num,
+			'publicPath': p,
+			'correlation_number': acc.correlation_number
+		});
 	}
 
 	multi.exec(function(err, replies) {
@@ -263,55 +262,6 @@ exports.addInfo = function(api_key, data, callback) {
 			return callback(replies[0]);
 		} else {
 			return callback(null);
-		}
-	});*/
-	db.sadd(['API_KEYS', api_key], function(err) {
-		if (err) {
-			return callback(err)
-		} else {
-			db.hmset(api_key, {
-				'organization': data.organization,
-				'name': data.name,
-				'version': data.version,
-				'actorID': data.actorID,
-				'reference': data.reference
-			}, function(err) {
-				if (err) {
-					return callback(err)
-				} else {
-					db.sadd([data.actorID, api_key], function(err){
-						if (err) {
-							return callback(err)
-						} else {
-							var acc,
-								count = 0;
-							for (var p in data.accounting) {
-								acc = data.accounting[p];
-								db.sadd([api_key + '_paths', p], function(err) {
-									if (err) {
-										return callback(err);
-									} else {
-										db.hmset(data.actorID + api_key + p, {
-											'actorID': data.actorID,
-											'API_KEY': api_key,
-											'num': acc.num,
-											'publicPath': p,
-											'correlation_number': acc.correlation_number
-										}, function(err){
-											count ++;
-											if (err) {
-												return callback(err);
-											} else if (count == Object.keys(data.accounting).length) {
-												return callback(null);
-											}
-										});
-									}
-								});
-							};
-						}
-					});
-				}
-			});
 		}
 	});
 };
@@ -340,24 +290,29 @@ exports.getApiKey = function(user, offer, callback) {
 exports.getInfo = function(user, callback) {
 	var toReturn = {};
 
-	db.smembers(user, function(err, acc) {
+	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
 		} else if (acc.length !== 0) {
-			var count = 0;
-			acc.forEach(function(entry) {
-				db.hgetall(entry, function(err, info) {
-					toReturn[entry] = {
-						API_KEY: entry,
-						organization: info['organization'],
-						name: info['name'],
-						version: info['version']
-					}
-					count++;
-					if (acc.length == count) {
-						return callback(null, toReturn);
+			async.each(api_keys, function(api_key, task_callback) {
+				db.hgetall(api_key, function(err, api_key_info) {
+					if (err) {
+						task_callback(err);
+					} else {
+						toReturn[entry] = {
+							API_KEY: entry,
+							organization: api_key_info['organization'],
+							name: api_key_info['name'],
+							version: api_key_info['version']
+						}
 					}
 				});
+			}, function(err) {
+				if (err) {
+					return callback(err, null);
+				} else {
+					return callback(null, toReturn);
+				}
 			});
 		} else {
 			return callback(null, toReturn);

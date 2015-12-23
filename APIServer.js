@@ -4,17 +4,32 @@ var express = require('express');
     proxy = require('./server.js'),
     config = require('./config'),
     bodyParser = require('body-parser'),
-    async = require('async');
+    async = require('async'),
+    winston = require('winston');
 
 var db = require(config.database);
 var app = express();
+var logger = new winston.Logger({
+    transports: [
+        new winston.transports.File({
+            level: 'debug',
+            filename: './logs/all-log',
+            colorize: false
+        }),
+        new winston.transports.Console({
+            level: 'info',
+            colorize: true
+        })
+    ],
+    exitOnError: false
+});
 
 exports.run = function(){
     app.listen(app.get('port'));
 };
 
 var newResourceHandler = function(req, res) {
-    console.log("[LOG] New resource notification recieved");
+    logger.log('debug', "New resource notification recieved");
     req.setEncoding('utf-8');
 
     body = req.body;
@@ -50,7 +65,7 @@ var newResourceHandler = function(req, res) {
 };
 
 var newBuyHandler = function(req, res){
-    console.log("[LOG] WStore notification recieved.");
+    logger.log('debug', "WStore notification recieved");
     req.setEncoding('utf-8');
 
     body = req.body;
@@ -63,12 +78,14 @@ var newBuyHandler = function(req, res){
 
     db.getApiKey(user, offer, function(err, api_key) {
         if (err) {
-            console.log('[ERROR] Error getting the api_key')
+            logger.warn('Error getting the api_key')
+            res.status(500).send();
         } else if (api_key === null) {
             // Generate API_KEY
             generateHash([user, offer.organization, offer.name, offer.version], function(err, id) {
                 if (err) {
-                    console.log('[ERROR] Error generating API_KEY');
+                    logger.warn('Error generating API_KEY');
+                    res.status(500).send();
                 } else {
                     api_key = id;
 
@@ -85,17 +102,17 @@ var newBuyHandler = function(req, res){
                         var publicPath = url.parse(resource.url).pathname;
                         db.checkBuy(api_key, publicPath, function(err, bought) { // Check if the user already has bought the resource
                             if (err) {
-                                task_callback('[ERROR] Error in db');
+                                task_callback('Error in db');
                             } else {
                                 db.getUnit(publicPath, offer.organization, offer.name, offer.version, function(err, unit) {
                                     if (err) {
-                                        task_callback('[ERROR] Error in db');
+                                        task_callback('Error in db');
                                     } else if (unit === null ){ // Incorrect service
-                                        task_callback('[ERROR] Wrong path in the offer'); // If one path in the offer is wrong, send 400
+                                        task_callback('Wrong path in the offer'); // If one path in the offer is wrong, send 400
                                     } else {
                                         db.getService(publicPath, function(err, service) {
                                             if (err) {
-                                                task_callback('[ERROR] Error in db');
+                                                task_callback('Error in db');
                                             } else {
                                                 if (! bought) { // Already bought
                                                     accounting_info[api_key].accounting[publicPath] = {
@@ -109,7 +126,7 @@ var newBuyHandler = function(req, res){
                                                 } else { // New resource for the client
                                                     db.getNotificationInfo(api_key, publicPath, function(err, info) {
                                                         if (err) {
-                                                            task_callback('[ERROR] Error in db');
+                                                            task_callback('Error in db');
                                                         } else {
                                                             accounting_info[api_key].accounting[publicPath] = {
                                                                 url: service.url,
@@ -129,7 +146,8 @@ var newBuyHandler = function(req, res){
                             }
                         });
                     }, function(err) {
-                        if (err == '[ERROR] Wrong path in the offer') {
+                        if (err == 'Wrong path in the offer') {
+                            logger.warn('debug', "%s", err);
                             res.status(400).send(); // Wrong path in the offer
                         } else if (err) {
                             res.status(500).send(); // Internal server error 

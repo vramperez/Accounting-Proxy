@@ -1,12 +1,26 @@
 var redis = require('redis'),
 	async = require('async'),
+	winston = require('winston'),
 	db;
 
 db = redis.createClient();
+var logger = new winston.Logger({
+    transports: [
+        new winston.transports.File({
+            level: 'debug',
+            filename: './logs/all-log',
+            colorize: false
+        })
+    ],
+    exitOnError: false
+});
+
 
 db.on('error', function(err) {
-	console.log("Error" + err);
+	logger.warn("%s". err);
 });
+
+exports.init = function() {};
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
 	db.smembers(user, function(err, api_keys) {
@@ -116,6 +130,40 @@ exports.newService = function(publicPath, url, port, callback){
 	});
 };
 
+// CLI: getInfo [user]
+exports.getInfo = function(user, callback) {
+	var toReturn = {};
+
+	db.smembers(user, function(err, api_keys) {
+		if (err) {
+			return callback(err, null);
+		} else if (acc.length !== 0) {
+			async.each(api_keys, function(api_key, task_callback) {
+				db.hgetall(api_key, function(err, api_key_info) {
+					if (err) {
+						task_callback(err);
+					} else {
+						toReturn[entry] = {
+							API_KEY: entry,
+							organization: api_key_info['organization'],
+							name: api_key_info['name'],
+							version: api_key_info['version']
+						}
+					}
+				});
+			}, function(err) {
+				if (err) {
+					return callback(err, null);
+				} else {
+					return callback(null, toReturn);
+				}
+			});
+		} else {
+			return callback(null, toReturn);
+		}
+	});
+};
+
 exports.addResource = function(data, callback) {
 	var multi = redis.createClient();
 
@@ -147,16 +195,6 @@ exports.getUnit = function(path, organization, name, version, callback) {
 			return callback(null, null);
 		} else {
 			return callback(null, resource.unit);
-		}
-	});
-}
-
-exports.existsApiKey = function(api_key, callback) {
-	db.exists(api_key, function(err, reply) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			return callback(null, reply);
 		}
 	});
 }
@@ -245,7 +283,6 @@ exports.addInfo = function(api_key, data, callback) {
 	});
 
 	for (var p in data.accounting) {
-		console.log(p)
 		acc = data.accounting[p];
 		multi.sadd([api_key + '_paths', p]);
 		multi.hmset(data.actorID + api_key + p, {
@@ -283,40 +320,6 @@ exports.getApiKey = function(user, offer, callback) {
 			});
 		}
 		return callback(null, null);
-	});
-};
-
-// CLI: getInfo [user]
-exports.getInfo = function(user, callback) {
-	var toReturn = {};
-
-	db.smembers(user, function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else if (acc.length !== 0) {
-			async.each(api_keys, function(api_key, task_callback) {
-				db.hgetall(api_key, function(err, api_key_info) {
-					if (err) {
-						task_callback(err);
-					} else {
-						toReturn[entry] = {
-							API_KEY: entry,
-							organization: api_key_info['organization'],
-							name: api_key_info['name'],
-							version: api_key_info['version']
-						}
-					}
-				});
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, toReturn);
-				}
-			});
-		} else {
-			return callback(null, toReturn);
-		}
 	});
 };
 

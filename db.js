@@ -1,4 +1,5 @@
-var sqlite = require('sqlite3').verbose(); // Debug enable
+var sqlite = require('sqlite3').verbose(), // Debug enable
+    async = require('async');
 
 var db = new sqlite.Database('accountingDB.sqlite');
 
@@ -7,31 +8,12 @@ exports.init = function() {
     db.serialize(function() {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
-        db.run('CREATE TABLE IF NOT EXISTS servicies ( \
-                    privatePath     TEXT, \
-                    port            TEXT, \
-                    PRIMARY KEY(privatePath, port) \
-               )');
 
         db.run('CREATE TABLE IF NOT EXISTS public ( \
                     publicPath      TEXT, \
-                    privatePath     TEXT, \
+                    url             TEXT, \
                     port            TEXT, \
-                    PRIMARY KEY (publicPath), \
-                    FOREIGN KEY (privatePath, port) REFERENCES servicies (privatePath, port) ON UPDATE CASCADE \
-               )');
-
-        db.run('CREATE TABLE IF NOT EXISTS resources ( \
-                    publicPath      TEXT, \
-                    PRIMARY KEY (publicPath), \
-                    FOREIGN KEY (publicPath) REFERENCES public (publicPath) ON UPDATE CASCADE \
-               )');
-
-        db.run('CREATE TABLE IF NOT EXISTS offers ( \
-                    organization    TEXT, \
-                    name            TEXT, \
-                    version         TEXT, \
-                    PRIMARY KEY (organization, name, version) \
+                    PRIMARY KEY (publicPath) \
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offerResource ( \
@@ -42,14 +24,7 @@ exports.init = function() {
                     record_type     TEXT, \
                     unit            TEXT, \
                     component_label TEXT, \
-                    PRIMARY KEY (publicPath, organization, name, version), \
-                    FOREIGN KEY (publicPath) REFERENCES resources (publicPath), \
-                    FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version) \
-               )');
-
-        db.run('CREATE TABLE IF NOT EXISTS accounts ( \
-                    actorID         TEXT, \
-                    PRIMARY KEY (actorID) \
+                    PRIMARY KEY (publicPath, organization, name, version)\
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offerAccount ( \
@@ -60,7 +35,6 @@ exports.init = function() {
                     API_KEY         TEXT, \
                     reference       TEXT, \
                     PRIMARY KEY (API_KEY), \
-                    FOREIGN KEY (organization, name, version) REFERENCES offers (organization, name, version), \
                     FOREIGN KEY (actorID) REFERENCES accounts (actorID) \
                )');
 
@@ -73,390 +47,317 @@ exports.init = function() {
                     PRIMARY KEY (actorID, API_KEY, publicPath), \
                     FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
-                    FOREIGN KEY (publicPath) REFERENCES resources(publicPath) \
                )');
         });
 };
 
-exports.loadFromDB = function(setData) {
-    var data  = {};
-    db.all('SELECT * \
-            FROM offerAccount',
-           function(err, row) {
-               // console.log(row);
-               var counter = row.length;
-               if (row.length !== 0)
-                   for (i in row) {
-                       loadResourcesAux(data, row[i], function() {
-                           counter--;
-                           if (counter === 0)
-                               setData(null, data);
-                       });
-                   }
-               else
-                   setData(null, data);
-           }
-          );
-};
-
-function loadResourcesAux(data, offer, callback) {
-    db.all('SELECT accounting.num as num, accounting.correlation_number as correlation_number, accounting.publicPath as publicPath, public.privatePath as privatePath, public.port as port, offerResource.unit as unit \
-            FROM accounting, public, offerResource \
-            WHERE API_KEY=$api_key AND accounting.publicPath=public.publicPath AND accounting.publicPath=offerResource.publicPath',
-           { $api_key: offer.API_KEY },
-           function(err, row) {
-               // console.log(offer.API_KEY, row, err);
-               var id = offer.API_KEY;
-
-               if (data[id] === undefined) {
-                   data[id] =  {
-                       actorID: offer.actorID,
-                       organization: offer.organization,
-                       name: offer.name,
-                       version: offer.version,
-                       accounting: {},
-                       reference: offer.reference
-                   };
-               }
-
-               for (var i in row) {
-                   var res = row[i];
-                   data[id].accounting[res.publicPath] = {
-                       privatePath: res.privatePath,
-                       port: res.port,
-                       num: res.num,
-                       correlation_number: res.correlation_number,
-                       unit: res.unit
-                   };
-               }
-               callback();
-           }
-    );
+exports.checkInfo = function(user, api_key, publicPath, callback) {
+    db.all('SELECT res.unit\
+            FROM accounting as acc AND offerAccount as offer AND offerResource as res \
+            WHERE API_KEY=$api_key AND acc.API_KEY=offer.API_KEY',
+            {
+                $api_key: api_key
+            }, function(err, unit) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, unit);
+                }
+            })
 }
 
-// UNUSED
-// exports.checkRequest = function(actorID, publicPath, callback) {
-//     db.all('SELECT privatePath, port \
-//             FROM public \
-//             WHERE publicPath=$publicPath AND EXISTS ( \
-//               SELECT privatePath, port \
-//               FROM resources \
-//               WHERE public.privatePath=privatePath AND public.port=port AND EXISTS ( \
-//                 SELECT provider, resourceName, resourceVersion, organization, offerName, offerVersion \
-//                 FROM offerResource \
-//                 WHERE resources.provider=provider AND resources.name=resourceName AND resources.version=resourceVersion AND EXISTS ( \
-//                   SELECT organization, name, version \
-//                   FROM offerAccount \
-//                   WHERE actorID=$actorID AND offerResource.organization=organization AND offerResource.offerName=name AND offerResource.offerVersion=version)))',
-//         {$actorID: actorID, $publicPath: publicPath}, function(error, row) {
-//             if (row.length === 1)
-//                 callback(null, row[0].privatePath, row[0].port);
-//             else
-//                 callback("User doesn't have access", null, null);
-//     });
-// };
+// CLI: addService [path] [url] [port]
+exports.newService = function(publicPath, url, port, callback) {
+    db.run('INSERT OR REPLACE INTO public \
+            VALUES ($path, $url, $port)',
+        {
+            $path: publicPath,
+            $url: url,
+            $port: port
+        }, function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null)
+        }
+    });
+};
 
-exports.count = function(actorID, API_KEY, publicPath, amount) {
+// CLI: deleteService [publicPath]
+exports.deleteService = function(path, callback) {
+    db.run('DELETE FROM public \
+            WHERE publicPath=$path',
+        {
+         $path: path
+        }, function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
+};
+
+// CLI: getService [publicPath]
+exports.getService = function(path, callback) {
+    db.all('SELECT url, port \
+            FROM public \
+            WHERE publicPath=$path', {
+                $path: path
+            }, function(err, service) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, service);
+                }
+            });
+}
+
+// CLI: getInfo [user]
+exports.getInfo = function(user, callback) {
+    db.all('SELECT organization, name, version, API_KEY \
+            FROM offerAccount \
+            WHERE actorID=$user', {
+                $user: user
+            }, function(err, row) {
+                if (err) {
+                    return callback(err, null);
+                } else if (row.length === 0) {
+                    return callback(null, {});
+                } else {
+                    return callback(null, row);
+                }
+    });
+};
+
+exports.addResource = function(data, callback) {
+    db.serialize(function() {
+        db.run("INSERT OR REPLACE INTO offerResource \
+            VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)",
+            {
+                $publicPath: data.publicPath,
+                $org: data.offering.organization,
+                $name: data.offering.name,
+                $version: data.offering.version,
+                $record_type: data.record_type,
+                $unit: data.unit,
+                $component_label: data.component_label
+            }, function (err) {
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
+         });
+    });
+};
+
+exports.getUnit = function(path, organization, name, version, callback) {
+    db.all('SELECT unit \
+            FROM offerResource \
+            WHERE publicPath=$path AND organization=$org AND name=$name AND version=$version',
+            {
+                $path: path,
+                $org: organization,
+                $name: name,
+                $version: version
+            }, function(err, unit) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, unit[0].unit);
+                }
+            });
+}
+
+exports.getApiKeys = function(callback) {
+    var toReturn = [];
+
+    db.all('SELECT API_KEY \
+            FROM offerAccount', 
+            function(err, apiKeys) {
+                if (err) {
+                    return callback(err, null);
+                } else if (apiKeys === undefined){
+                    return callback(null, []);
+                } else {
+                    async.each(apiKeys, function(api_key_obj, task_callback) {
+                        toReturn.push(api_key_obj.API_KEY);
+                        task_callback(null);
+                    }, function(err) {
+                        if (err) {
+                            return callback(err, null);
+                        } else {
+                            return callback(null, toReturn);
+                        }
+                    });
+                }
+    });
+}
+
+exports.getResources = function(api_key, callback) {
+    db.all('SELECT publicPath \
+            FROM accounting \
+            WHERE API_KEY=$api_key',
+            {
+                $api_key: api_key
+            }, function(err, resources) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, resources[0]);
+                }
+            });
+}
+
+exports.getNotificationInfo = function(api_key, path, callback) {
+    db.all('SELECT acc.API_KEY, acc.actorID as acotrID, acc.num as num, \
+                acc.publicPath as publicPath, acc.correlation_number as correlation_number, \
+                offer.organization as organization, offer.name as name, offer.version as version \
+            FROM accounting as acc , offerAccount as offer \
+            WHERE acc.API_KEY=offer.API_KEY AND acc.API_KEY=$api_key AND offer.API_KEY=$api_key', {
+                $api_key: api_key
+            }, function(err, notification_info) {
+                console.log(notification_info)
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, notification_info[0]);
+                }
+    });
+}
+
+exports.checkBuy = function(api_key, path, callback) {
+    db.all('SELECT publicPath \
+            FROM accounting \
+            WHERE API_KEY=$api_key', {
+                $api_key: api_key
+            }, function(err, path) {
+                if (err ) {
+                    return callback(err, null);
+                } else if (path.length != 0 ){
+                    return callback(null, true);
+                } else {
+                    return callback(null, false);
+                }
+    });
+}           
+
+exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
     db.run('UPDATE accounting \
-            SET num=num+$amount \
-            WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
+        SET num=num+$amount \
+        WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
         {
             $actorID: actorID,
             $API_KEY: API_KEY,
             $publicPath: publicPath,
             $amount: amount
+        }, function(err) {
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
         });
 };
 
-exports.resetCount = function(actorID, API_KEY, publicPath) {
+exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
     db.run('UPDATE accounting \
-            SET num=0, correlation_number=correlation_number+1 \
-            WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
-           {
+        SET num=0, correlation_number=correlation_number+1 \
+        WHERE actorID=$actorID AND API_KEY=$API_KEY AND publicPath=$publicPath',
+        {
             $actorID: actorID,
             $API_KEY: API_KEY,
             $publicPath: publicPath
-           });
-};
-
-exports.getResources = function(org, name, version, callback) {
-    db.all('SELECT publicPath \
-           FROM offerResource \
-           WHERE organization=$org AND offerName=$name AND offerVersion=$version',
-           {
-               $org: org,
-               $name: name,
-               $version: version
-           }, function(err, row) {
-               if (row.length !== 0)
-                   callback(row);
-               else
-                   callback(null);
-           });
-};
-
-exports.loadResources = function(callback) {
-    db.all('SELECT p.publicPath as publicPath, privatePath, port \
-            FROM public as p, resources as r \
-            WHERE p.publicPath=r.publicPath',
-           function(err, row) {
-               var l = row.length;
-               var toReturn = {};
-
-               for (var i=0; i<l; i++) {
-                   toReturn[row[i].publicPath] = {
-                       privatePath: row[i].privatePath,
-                       port: row[i].port
-                   };
-               }
-               callback(toReturn);
-    });
-};
-
-exports.getService = function(publicPath, callback) {
-    db.all("SELECT privatePath, port \
-            FROM public \
-            WHERE publicPath=$publicPath",
-           { $publicPath: publicPath },
-           function(err, row) {
-               if (err || row.length === 0)
-                   callback(undefined);
-               else
-                   callback(row[0]);
-           });
+        }, function(err) {
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
+        });
 };
 
 exports.getApiKey = function(user, offer, callback) {
     db.all('SELECT API_KEY \
-            FROM offerAccount \
-            WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
-           {
-               $org: offer.organization,
-               $name: offer.name,
-               $version: offer.version,
-               $actorID: user
-           },
-           function(err, row) {
-               if (row.length === 1)
-                   callback(row[0].API_KEY);
-               else
-                    callback();
-           });
+        FROM offerAccount \
+        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
+        {
+            $org: offer.organization,
+            $name: offer.name,
+            $version: offer.version,
+            $actorID: user
+        },
+        function(err, row_list) {
+            if (err) {
+                return callback(err, null);
+            } else if (row_list[0] === undefined){
+                return callback(null, null);
+            } else {
+                return callback(null, row_list[0].API_KEY);
+            }
+    });
 };
 
 exports.getAccountingInfo = function(publicPath, offer, callback) {
     db.all('SELECT record_type, unit, component_label \
-            FROM offerResource \
-            WHERE publicPath=$publicPath AND organization=$org AND name=$name AND version=$v',
-           {
-               $publicPath: publicPath,
-               $org: offer.organization,
-               $name: offer.name,
-               $v: offer.version
-           },
-           function(err, row) {
-               if (err || row.length === 0)
-                   callback(undefined);
-               else
-                   callback(row[0]);
-           });
+        FROM offerResource \
+        WHERE publicPath=$publicPath AND organization=$org AND name=$name AND version=$v',
+        {
+            $publicPath: publicPath,
+            $org: offer.organization,
+            $name: offer.name,
+            $v: offer.version
+        },
+        function(err, row_list) {
+            if (err) {
+                return callback(err, null);
+            } else if (row_list.length === 0) {
+                return callback(null, null);
+            } else {
+                return callback(null, row_list[0]);
+            }
+    });
 };
 
 exports.addInfo = function(API_KEY, data, callback) {
     var acc;
 
     db.serialize(function() {
-
         for (var p in data.accounting) {
-        acc = data.accounting[p];
-
-            // Add user if not exists
-            db.run('INSERT OR REPLACE INTO accounts \
-                    VALUES ($actorID)',
-                   { $actorID: data.actorID },
-                   function(err) { if (err) callback(err); });
-
-            // Add offer it not existes
-            // db.run('INSERT OR REPLACE INTO offers \
-            //         VALUES ($org, $name, $version)',
-            //        {
-            //            $org: data.organization,
-            //            $name: data.name,
-            //            $version: data.version
-            //        });
-
-            // Add reference: OVERWRITE REFERENCE!!
+            acc = data.accounting[p];
             db.run('INSERT OR REPLACE INTO offerAccount \
-                    VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
-                   {
-                       $org: data.organization,
-                       $name: data.name,
-                       $version: data.version,
-                       $actorID: data.actorID,
-                       $API_KEY: API_KEY,
-                       $ref: data.reference
-                   },
-                   function(err) { if (err) callback(err); });
-
-            // Add resource link to offer
-            // db.run('INSERT OR REPLACE INTO offerResource \
-            //         VALUES ($publicPath, $org, $offerName, $offerVersion)',
-            //        {
-            //            $publicPath: p,
-            //            $org: data.organization,
-            //            $offerName: data.name,
-            //            $offerVersion: data.version
-            //        });
-            // Add accounting
-            db.run('INSERT OR REPLACE INTO accounting \
+                VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
+                {
+                 $org: data.organization,
+                 $name: data.name,
+                 $version: data.version,
+                 $actorID: data.actorID,
+                 $API_KEY: API_KEY,
+                 $ref: data.reference
+                },
+                function(err) { 
+                    if (err) {
+                        return callback(err);
+                    } 
+                });
+                // Add accounting
+                db.run('INSERT OR REPLACE INTO accounting \
                     VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
-                   {
-                       $actorID: data.actorID,
-                       $API_KEY: API_KEY,
-                       $num: acc.num,
-                       $publicPath: p,
-                       $correlation_number: acc.correlation_number
-                   },
-                   function(err) { if (err) callback(err); else callback(); });
+                    {
+                        $actorID: data.actorID,
+                        $API_KEY: API_KEY,
+                        $num: acc.num,
+                        $publicPath: p,
+                        $correlation_number: acc.correlation_number
+                    },
+                    function(err) { 
+                        if (err) {
+                            return callback(err);
+                        } else {
+                            return callback(null);
+                        } 
+            });
         }
     });
-};
-
-// TODO: Is it necessary??
-// TODO: Update for new information structure
-exports.getPublicPaths = function(resource, callback) {
-    db.all('SELECT publicPath \
-            FROM public \
-            WHERE EXISTS ( \
-              SELECT privatePath, port \
-              FROM resources \
-              WHERE resources.provider=$prov AND resources.name=$name AND resources.version=$version AND public.privatePath=resources.privatePath AND public.port=resources.port)',
-           {
-               $prov: resource.provider,
-               $name: resource.name,
-               $version: resource.version
-           }, function(err, row) {
-               callback(row);
-           });
-};
-
-exports.getReference = function(API_KEY, callback) {
-    db.all('SELECT reference \
-            FROM offerAccount \
-            WHERE API_KEY=$api',
-           { $api: API_KEY},
-           function(err, row) {
-               if (err || row.length === 0)
-                   callback(undefined);
-               else
-                   callback(row[0].reference);
-           });
-};
-
-exports.getOffer = function(API_KEY, callback) {
-    db.all('SELECT organization, name, version \
-            FROM offerAccount \
-            WHERE API_KEY=$api',
-           { $api: API_KEY },
-           function(err, row) {
-               if (err || row.length === 0)
-                   callback(undefined);
-               else
-                   callback(row[0]);
-           });
-};
-
-exports.loadUnits = function(callback) {
-    db.all('SELECT publicPath, organization, name, version, unit \
-            FROM offerResource',
-           function(err, row) {
-               callback(row);
-           });
-};
-
-exports.addResource = function(data, callback) {
-
-    db.serialize(function() {
-
-        db.run('INSERT OR REPLACE INTO offers \
-                VALUES ($org, $name, $version)',
-               {
-                   $org: data.offering.organization,
-                   $name: data.offering.name,
-                   $version: data.offering.version
-               }, function (err) {
-                   if (err) callback(err);
-               });
-
-        db.run('INSERT OR REPLACE INTO resources \
-                VALUES ($p)',
-               {
-                   $p: data.publicPath
-               }, function (err) {
-                   if (err) callback(err);
-               });
-
-        db.run("INSERT OR REPLACE INTO offerResource \
-                VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)",
-               {
-                   $publicPath: data.publicPath,
-                   $org: data.offering.organization,
-                   $name: data.offering.name,
-                   $version: data.offering.version,
-                   $record_type: data.record_type,
-                   $unit: data.unit,
-                   $component_label: data.component_label
-               }, function (err) {
-                   if (err)
-                       callback(err);
-                   else
-                       callback(undefined);
-               });
-    });
-};
-
-// CLI: addService [path] [port]
-exports.newService = function(path, port, callback) {
-    db.run('INSERT OR REPLACE INTO servicies \
-            VALUES ($path, $port)',
-           {
-               $path: path,
-               $port: port
-           }, function(err) {
-               if (err)
-                   callback("[ERROR] Adding new service failed.");
-               callback();
-           });
-};
-
-// CLI: deleteService [path] [port]
-exports.deleteService = function(path, port, callback) {
-    db.run('DELETE FROM servicies \
-            WHERE privatePath=$path AND port=$port',
-           {
-               $path: path,
-               $port: port
-           }, function(err) {
-               if (err)
-                   callback("[ERROR] Deleting service failed.");
-               callback();
-           });
-};
-
-// CLI: getInfo [user]
-exports.getInfo = function(user, callback) {
-    db.all('SELECT organization, name, version, API_KEY \
-            FROM offerAccount \
-            WHERE actorID=$user',
-           {
-               $user: user
-           }, function(err, row) {
-               // console.log(row);
-               if (err)
-                   callback(err, undefined);
-               else if (row.length === 0)
-                   callback(null, undefined);
-               else
-                   callback(null,row);
-           });
 };

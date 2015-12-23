@@ -139,4 +139,4 @@ exports.CBRequestHandler = function(request, response, service, unit, operation)
 
 app.use(bodyParser.json());
 app.set('port', config.resources.notification_port);
-app.post('/subscriptions', module.exports.notificationHandler);
+app.post('/subscriptions', notificationHandler);

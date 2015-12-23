@@ -1,16 +1,30 @@
 var http = require('http'),
     info = require('./HTTP_Client/info.json'),
-    config = require('./config');
+    config = require('./config'),
+    winston = require('winston')
 
 var db = require(config.database);
-
+var logger = new winston.Logger({
+    transports: [
+        new winston.transports.File({
+            level: 'debug',
+            filename: './logs/all-log',
+            colorize: false
+        }),
+        new winston.transports.Console({
+            level: 'info',
+            colorize: true
+        })
+    ],
+    exitOnError: false
+});
 
 // Send notifications to the WStore
 exports.notify = function(accounting_info) {
     if (accounting_info.num === 0){
-        console.log('[LOG] NO request needed.');
+        logger.log('debug', 'No request needed.');
     } else {
-        console.log('[LOG] Request needed.');
+        logger.log('debug', 'Request needed.');
         db.getAccountingInfo(accounting_info.publicPath, {
             organization: accounting_info.organization,
             name: accounting_info.name,
@@ -18,7 +32,7 @@ exports.notify = function(accounting_info) {
         }, function(err, acc) {
 
             if (err || acc === null) {
-                console.log('[ERROR] Error while notifying')
+                logger.warn('Error while notifying')
             } else {
                 info.offering = {
                     organization: accounting_info.organization,
@@ -48,14 +62,14 @@ exports.notify = function(accounting_info) {
 
                 var request = http.request(options, function(res) {
                     if (200 <= res.statusCode && res.statusCode <= 299) {
-                        console.log('[LOG] Resquest worked!');
+                        logger.log('Resquest worked!');
                         db.resetCount(accounting_info.actorID, accounting_info.API_KEY, accounting_info.publicPath, function(err) {
                             if (err) {
-                                console.log('[ERROR] Error while reseting the account')
+                                logger.warn('Error while reseting the account')
                             }
                         });
                     } else {
-                        console.log('[LOG] Resquest failed!');
+                        logger.warn('Resquest failed!');
                     }
                 });
                 request.write(body);

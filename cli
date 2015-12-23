@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-var cli = require('commander');
-var db = require('./db_Redis.js');
+var cli = require('commander'),
+    config = require('./config');
+
+var db = require(config.database);
+
+db.init();
 
 cli
     .description('Configuration tool for accounting proxy.')
@@ -14,13 +18,15 @@ cli
     .action(function(publicPath, url, port) {
         if (/\/((\w+)\/?)*$/.test(publicPath) &&
             /^(ftp|http|https):\/\/[^ "]+$/.test(url) &&
-            /^\d*$/.test(port))
-            db.newService(publicPath, url, port, function(err) {
-                if (err)
-                    console.log(err);
-                else
-                    console.log('[LOG] Service successfully added.');
-            });
+            /^\d*$/.test(port)) {
+                db.newService(publicPath, url, port, function(err) {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log('[LOG] Service successfully added.');
+                    }
+                });
+        }
         else {
             console.log("[ERROR] Invalid parameters.");
         }
@@ -31,17 +37,17 @@ cli
     .command('getService [publicPath]')
     .description('Get service\'s information.')
     .action(function(publicPath) {
-        if (/\/((\w+)\/?)*$/.test(publicPath))
+        if (/\/((\w+)\/?)*$/.test(publicPath)){
             db.getService(publicPath, function(err, data) {
-                if(err)
-                    console.log(err);
-                else if (data === null)
+                if(err || data === null) {
                     console.log('No data avaliable');
-                else
-                     console.log("Url: " + data['url'] + "  Port: " + data['port']);
-                });
-        else 
+                } else {
+                    console.log("Url: " + data['url'] + "  Port: " + data['port']);
+                }
+            });
+        } else {
             console.log("[ERROR] Invalid parameters.");
+        } 
     });
 
 
@@ -50,14 +56,15 @@ cli
     .command('deleteService [publicPath]')
     .description('Delete a service from proxy database.')
     .action(function(path) {
-        if (/\/((\w+)\/?)*$/.test(path))
+        if (/\/((\w+)\/?)*$/.test(path)) {
             db.deleteService(path, function(err) {
-                if (err)
+                if (err) {
                     console.log(err);
-                else
+                } else {
                     console.log('[LOG] Service ' + path + ' deleted.')
+                }
             });
-        else {
+        } else {
             console.log("[ERROR] Invalid parameters.");
         }
     });
@@ -68,11 +75,11 @@ cli
     .description('Get user\'s information.')
     .action(function(user) {
         db.getInfo(user, function(err, data) {
-            if (err)
+            if (err) {
                 console.log('Error occur in DB.');
-            else if (data === undefined)
+            } else if (data === undefined) {
                 console.log('No data avaliable.');
-            else {
+            } else {
                 console.log("[FORMAT: Organization - Name - Version - API_KEY]");
                 for (i in data) {
                     console.log(data[i].organization + " - " +

@@ -7,7 +7,23 @@ var express = require('express'),
     contextBroker = require('./orion_context_broker/cb_handler'),
     url = require('url'),
     bodyParser = require('body-parser'),
-    async = require('async');
+    async = require('async'),
+    winston = require('winston');
+
+var logger = new winston.Logger({
+    transports: [
+        new winston.transports.File({
+            level: 'debug',
+            filename: './logs/all-log',
+            colorize: false
+        }),
+        new winston.transports.Console({
+            level: 'info',
+            colorize: true
+        })
+    ],
+    exitOnError: false
+});
 
 var db = require(config.database);
 var app = express();
@@ -18,24 +34,24 @@ var notify = function(callback) {
         if (err) {
             return callback(err);
         } else if (api_keys.length == 0){
-            console.log('[LOG] No data availiable');
+            logger.log('debug', "No data availiable");
             return callback(null);
         } else {
             async.each(api_keys, function(api_key, callback) {
                 db.getResources(api_key, function(err, resources) {
                     if (err) {
-                        callback(err);
+                        return callback(err);
                     } else  if (resources.length == 0) {
-                        console.log('[LOG] No data availiable');
+                        logger.log('debug', "No data availiable");
                         return callback(null);
                     } else {
                         async.each(resources, function(resource, callback) {
                             db.getNotificationInfo(api_key, resource, function(err, info) {
                                 if (err) {
-                                    callback(err);
+                                    return callback(err);
                                 } else {
                                     notifier.notify(info);
-                                    callback(err);
+                                    return callback(err);
                                 }
                             });
                         });
@@ -51,12 +67,14 @@ app.use( function(request, response) {
     var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
 
+    logger.log('debug', "[%s] New request", API_KEY); 
+
     if(serID === undefined) {
-        console.log("[LOG] Undefined username");
+        logger.log('debug', "[%s] Undefined username", API_KEY);
         response.status(400).end();
 
     } else if (API_KEY === undefined) {
-        console.log("[LOG] Undefined API_KEY");
+        logger.log('debug', "[%s] Undefined API_KEY", API_KEY);
         response.status(400).end();
 
     } else {
@@ -91,7 +109,7 @@ app.use( function(request, response) {
                                         response.send(resp);
                                         count(userID, API_KEY, publicPath, unit, resp, function(err){
                                             if(err) {
-                                                console.log('[LOG] An error ocurred while making the accounting');
+                                                logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
                                             }
                                         });
                                     });
@@ -107,7 +125,7 @@ app.use( function(request, response) {
                                 response.send(resp);
                                 count(userID, API_KEY, publicPath, unit, resp, function(err){
                                     if (err){
-                                        console.log('[LOG] An error ocurred while making the accounting');
+                                        logger.log("[%s] An error ocurred while making the accounting", API_KEY);
                                     }
                                 });
                             });
@@ -127,9 +145,9 @@ var count = function(user, API_KEY, publicPath, unit, response, callback) {
         } else {
             db.count(user, API_KEY, publicPath, amount, function(err){
                 if (err) {
-                    callback(err);
+                    return callback(err);
                 } else {
-                    callback(null);
+                    return callback(null);
                 }
             });
         }
@@ -141,33 +159,35 @@ var count = function(user, API_KEY, publicPath, unit, response, callback) {
  * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
  */
 var job = cron.scheduleJob('00 00 * * *', function() {
-    console.log('[LOG] Sending accounting information...');
+    logger.info('Sending accounting information...');
     notify(function(err) {
         if (err) {
-            console.log('[ERROR] Error while notifying the WStore');
+            logger.error('Error while notifying the WStore');
         }
     });
 });
 
+logger.info("Loading accounting modules...");
 // Load accounting modules
 for (var u in config.modules.accounting) {
     try {
         acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u] + ".js").count;
     } catch (e) {
-        console.log("[ERROR] No accounting module for unit '" + config.modules.accounting[u] + "': missing file " +
-                    "'acc_modules\\" +  config.modules.accounting[u] + ".js'");
+        logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
         process.exit(1);
     }
 }
 
 // Start ContextBroker Server for subscription notifications if it is enabled in the config
 if (config.resources.contextBroker) {
+    logger.info("Loading module for Orion Context Broker...");
     contextBroker.run();
 }
 
 notify(function(err) {
+    logger.info("Notifying the WStore...");
     if (err){
-        console.log('[ERROR] Error while notifying the WStore');
+        logger.warn("Notification to the WStore failed");
     }
 });
 

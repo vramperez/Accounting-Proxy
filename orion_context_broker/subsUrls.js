@@ -1,5 +1,3 @@
-
-
 /**
  * Operation identification table. Each row of the table contains a Context Broker subscribe or unsubscribe operations with two fields:
  * the method of the operation and a regular expression to identify the URL.

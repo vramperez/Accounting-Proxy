@@ -18,6 +18,8 @@ cli
                 db.newService(publicPath, privatePath, port, function(err) {
                     if (err) {
                         console.log(err);
+                    } else {
+                        console.log("[LOG] Service successfully add.");
                     }
                 });
         } else {
@@ -56,6 +58,8 @@ cli
             db.deleteService(path, port, function(err) {
                 if (err) {
                     console.log(err);
+                } else {
+                    console.log("[LOG] Service successfully delete.");
                 }
             });
         } else {

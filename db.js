@@ -52,18 +52,22 @@ exports.init = function() {
 };
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
-    db.all('SELECT res.unit\
-            FROM accounting as acc AND offerAccount as offer AND offerResource as res \
-            WHERE API_KEY=$api_key AND acc.API_KEY=offer.API_KEY',
+    db.all('SELECT offerResource.unit\
+            FROM offerAccount, offerResource\
+            WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.name AND offerAccount.version=offerResource.version AND\
+                    offerAccount.API_KEY=$api_key AND offerAccount.actorID=$actorID AND offerResource.publicPath=$publicPath',
             {
-                $api_key: api_key
+                $api_key: api_key,
+                $actorID: user,
+                $publicPath: publicPath
+
             }, function(err, unit) {
                 if (err) {
                     return callback(err, null);
                 } else {
-                    return callback(null, unit);
+                    return callback(null, unit[0].unit);
                 }
-            })
+    });
 }
 
 // CLI: addService [path] [url] [port]
@@ -108,7 +112,7 @@ exports.getService = function(path, callback) {
                 if (err) {
                     return callback(err, null);
                 } else {
-                    return callback(null, service);
+                    return callback(null, service[0]);
                 }
             });
 }
@@ -164,10 +168,12 @@ exports.getUnit = function(path, organization, name, version, callback) {
             }, function(err, unit) {
                 if (err) {
                     return callback(err, null);
+                } else if (unit.length == 0){
+                    return callback(null, null);
                 } else {
                     return callback(null, unit[0].unit);
                 }
-            });
+    });
 }
 
 exports.getApiKeys = function(callback) {
@@ -207,7 +213,7 @@ exports.getResources = function(api_key, callback) {
                 } else {
                     return callback(null, resources[0]);
                 }
-            });
+    });
 }
 
 exports.getNotificationInfo = function(api_key, path, callback) {
@@ -218,7 +224,6 @@ exports.getNotificationInfo = function(api_key, path, callback) {
             WHERE acc.API_KEY=offer.API_KEY AND acc.API_KEY=$api_key AND offer.API_KEY=$api_key', {
                 $api_key: api_key
             }, function(err, notification_info) {
-                console.log(notification_info)
                 if (err) {
                     return callback(err, null);
                 } else {
@@ -258,7 +263,7 @@ exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
             } else {
                 return callback(null);
             }
-        });
+    });
 };
 
 exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
@@ -275,7 +280,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
             } else {
                 return callback(null);
             }
-        });
+    });
 };
 
 exports.getApiKey = function(user, offer, callback) {

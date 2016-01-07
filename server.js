@@ -10,7 +10,7 @@ var express = require('express'),
     async = require('async'),
     winston = require('winston');
 
-var logger = new winston.Logger({
+var logger = new winston.Logger( {
     transports: [
         new winston.transports.File({
             level: 'debug',
@@ -28,6 +28,8 @@ var logger = new winston.Logger({
 var db = require(config.database);
 var app = express();
 var acc_modules = {};
+
+"use strict";
 
 var notify = function(callback) {
     db.getApiKeys(function(err, api_keys) {
@@ -69,7 +71,7 @@ app.use( function(request, response) {
 
     logger.log('debug', "[%s] New request", API_KEY); 
 
-    if(serID === undefined) {
+    if(userID === undefined) {
         logger.log('debug', "[%s] Undefined username", API_KEY);
         response.status(400).end();
 
@@ -84,7 +86,7 @@ app.use( function(request, response) {
             } else if (unit === null) { // Invalid API_KEY or user
                 response.status(401).end();
             } else {
-                db.getService(function(err, service) {
+                db.getService(publicPath ,function(err, service) {
                     if (err) {
                         response.status(500).end();
                     } else {

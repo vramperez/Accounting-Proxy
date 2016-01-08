@@ -23,23 +23,32 @@ db.on('error', function(err) {
 exports.init = function() {};
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
+	var unit;
+
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
 		} else {
 			async.each(api_keys, function(entry, task_callback) {
 				if (api_key === entry) {
-					checkInfoAux(entry, function(err, unit) {
+					db.hgetall(api_key, function(err, api_key_info) {
 						if (err) {
-							task_callback(err, null);
+							task_callback(err);
 						} else {
-							task_callback(null, unit);
+							checkInfoAux(api_key_info, publicPath, function(err, res) {
+								if (err) {
+									task_callback(err);
+								} else {
+									unit = res;
+									task_callback(null);
+								}
+							});
 						}
 					});
 				} else {
-					task_callback(null, null);
+					task_callback(null);
 				}
-			}, function(err, unit) {
+			}, function(err) {
 				if (err) {
 					return callback(err, null);
 				} else {
@@ -50,7 +59,9 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
 	});
 }
 
-checkInfoAux = function(api_key, publicPath, callback){
+checkInfoAux = function(api_key, publicPath, callback) {
+	var unit;
+
 	db.smembers('resources', function(err, resources) {
 		if (err) {
 			return callback(err, null);
@@ -58,25 +69,27 @@ checkInfoAux = function(api_key, publicPath, callback){
 			async.each(resources, function(resource, task_callback) {
 				db.hgetall(resource, function(err, res) {
 					if (err) {
-						task_callback(err, null);
+						task_callback(err);
 					} else {
 						db.hgetall(res.publicPath, function(err, serv) {
 							if (err) {
-								task_callback(err, null);
+								task_callback(err);
 							} else {
-								if (res !== null && api_key.organization === res.org && 
+								if (res !== null && 
+									api_key.organization === res.org && 
 									api_key.name === res.name && 
 									api_key.version === res.version &&
 									publicPath === res.publicPath) {
-										task_callback(null, serv.unit);
+										unit = res.unit;
+										task_callback(null);
 								} else {
-									task_callback(null, null);
+									task_callback(null);
 								}
 							}
 						});
 					}
 				});
-			}, function(err, unit) {
+			}, function(err) {
 				if (err) {
 					return callback(err, null);
 				} else {
@@ -281,6 +294,7 @@ exports.addInfo = function(api_key, data, callback) {
 				'actorID': data.actorID,
 				'reference': data.reference
 	});
+	multi.sadd([data.actorID, api_key]);
 
 	for (var p in data.accounting) {
 		acc = data.accounting[p];

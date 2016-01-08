@@ -1,4 +1,4 @@
-var express = require('express');
+var express = require('express'),
     crypto = require('crypto'),
     url = require('url'),
     proxy = require('./server.js'),

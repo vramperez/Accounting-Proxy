@@ -64,6 +64,8 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
             }, function(err, unit) {
                 if (err) {
                     return callback(err, null);
+                } else if (unit[0] === undefined) {
+                    return callback(null, null);
                 } else {
                     return callback(null, unit[0].unit);
                 }

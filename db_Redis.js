@@ -408,18 +408,6 @@ exports.getAccountingInfo = function(publicPath, offer, callback) {
 	});
 };
 
-exports.getOffer = function(API_KEY, callback) {
-	db.hgetall(API_KEY, function(err, offer) {
-		if (err) {
-			return callback(err, null);
-		} else if (offer === null) {
-			return callback(null, null);
-		} else {
-			return callback(null, offer);
-		}
-	});
-};
-
 exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
 	db.hmset(subscriptionID, {
 		'API_KEY': API_KEY,

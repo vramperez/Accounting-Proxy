@@ -32,7 +32,7 @@
   ],
   "scripts": {
     "test": "npm run unit && npm run integration",
-    "unit": "istanbul cover jasmine-node test/unit",
-    "integration": "istanbul cover jasmine-node test/integration"
+    "unit": "istanbul cover _mocha test/unit",
+    "integration": "istanbul cover _mocha test/integration"
   }
 }

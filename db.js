@@ -49,6 +49,17 @@ exports.init = function() {
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
                )');
         });
+
+        db.run('CREATE TABLE IF NOT EXISTS subscriptions ( \
+                    subscriptionID      TEXT, \
+                    API_KEY             TEXT, \
+                    publicPath          TEXT, \
+                    ref_host            TEXT, \
+                    ref_port            TEXT, \
+                    ref_path            TEXT, \
+                    unit                TEXT, \
+                    PRIMARY KEY (subscriptionID) \
+                )');
 };
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
@@ -294,8 +305,7 @@ exports.getApiKey = function(user, offer, callback) {
             $name: offer.name,
             $version: offer.version,
             $actorID: user
-        },
-        function(err, row_list) {
+        }, function(err, row_list) {
             if (err) {
                 return callback(err, null);
             } else if (row_list[0] === undefined){
@@ -315,8 +325,7 @@ exports.getAccountingInfo = function(publicPath, offer, callback) {
             $org: offer.organization,
             $name: offer.name,
             $v: offer.version
-        },
-        function(err, row_list) {
+        }, function(err, row_list) {
             if (err) {
                 return callback(err, null);
             } else if (row_list.length === 0) {
@@ -331,40 +340,97 @@ exports.addInfo = function(API_KEY, data, callback) {
     var acc;
 
     db.serialize(function() {
-        for (var p in data.accounting) {
-            acc = data.accounting[p];
+        async.forEachOf(data.accounting, function(acc, p, task_callback) {
             db.run('INSERT OR REPLACE INTO offerAccount \
                 VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
                 {
-                 $org: data.organization,
-                 $name: data.name,
-                 $version: data.version,
-                 $actorID: data.actorID,
-                 $API_KEY: API_KEY,
-                 $ref: data.reference
-                },
-                function(err) { 
+                    $org: data.organization,
+                    $name: data.name,
+                    $version: data.version,
+                    $actorID: data.actorID,
+                    $API_KEY: API_KEY,
+                    $ref: data.reference
+                }, function(err) {
                     if (err) {
-                        return callback(err);
-                    } 
-                });
-                // Add accounting
-                db.run('INSERT OR REPLACE INTO accounting \
-                    VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
-                    {
-                        $actorID: data.actorID,
-                        $API_KEY: API_KEY,
-                        $num: acc.num,
-                        $publicPath: p,
-                        $correlation_number: acc.correlation_number
-                    },
-                    function(err) { 
-                        if (err) {
-                            return callback(err);
-                        } else {
-                            return callback(null);
-                        } 
+                        task_callback(err);
+                    } else {
+                        // Add accounting
+                        db.run('INSERT OR REPLACE INTO accounting \
+                            VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
+                            {
+                                $actorID: data.actorID,
+                                $API_KEY: API_KEY,
+                                $num: acc.num,
+                                $publicPath: p,
+                                $correlation_number: acc.correlation_number
+                            }, function(err) {
+                                if (err) {
+                                    task_callback(err);
+                                } else {
+                                    task_callback(null);
+                                } 
+                        });
+                    }
             });
-        }
+        }, function(err) {
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
+        });
+    });
+};
+
+exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
+    db.serialize(function() {
+        db.run('INSERT OR REPLACE INTO subscriptions \
+            VALUES ($subs_id, $api_key, $publicPath, $ref_host, $ref_port, $ref_path, $unit)',
+            {
+                $subs_id: subscriptionID,
+                $api_key: API_KEY,
+                $publicPath: publicPath,
+                $ref_host: ref_host,
+                $ref_port: ref_port,
+                $ref_path: ref_path,
+                $unit: unit
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+        });
+    });
+};
+
+exports.getCBSubscription = function(subscriptionID, callback) {
+    db.all('SELECT subscriptionID \
+        FROM subscriptions \
+        WHERE subscriptionID=$subs_ID',
+        {
+            $subs_ID: subscriptionID
+        }, function(err, subs_info) {
+            if (err) {
+                return callback(err, null);
+            } else if (subs_info.length == 0) {
+                return callback(null, null);
+            } else {
+                return callback(null, subs_info[0]);
+            }
+    });
+};
+
+exports.deleteCBSubscription = function(subscriptionID, callback) {
+    db.run('DELETE FROM subscriptions \
+            WHERE subscriptionID=$subs_ID',
+            {
+                $subs_ID: subscriptionID
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
     });
 };

@@ -102,14 +102,14 @@ checkInfoAux = function(api_key, publicPath, callback) {
 
 // CLI: deleteService [path]
 exports.deleteService = function(path, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.del(path);
 	multi.srem('public', path);
 
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -129,14 +129,13 @@ exports.getService = function(publicPath, callback) {
 
 // CLI: addService [publicPath] [url] [port]
 exports.newService = function(publicPath, url, port, callback){
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['public', publicPath]);
 	multi.hmset(publicPath, { 'url': url, 'port': port });
-
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -178,7 +177,7 @@ exports.getInfo = function(user, callback) {
 };
 
 exports.addResource = function(data, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version]);
 	multi.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
@@ -191,9 +190,9 @@ exports.addResource = function(data, callback) {
 				'component_label': data.component_label
 	});
 
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -280,11 +279,11 @@ exports.checkBuy = function(api_key, path, callback) {
 				}
 			})
 		}
-	})
+	});
 }
 
 exports.addInfo = function(api_key, data, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['API_KEYS', api_key]);
 	multi.hmset(api_key, {
@@ -296,8 +295,7 @@ exports.addInfo = function(api_key, data, callback) {
 	});
 	multi.sadd([data.actorID, api_key]);
 
-	for (var p in data.accounting) {
-		acc = data.accounting[p];
+	async.forEachOf(data.accounting, function(acc, p, task_callback) {
 		multi.sadd([api_key + '_paths', p]);
 		multi.hmset(data.actorID + api_key + p, {
 			'actorID': data.actorID,
@@ -306,13 +304,20 @@ exports.addInfo = function(api_key, data, callback) {
 			'publicPath': p,
 			'correlation_number': acc.correlation_number
 		});
-	}
-
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+		task_callback();
+	}, function(err) {
+		if (err) {
+			return callback(err);
 		} else {
-			return callback(null);
+			multi.exec(function(err, replies) {
+				if (err) {
+					return callback(err);
+				} else if (replies != undefined) {
+					return callback(replies[0]);
+				} else {
+					return callback(null);
+				}
+			});
 		}
 	});
 };

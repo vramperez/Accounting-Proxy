@@ -149,18 +149,19 @@ exports.getInfo = function(user, callback) {
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
-		} else if (acc.length !== 0) {
+		} else {
 			async.each(api_keys, function(api_key, task_callback) {
 				db.hgetall(api_key, function(err, api_key_info) {
 					if (err) {
-						task_callback(err);
+						return callback(err, null);
 					} else {
-						toReturn[entry] = {
-							API_KEY: entry,
+						toReturn[api_key] = {
+							API_KEY: api_key,
 							organization: api_key_info['organization'],
 							name: api_key_info['name'],
 							version: api_key_info['version']
 						}
+						task_callback();
 					}
 				});
 			}, function(err) {
@@ -170,9 +171,7 @@ exports.getInfo = function(user, callback) {
 					return callback(null, toReturn);
 				}
 			});
-		} else {
-			return callback(null, toReturn);
-		}
+		} 
 	});
 };
 
@@ -294,7 +293,6 @@ exports.addInfo = function(api_key, data, callback) {
 				'reference': data.reference
 	});
 	multi.sadd([data.actorID, api_key]);
-
 	async.forEachOf(data.accounting, function(acc, p, task_callback) {
 		multi.sadd([api_key + '_paths', p]);
 		multi.hmset(data.actorID + api_key + p, {
@@ -309,11 +307,9 @@ exports.addInfo = function(api_key, data, callback) {
 		if (err) {
 			return callback(err);
 		} else {
-			multi.exec(function(err, replies) {
+			multi.exec(function(err) {
 				if (err) {
 					return callback(err);
-				} else if (replies != undefined) {
-					return callback(replies[0]);
 				} else {
 					return callback(null);
 				}
@@ -323,22 +319,28 @@ exports.addInfo = function(api_key, data, callback) {
 };
 
 exports.getApiKey = function(user, offer, callback) {
-	db.smembers(user, function(err, apiKey) {
+	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
-		} else if (apiKey.length !== 0) {
+		} else if (api_keys.length !== 0) {
 			var count = 0;
-			apiKey.forEach(function(entry) {
-				db.hgetall(entry, function(err, offerAcc) {
-					if (offerAcc['organization'] === offer['organization'] &&
+
+			async.filter(api_keys, function(api_key, task_callback) {
+				db.hgetall(api_key, function(err, offerAcc) {
+					if (err) {
+						return callback(err, null);
+					} else if (offerAcc['organization'] === offer['organization'] &&
 						offerAcc['name'] === offer['name'] &&
 						offerAcc['version'] === offer['version']) {
-							return callback(null, entry);
+							task_callback(true);
+					} else {
+						task_callback(false);
 					}
 				});
+			}, function(res) {
+				return callback(null, res[0]);
 			});
 		}
-		return callback(null, null);
 	});
 };
 

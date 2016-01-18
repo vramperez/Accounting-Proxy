@@ -95,7 +95,7 @@ exports.newService = function(publicPath, url, port, callback) {
         if (err) {
             return callback(err);
         } else {
-            return callback(null)
+            return callback(null);
         }
     });
 };
@@ -149,8 +149,8 @@ exports.getInfo = function(user, callback) {
 
 exports.addResource = function(data, callback) {
     db.serialize(function() {
-        db.run("INSERT OR REPLACE INTO offerResource \
-            VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)",
+        db.run('INSERT OR REPLACE INTO offerResource \
+            VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)',
             {
                 $publicPath: data.publicPath,
                 $org: data.offering.organization,
@@ -202,13 +202,9 @@ exports.getApiKeys = function(callback) {
                 } else {
                     async.each(apiKeys, function(api_key_obj, task_callback) {
                         toReturn.push(api_key_obj.API_KEY);
-                        task_callback(null);
-                    }, function(err) {
-                        if (err) {
-                            return callback(err, null);
-                        } else {
-                            return callback(null, toReturn);
-                        }
+                        task_callback();
+                    }, function() {
+                        return callback(null, toReturn);
                     });
                 }
     });
@@ -382,12 +378,12 @@ exports.addInfo = function(API_KEY, data, callback) {
     });
 };
 
-exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
+exports.addCBSubscription = function( API_KEY, publicPath, subscription_id, ref_host, ref_port, ref_path, unit, callback) {
     db.serialize(function() {
         db.run('INSERT OR REPLACE INTO subscriptions \
             VALUES ($subs_id, $api_key, $publicPath, $ref_host, $ref_port, $ref_path, $unit)',
             {
-                $subs_id: subscriptionID,
+                $subs_id: subscription_id,
                 $api_key: API_KEY,
                 $publicPath: publicPath,
                 $ref_host: ref_host,
@@ -404,12 +400,12 @@ exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_h
     });
 };
 
-exports.getCBSubscription = function(subscriptionID, callback) {
+exports.getCBSubscription = function(subscription_id, callback) {
     db.all('SELECT subscriptionID \
         FROM subscriptions \
-        WHERE subscriptionID=$subs_ID',
+        WHERE subscriptionID=$subs_id',
         {
-            $subs_ID: subscriptionID
+            $subs_id: subscription_id
         }, function(err, subs_info) {
             if (err) {
                 return callback(err, null);
@@ -421,11 +417,11 @@ exports.getCBSubscription = function(subscriptionID, callback) {
     });
 };
 
-exports.deleteCBSubscription = function(subscriptionID, callback) {
+exports.deleteCBSubscription = function(subscription_id, callback) {
     db.run('DELETE FROM subscriptions \
-            WHERE subscriptionID=$subs_ID',
+            WHERE subscriptionID=$subs_id',
             {
-                $subs_ID: subscriptionID
+                $subs_id: subscription_id
             }, function(err) {
                 if (err) {
                     return callback(err);

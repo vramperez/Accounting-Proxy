@@ -40,13 +40,13 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
 									task_callback(err);
 								} else {
 									unit = res;
-									task_callback(null);
+									task_callback();
 								}
 							});
 						}
 					});
 				} else {
-					task_callback(null);
+					task_callback();
 				}
 			}, function(err) {
 				if (err) {
@@ -81,9 +81,9 @@ checkInfoAux = function(api_key, publicPath, callback) {
 									api_key.version === res.version &&
 									publicPath === res.publicPath) {
 										unit = res.unit;
-										task_callback(null);
+										task_callback();
 								} else {
-									task_callback(null);
+									task_callback();
 								}
 							}
 						});
@@ -153,7 +153,7 @@ exports.getInfo = function(user, callback) {
 			async.each(api_keys, function(api_key, task_callback) {
 				db.hgetall(api_key, function(err, api_key_info) {
 					if (err) {
-						return callback(err, null);
+						task_callback(err);
 					} else {
 						toReturn[api_key] = {
 							API_KEY: api_key,
@@ -270,12 +270,8 @@ exports.checkBuy = function(api_key, path, callback) {
 				} else {
 					task_callback();
 				}
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, bought);
-				}
+			}, function() {
+				return callback(null, bought);
 			})
 		}
 	});
@@ -303,18 +299,14 @@ exports.addInfo = function(api_key, data, callback) {
 			'correlation_number': acc.correlation_number
 		});
 		task_callback();
-	}, function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			multi.exec(function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-			});
-		}
+	}, function() {
+		multi.exec(function(err) {
+			if (err) {
+				return callback(err);
+			} else {
+				return callback(null);
+			}
+		});
 	});
 };
 
@@ -338,7 +330,12 @@ exports.getApiKey = function(user, offer, callback) {
 					}
 				});
 			}, function(res) {
-				return callback(null, res[0]);
+				if (res.length != 0) {
+					return callback(null, res[0]);
+				} else {
+					return callback(null, null);
+				}
+				
 			});
 		}
 	});

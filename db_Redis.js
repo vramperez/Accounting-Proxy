@@ -23,23 +23,32 @@ db.on('error', function(err) {
 exports.init = function() {};
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
+	var unit;
+
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
 		} else {
 			async.each(api_keys, function(entry, task_callback) {
 				if (api_key === entry) {
-					checkInfoAux(entry, function(err, unit) {
+					db.hgetall(api_key, function(err, api_key_info) {
 						if (err) {
-							task_callback(err, null);
+							task_callback(err);
 						} else {
-							task_callback(null, unit);
+							checkInfoAux(api_key_info, publicPath, function(err, res) {
+								if (err) {
+									task_callback(err);
+								} else {
+									unit = res;
+									task_callback();
+								}
+							});
 						}
 					});
 				} else {
-					task_callback(null, null);
+					task_callback();
 				}
-			}, function(err, unit) {
+			}, function(err) {
 				if (err) {
 					return callback(err, null);
 				} else {
@@ -50,7 +59,9 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
 	});
 }
 
-checkInfoAux = function(api_key, publicPath, callback){
+checkInfoAux = function(api_key, publicPath, callback) {
+	var unit;
+
 	db.smembers('resources', function(err, resources) {
 		if (err) {
 			return callback(err, null);
@@ -58,25 +69,27 @@ checkInfoAux = function(api_key, publicPath, callback){
 			async.each(resources, function(resource, task_callback) {
 				db.hgetall(resource, function(err, res) {
 					if (err) {
-						task_callback(err, null);
+						task_callback(err);
 					} else {
 						db.hgetall(res.publicPath, function(err, serv) {
 							if (err) {
-								task_callback(err, null);
+								task_callback(err);
 							} else {
-								if (res !== null && api_key.organization === res.org && 
+								if (res !== null && 
+									api_key.organization === res.org && 
 									api_key.name === res.name && 
 									api_key.version === res.version &&
 									publicPath === res.publicPath) {
-										task_callback(null, serv.unit);
+										unit = res.unit;
+										task_callback();
 								} else {
-									task_callback(null, null);
+									task_callback();
 								}
 							}
 						});
 					}
 				});
-			}, function(err, unit) {
+			}, function(err) {
 				if (err) {
 					return callback(err, null);
 				} else {
@@ -89,14 +102,14 @@ checkInfoAux = function(api_key, publicPath, callback){
 
 // CLI: deleteService [path]
 exports.deleteService = function(path, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.del(path);
 	multi.srem('public', path);
 
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -116,14 +129,13 @@ exports.getService = function(publicPath, callback) {
 
 // CLI: addService [publicPath] [url] [port]
 exports.newService = function(publicPath, url, port, callback){
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['public', publicPath]);
 	multi.hmset(publicPath, { 'url': url, 'port': port });
-
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -137,18 +149,19 @@ exports.getInfo = function(user, callback) {
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
-		} else if (acc.length !== 0) {
+		} else {
 			async.each(api_keys, function(api_key, task_callback) {
 				db.hgetall(api_key, function(err, api_key_info) {
 					if (err) {
 						task_callback(err);
 					} else {
-						toReturn[entry] = {
-							API_KEY: entry,
+						toReturn[api_key] = {
+							API_KEY: api_key,
 							organization: api_key_info['organization'],
 							name: api_key_info['name'],
 							version: api_key_info['version']
 						}
+						task_callback();
 					}
 				});
 			}, function(err) {
@@ -158,14 +171,12 @@ exports.getInfo = function(user, callback) {
 					return callback(null, toReturn);
 				}
 			});
-		} else {
-			return callback(null, toReturn);
-		}
+		} 
 	});
 };
 
 exports.addResource = function(data, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version]);
 	multi.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
@@ -178,9 +189,9 @@ exports.addResource = function(data, callback) {
 				'component_label': data.component_label
 	});
 
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
+	multi.exec(function(err) {
+		if (err) {
+			return callback(err);
 		} else {
 			return callback(null);
 		}
@@ -259,19 +270,15 @@ exports.checkBuy = function(api_key, path, callback) {
 				} else {
 					task_callback();
 				}
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, bought);
-				}
+			}, function() {
+				return callback(null, bought);
 			})
 		}
-	})
+	});
 }
 
 exports.addInfo = function(api_key, data, callback) {
-	var multi = redis.createClient();
+	var multi = db.multi();
 
 	multi.sadd(['API_KEYS', api_key]);
 	multi.hmset(api_key, {
@@ -281,9 +288,8 @@ exports.addInfo = function(api_key, data, callback) {
 				'actorID': data.actorID,
 				'reference': data.reference
 	});
-
-	for (var p in data.accounting) {
-		acc = data.accounting[p];
+	multi.sadd([data.actorID, api_key]);
+	async.forEachOf(data.accounting, function(acc, p, task_callback) {
 		multi.sadd([api_key + '_paths', p]);
 		multi.hmset(data.actorID + api_key + p, {
 			'actorID': data.actorID,
@@ -292,34 +298,46 @@ exports.addInfo = function(api_key, data, callback) {
 			'publicPath': p,
 			'correlation_number': acc.correlation_number
 		});
-	}
-
-	multi.exec(function(err, replies) {
-		if (replies != undefined) {
-			return callback(replies[0]);
-		} else {
-			return callback(null);
-		}
+		task_callback();
+	}, function() {
+		multi.exec(function(err) {
+			if (err) {
+				return callback(err);
+			} else {
+				return callback(null);
+			}
+		});
 	});
 };
 
 exports.getApiKey = function(user, offer, callback) {
-	db.smembers(user, function(err, apiKey) {
+	db.smembers(user, function(err, api_keys) {
 		if (err) {
 			return callback(err, null);
-		} else if (apiKey.length !== 0) {
+		} else if (api_keys.length !== 0) {
 			var count = 0;
-			apiKey.forEach(function(entry) {
-				db.hgetall(entry, function(err, offerAcc) {
-					if (offerAcc['organization'] === offer['organization'] &&
+
+			async.filter(api_keys, function(api_key, task_callback) {
+				db.hgetall(api_key, function(err, offerAcc) {
+					if (err) {
+						return callback(err, null);
+					} else if (offerAcc['organization'] === offer['organization'] &&
 						offerAcc['name'] === offer['name'] &&
 						offerAcc['version'] === offer['version']) {
-							return callback(null, entry);
+							task_callback(true);
+					} else {
+						task_callback(false);
 					}
 				});
+			}, function(res) {
+				if (res.length != 0) {
+					return callback(null, res[0]);
+				} else {
+					return callback(null, null);
+				}
+				
 			});
 		}
-		return callback(null, null);
 	});
 };
 
@@ -390,18 +408,6 @@ exports.getAccountingInfo = function(publicPath, offer, callback) {
 			return callback(null, toReturn);
 		} else {
 			return callback(null, null);
-		}
-	});
-};
-
-exports.getOffer = function(API_KEY, callback) {
-	db.hgetall(API_KEY, function(err, offer) {
-		if (err) {
-			return callback(err, null);
-		} else if (offer === null) {
-			return callback(null, null);
-		} else {
-			return callback(null, offer);
 		}
 	});
 };

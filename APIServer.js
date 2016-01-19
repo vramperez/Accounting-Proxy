@@ -1,4 +1,4 @@
-var express = require('express');
+var express = require('express'),
     crypto = require('crypto'),
     url = require('url'),
     proxy = require('./server.js'),
@@ -23,6 +23,8 @@ var logger = new winston.Logger({
     ],
     exitOnError: false
 });
+
+"use strict";
 
 exports.run = function(){
     app.listen(app.get('port'));
@@ -147,7 +149,7 @@ var newBuyHandler = function(req, res){
                         });
                     }, function(err) {
                         if (err == 'Wrong path in the offer') {
-                            logger.warn('debug', "%s", err);
+                            logger.log('debug', "%s", err);
                             res.status(400).send(); // Wrong path in the offer
                         } else if (err) {
                             res.status(500).send(); // Internal server error 
@@ -163,6 +165,8 @@ var newBuyHandler = function(req, res){
                     });
                 }
             });
+        } else {
+            res.status(201).send();
         }
     });
 };

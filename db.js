@@ -49,21 +49,38 @@ exports.init = function() {
                     FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
                )');
         });
+
+        db.run('CREATE TABLE IF NOT EXISTS subscriptions ( \
+                    subscriptionID      TEXT, \
+                    API_KEY             TEXT, \
+                    publicPath          TEXT, \
+                    ref_host            TEXT, \
+                    ref_port            TEXT, \
+                    ref_path            TEXT, \
+                    unit                TEXT, \
+                    PRIMARY KEY (subscriptionID) \
+                )');
 };
 
 exports.checkInfo = function(user, api_key, publicPath, callback) {
-    db.all('SELECT res.unit\
-            FROM accounting as acc AND offerAccount as offer AND offerResource as res \
-            WHERE API_KEY=$api_key AND acc.API_KEY=offer.API_KEY',
+    db.all('SELECT offerResource.unit\
+            FROM offerAccount, offerResource\
+            WHERE offerAccount.organization=offerResource.organization AND offerAccount.name=offerResource.name AND offerAccount.version=offerResource.version AND\
+                    offerAccount.API_KEY=$api_key AND offerAccount.actorID=$actorID AND offerResource.publicPath=$publicPath',
             {
-                $api_key: api_key
+                $api_key: api_key,
+                $actorID: user,
+                $publicPath: publicPath
+
             }, function(err, unit) {
                 if (err) {
                     return callback(err, null);
+                } else if (unit[0] === undefined) {
+                    return callback(null, null);
                 } else {
-                    return callback(null, unit);
+                    return callback(null, unit[0].unit);
                 }
-            })
+    });
 }
 
 // CLI: addService [path] [url] [port]
@@ -78,7 +95,7 @@ exports.newService = function(publicPath, url, port, callback) {
         if (err) {
             return callback(err);
         } else {
-            return callback(null)
+            return callback(null);
         }
     });
 };
@@ -108,7 +125,7 @@ exports.getService = function(path, callback) {
                 if (err) {
                     return callback(err, null);
                 } else {
-                    return callback(null, service);
+                    return callback(null, service[0]);
                 }
             });
 }
@@ -132,8 +149,8 @@ exports.getInfo = function(user, callback) {
 
 exports.addResource = function(data, callback) {
     db.serialize(function() {
-        db.run("INSERT OR REPLACE INTO offerResource \
-            VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)",
+        db.run('INSERT OR REPLACE INTO offerResource \
+            VALUES ($publicPath, $org, $name, $version, $record_type, $unit, $component_label)',
             {
                 $publicPath: data.publicPath,
                 $org: data.offering.organization,
@@ -164,10 +181,12 @@ exports.getUnit = function(path, organization, name, version, callback) {
             }, function(err, unit) {
                 if (err) {
                     return callback(err, null);
+                } else if (unit.length == 0){
+                    return callback(null, null);
                 } else {
                     return callback(null, unit[0].unit);
                 }
-            });
+    });
 }
 
 exports.getApiKeys = function(callback) {
@@ -183,13 +202,9 @@ exports.getApiKeys = function(callback) {
                 } else {
                     async.each(apiKeys, function(api_key_obj, task_callback) {
                         toReturn.push(api_key_obj.API_KEY);
-                        task_callback(null);
-                    }, function(err) {
-                        if (err) {
-                            return callback(err, null);
-                        } else {
-                            return callback(null, toReturn);
-                        }
+                        task_callback();
+                    }, function() {
+                        return callback(null, toReturn);
                     });
                 }
     });
@@ -207,7 +222,7 @@ exports.getResources = function(api_key, callback) {
                 } else {
                     return callback(null, resources[0]);
                 }
-            });
+    });
 }
 
 exports.getNotificationInfo = function(api_key, path, callback) {
@@ -218,7 +233,6 @@ exports.getNotificationInfo = function(api_key, path, callback) {
             WHERE acc.API_KEY=offer.API_KEY AND acc.API_KEY=$api_key AND offer.API_KEY=$api_key', {
                 $api_key: api_key
             }, function(err, notification_info) {
-                console.log(notification_info)
                 if (err) {
                     return callback(err, null);
                 } else {
@@ -258,7 +272,7 @@ exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
             } else {
                 return callback(null);
             }
-        });
+    });
 };
 
 exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
@@ -275,7 +289,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
             } else {
                 return callback(null);
             }
-        });
+    });
 };
 
 exports.getApiKey = function(user, offer, callback) {
@@ -287,8 +301,7 @@ exports.getApiKey = function(user, offer, callback) {
             $name: offer.name,
             $version: offer.version,
             $actorID: user
-        },
-        function(err, row_list) {
+        }, function(err, row_list) {
             if (err) {
                 return callback(err, null);
             } else if (row_list[0] === undefined){
@@ -308,8 +321,7 @@ exports.getAccountingInfo = function(publicPath, offer, callback) {
             $org: offer.organization,
             $name: offer.name,
             $v: offer.version
-        },
-        function(err, row_list) {
+        }, function(err, row_list) {
             if (err) {
                 return callback(err, null);
             } else if (row_list.length === 0) {
@@ -324,40 +336,97 @@ exports.addInfo = function(API_KEY, data, callback) {
     var acc;
 
     db.serialize(function() {
-        for (var p in data.accounting) {
-            acc = data.accounting[p];
+        async.forEachOf(data.accounting, function(acc, p, task_callback) {
             db.run('INSERT OR REPLACE INTO offerAccount \
                 VALUES ($org, $name, $version, $actorID, $API_KEY, $ref)',
                 {
-                 $org: data.organization,
-                 $name: data.name,
-                 $version: data.version,
-                 $actorID: data.actorID,
-                 $API_KEY: API_KEY,
-                 $ref: data.reference
-                },
-                function(err) { 
+                    $org: data.organization,
+                    $name: data.name,
+                    $version: data.version,
+                    $actorID: data.actorID,
+                    $API_KEY: API_KEY,
+                    $ref: data.reference
+                }, function(err) {
                     if (err) {
-                        return callback(err);
-                    } 
-                });
-                // Add accounting
-                db.run('INSERT OR REPLACE INTO accounting \
-                    VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
-                    {
-                        $actorID: data.actorID,
-                        $API_KEY: API_KEY,
-                        $num: acc.num,
-                        $publicPath: p,
-                        $correlation_number: acc.correlation_number
-                    },
-                    function(err) { 
-                        if (err) {
-                            return callback(err);
-                        } else {
-                            return callback(null);
-                        } 
+                        task_callback(err);
+                    } else {
+                        // Add accounting
+                        db.run('INSERT OR REPLACE INTO accounting \
+                            VALUES ($actorID, $API_KEY, $num, $publicPath, $correlation_number)',
+                            {
+                                $actorID: data.actorID,
+                                $API_KEY: API_KEY,
+                                $num: acc.num,
+                                $publicPath: p,
+                                $correlation_number: acc.correlation_number
+                            }, function(err) {
+                                if (err) {
+                                    task_callback(err);
+                                } else {
+                                    task_callback(null);
+                                } 
+                        });
+                    }
             });
-        }
+        }, function(err) {
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
+        });
+    });
+};
+
+exports.addCBSubscription = function( API_KEY, publicPath, subscription_id, ref_host, ref_port, ref_path, unit, callback) {
+    db.serialize(function() {
+        db.run('INSERT OR REPLACE INTO subscriptions \
+            VALUES ($subs_id, $api_key, $publicPath, $ref_host, $ref_port, $ref_path, $unit)',
+            {
+                $subs_id: subscription_id,
+                $api_key: API_KEY,
+                $publicPath: publicPath,
+                $ref_host: ref_host,
+                $ref_port: ref_port,
+                $ref_path: ref_path,
+                $unit: unit
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+        });
+    });
+};
+
+exports.getCBSubscription = function(subscription_id, callback) {
+    db.all('SELECT subscriptionID \
+        FROM subscriptions \
+        WHERE subscriptionID=$subs_id',
+        {
+            $subs_id: subscription_id
+        }, function(err, subs_info) {
+            if (err) {
+                return callback(err, null);
+            } else if (subs_info.length == 0) {
+                return callback(null, null);
+            } else {
+                return callback(null, subs_info[0]);
+            }
+    });
+};
+
+exports.deleteCBSubscription = function(subscription_id, callback) {
+    db.run('DELETE FROM subscriptions \
+            WHERE subscriptionID=$subs_id',
+            {
+                $subs_id: subscription_id
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
     });
 };

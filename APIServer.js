@@ -1,7 +1,6 @@
 var express = require('express'),
     crypto = require('crypto'),
     url = require('url'),
-    proxy = require('./server.js'),
     config = require('./config'),
     bodyParser = require('body-parser'),
     async = require('async'),
@@ -178,21 +177,23 @@ var keysHandler = function(req, res){
         res.status(400).send();
     } else {
         db.getInfo(userID, function(err, data) {
-            if (data === {} || err != undefined) {
+            if (err != undefined || data.length == 0) {
                 res.status(400).send();
             } else {
-                var msg = [];
-                for (var i in data) {
-                    msg.push({
+                var result = [];
+                async.each(data, function(entry, task_callback) {
+                    result.push({
                         offering: {
-                            organization: data[i].organization,
-                            name: data[i].name,
-                            version: data[i].version
+                            organization: entry.organization,
+                            name: entry.name,
+                            version: entry.version
                         },
-                        API_KEY: data[i].API_KEY
+                        API_KEY: entry.API_KEY
                     });
-                }
-                res.json(msg);
+                    task_callback();
+                }, function() {
+                    res.json(result);
+                });
             }
         });
     }

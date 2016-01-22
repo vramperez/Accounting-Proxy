@@ -574,9 +574,12 @@ describe('Testing REDIS database,', function() {
 				return callback(null, info);
 			}
 			redis_mocker(implementations, function(db, spies) {
-				db.getInfo('0001', function(err, info) {
+				db.getInfo('0001', function(err, information) {
 					assert.equal(err, null);
-					assert.deepEqual(info, info);
+					assert.deepEqual(information, [ { API_KEY: 'api_key',
+   						organization: 'organization',
+    					name: 'name',
+    					version: '1.0' } ]);
 					assert.equal(spies.smembers.callCount, 1);
 					assert.equal(spies.each.callCount, 1);
 					assert.equal(spies.hgetall.callCount, 1);

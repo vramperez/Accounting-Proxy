@@ -144,7 +144,7 @@ exports.newService = function(publicPath, url, port, callback){
 
 // CLI: getInfo [user]
 exports.getInfo = function(user, callback) {
-	var toReturn = {};
+	var toReturn = [];
 
 	db.smembers(user, function(err, api_keys) {
 		if (err) {
@@ -155,12 +155,12 @@ exports.getInfo = function(user, callback) {
 					if (err) {
 						task_callback(err);
 					} else {
-						toReturn[api_key] = {
-							API_KEY: api_key,
-							organization: api_key_info['organization'],
-							name: api_key_info['name'],
-							version: api_key_info['version']
-						}
+						toReturn.push({
+								API_KEY: api_key,
+								organization: api_key_info['organization'],
+								name: api_key_info['name'],
+								version: api_key_info['version']
+						});
 						task_callback();
 					}
 				});

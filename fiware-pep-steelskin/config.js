@@ -133,7 +133,7 @@ config.middlewares = {
     /**
      * Indicates the module from where the middlewares will be loaded.
      */
-    require: 'lib/plugins/orionPlugin',
+    require: 'lib/plugins/restPlugin',
 
     /**
      * Indicates the list of middlewares to load.

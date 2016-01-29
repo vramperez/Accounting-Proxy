@@ -31,6 +31,8 @@ var acc_modules = {};
 
 "use strict";
 
+
+
 var notify = function(callback) {
     db.getApiKeys(function(err, api_keys) {
         if (err) {
@@ -53,7 +55,7 @@ var notify = function(callback) {
                                     return callback(err);
                                 } else {
                                     notifier.notify(info);
-                                    return callback(err);
+                                    return callback(null);
                                 }
                             });
                         });
@@ -61,6 +63,111 @@ var notify = function(callback) {
                 });
             });
         }
+    });
+}
+
+/* Create daemon to update WStore every day
+ * Cron format:
+ * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+ */
+var job = cron.scheduleJob('00 00 * * *', function() {
+    logger.info('Sending accounting information...');
+    notify(function(err) {
+        if (err) {
+            logger.error('Error while notifying the WStore');
+        }
+    });
+});
+
+logger.info("Loading accounting modules...");
+// Load accounting modules
+for (var u in config.modules.accounting) {
+    try {
+        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u]).count;
+    } catch (e) {
+        logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
+    }
+}
+
+// Start ContextBroker Server for subscription notifications if it is enabled in the config
+if (config.resources.contextBroker) {
+    logger.info("Loading module for Orion Context Broker...");
+    contextBroker.run();
+}
+
+notify(function(err) {
+    logger.info("Notifying the WStore...");
+    if (err){
+        logger.warn("Notification to the WStore failed");
+    }
+});
+
+// Auxiliar function for accounting
+exports.count = function(user, API_KEY, publicPath, unit, response, callback) {
+    acc_modules[unit](response, function(err, amount) {
+        if (err) {
+            return callback(err);
+        } else {
+            db.count(user, API_KEY, publicPath, amount, function(err){
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+            });
+        }
+    });
+};
+
+// Auxiliar functon that handles ContextBroker request
+var CBrequestHandler = function(request, response, service, options, unit) {
+    var userID = request.get('X-Actor-ID');
+    var API_KEY = request.get('X-API-KEY');
+    var publicPath = request.path;
+
+    contextBroker.getOperation(service.url, request, function(err, operation) {
+        if (err) {
+            logger.error('Error obtaining the operation based on CB path %s', options.path);
+        } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
+            contextBroker.requestHandler(request, response, service, unit, operation, function(err) {
+                if (err) {
+                    logger.error('Error processing CB request');
+                } 
+            });
+        } else {
+            proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Orion ConextBroker request ( no (un)subscription)
+                response.statusCode = status;
+                for(var idx in headers) {
+                    response.setHeader(idx, headers[idx]);
+                }
+                response.send(resp);
+                exports.count(userID, API_KEY, publicPath, unit, resp, function(err){
+                    if(err) {
+                        logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                    }
+                });
+            });
+        }
+    });
+}
+
+// Auxiliar function that handles generic requests (no ContextBroker)
+var requestHandler = function(request, response, options, unit) {
+    var userID = request.get('X-Actor-ID');
+    var API_KEY = request.get('X-API-KEY');
+    var publicPath = request.path;
+
+    proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Other requests
+        response.statusCode = status;
+        for (var idx in headers) {
+            response.setHeader(idx, headers[idx]);
+        }
+        response.send(resp);
+        exports.count(userID, API_KEY, publicPath, unit, resp, function(err){
+            if (err) {
+                logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+            }
+        });
     });
 }
 
@@ -83,7 +190,7 @@ app.use( function(request, response) {
         db.checkInfo(userID, API_KEY, publicPath, function(err, unit) {
             if (err) {
                 response.status(500).end();
-            } else if (unit === null) { // Invalid API_KEY or user
+            } else if (unit === null) { // Invalid API_KEY, user or path
                 response.status(401).end();
             } else {
                 db.getService(publicPath ,function(err, service) {
@@ -99,97 +206,14 @@ app.use( function(request, response) {
                         };
 
                         if (config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)) { // Orion ContextBroker request
-                            contextBroker.CBSubscriptionPath(service.url, request, function(operation) {
-                                if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
-                                    contextBroker.CBRequestHandler(request, response, servie, unit, operation);
-                                } else {
-                                    proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Orion ConextBroker request ( no (un)subscription)
-                                        response.statusCode = status;
-                                        for(var idx in headers) {
-                                            response.setHeader(idx, headers[idx]);
-                                        }
-                                        response.send(resp);
-                                        count(userID, API_KEY, publicPath, unit, resp, function(err){
-                                            if(err) {
-                                                logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
-                                            }
-                                        });
-                                    });
-                                }
-                            });
-                            
+                            CBrequestHandler(request, response, service, options, unit);
                         } else {
-                            proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Other requests
-                                response.statusCode = status;
-                                for (var idx in headers) {
-                                    response.setHeader(idx, headers[idx]);
-                                }
-                                response.send(resp);
-                                count(userID, API_KEY, publicPath, unit, resp, function(err){
-                                    if (err){
-                                        logger.log("[%s] An error ocurred while making the accounting", API_KEY);
-                                    }
-                                });
-                            });
+                            requestHandler(request, response, options, unit)
                         }
                     }
                 });
             }
         });
-    }
-});
-
-// Auxiliar function for accounting
-var count = function(user, API_KEY, publicPath, unit, response, callback) {
-    acc_modules[unit](response, function(err, amount) {
-        if (err) {
-            return callback(err);
-        } else {
-            db.count(user, API_KEY, publicPath, amount, function(err){
-                if (err) {
-                    return callback(err);
-                } else {
-                    return callback(null);
-                }
-            });
-        }
-    });
-};
-
-/* Create daemon to update WStore every day
- * Cron format:
- * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
- */
-var job = cron.scheduleJob('00 00 * * *', function() {
-    logger.info('Sending accounting information...');
-    notify(function(err) {
-        if (err) {
-            logger.error('Error while notifying the WStore');
-        }
-    });
-});
-
-logger.info("Loading accounting modules...");
-// Load accounting modules
-for (var u in config.modules.accounting) {
-    try {
-        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u] + ".js").count;
-    } catch (e) {
-        logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
-        process.exit(1);
-    }
-}
-
-// Start ContextBroker Server for subscription notifications if it is enabled in the config
-if (config.resources.contextBroker) {
-    logger.info("Loading module for Orion Context Broker...");
-    contextBroker.run();
-}
-
-notify(function(err) {
-    logger.info("Notifying the WStore...");
-    if (err){
-        logger.warn("Notification to the WStore failed");
     }
 });
 

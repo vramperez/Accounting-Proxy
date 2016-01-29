@@ -1,280 +1,554 @@
-var rewire = require('rewire'),
-	cb_handler = rewire('../../orion_context_broker/cb_handler');
+var proxyquire = require('proxyquire'),
+	assert = require('assert'),
+	sinon = require('sinon'),
+	async = require('async');
 
-var config_mock = {
-	resources: {
-		notification_port: 9000,
-		host: 'host'
+var mocker = function(implementations, callback) {
+	var mocks, spies, cb_handler;
+
+	// Create mocks and spies
+	var log_mock = {
+		log: function(level, msg) {},
+		info: function(msg) {},
+		warn: function(msg) {},
+		error: function(msg) {}
 	}
-}
-
-var proxy_mock = {
-	sendData: function(protocol, options, body, response, callback){
-		if(options.host === 'err_notifying')
-			return callback(400, { statusMessage: 'Error notifying the subscriptor'}, ['header1'])
-		else if (options.path === 'err_response_subs')
-			return callback(400, JSON.stringify({ subscribeResponse: {subscriptionId: 'subscriptionId'} }), ['header1'])
-		else
-			return callback(200, JSON.stringify({ subscribeResponse: {subscriptionId: 'err_deleteCBSubs'} }), ['header1']);
-	}
-}
-
-var req_mock = {
-	resetBody: function(){
-		this.body =  {
-			subscriptionId: ''
-		}
-	},
-	on: function(event, callback){
-		return callback(JSON.stringify(this.body));
-	},
-	get: function(header){
-		return this[header];
-	}
-}
-
-var resp_mock = {
-	message: undefined,
-	payload: undefined,
-	statusCode: undefined,
-	status: function(stat){
-		return this;
-	},
-	send: function(resp){},
-	json: function(payload){
-		this.payload = payload;
-	},
-	setHeader: function(header, value){}
-}
-
-var app_mock = {
-	port: config_mock.resources.notification_port,
-	get: function(option){
-		if(option === 'port')
-			return this.port;
-	},
-	set: function(option, value){
-		this.option = value;
-	},
-	listen: function(port){}
-}
-
-var db_mock = {
-	getCBSubscription: function(subscriptionId, callback){
-		switch(subscriptionId){
-			case 'err_getCBSubscription':
-				return callback(null);
-			case 'err_count':
-				return callback({
-					API_KEY: 'err_count',
-					publicPath: '/public',
-					unit: 'unit'
-				});
-			case 'err_notifying':
-				return callback({
-					API_KEY: 'err_notifying',
-					publicPath: '/public',
-					unit: 'unit',
-					ref_host: 'err_notifying',
-					ref_port: 9000,
-					ref_path: '/public'
-				});
-		}
-	},
-	addCBSubscription: function(api_key, path, subsId, host, port, path, unit, callback){
-		if(api_key == 'err_addCBSubs'){
-			return callback('Error')
-		}
-	},
-	deleteCBSubscription: function(subscriptionId, callback){
-		if(subscriptionId === 'err_deleteCBSubs')
-			return callback('Error');
-		else
-			return callback();
-	}
-}
-
-var acc_proxy_mock = {
-	count: function(api_key, path, unit, body, callback){
-		switch(api_key){
-			case 'err_count':
-				return callback('Error');
-			case 'err_notifying':
-				return callback();
+	mocks = {
+		logger: {
+			Logger: function(transports) {
+				return log_mock;
+			}
+		},
+		app: {
+			listen: function(port) {},
+			get: function(prop) {
+				return 9010;
+			},
+			use: function(middleware) {},
+			set: function(key, value) {},
+			post: function(path, handler) {}
+		},
+		config: {
+			database: './db',
+			resources: {
+				notification_port: 9002
+			}
+		},
+		db: {},
+		async: {
+			forEachOf: function(list, handler, callback) {
+				for(var  i=0; i<Object.keys(list).length; i++) {
+					handler(list[Object.keys(list)[i]], Object.keys(list)[i], function(param) {
+						if (i == Object.keys(list).length - 1 ) {
+							return callback(param);
+						}
+					});
+				}
+			}
+		},
+		req: {},
+		res: {},
+		bodyParser: {},
+		proxy: {},
+		url: {},
+		server: {
+			'@noCallThru': true
+		},
+		subsUrls: {
+			'@noCallThru': true
 		}
 	}
+	spies = {
+		logger: {
+			log: sinon.spy(log_mock, 'log'),
+			warn: sinon.spy(log_mock, 'warn'),
+			info: sinon.spy(log_mock, 'info'),
+			error: sinon.spy(log_mock, 'error')
+		},
+		app: {},
+		config: {},
+		db: {},
+		async: {
+			forEachOf: sinon.spy(mocks.async, 'forEachOf')
+		},
+		req: {},
+		res: {},
+		bodyParser: {},
+		proxy: {},
+		url: {},
+		server: {},
+		subsUrls: {}
+	}
+
+	// Complete app_mock implementation and add spies
+	async.each(Object.keys(implementations), function(obj, task_callback1) {
+		async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
+			mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
+			if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
+				if (obj == 'req' || obj == 'res') {
+					spies[obj][implem.toString()] = sinon.spy(implementations[obj], implem.toString());
+				} else {
+					spies[obj][implem.toString()] = sinon.spy(mocks[obj], implem.toString());
+				}
+				task_callback2();
+			} else {
+				task_callback2();
+			}
+		}, function() {
+			return task_callback1();
+		});
+	}, function() {
+		// Mocking dependencies
+		cb_handler = proxyquire('../../orion_context_broker/cb_handler', {
+			express: function() {
+				return mocks.app;
+			},
+			'../config': mocks.config,
+			'.././db': mocks.db,
+			'async': mocks.async,
+			'winston': mocks.logger,
+			'body-parser': mocks.bodyParser,
+			'../HTTP_Client/HTTPClient': mocks.proxy,
+			'url': mocks.url,
+			'../server': mocks.server,
+			'winston': mocks.logger,
+			'./subsUrls': mocks.subsUrls
+		});
+		return callback(cb_handler, spies);
+	});
 }
 
-describe("Testing db_handler", function(){
+describe('Testing Context-Broker handler', function() {
 
-	cb_handler.__set__('app', app_mock);
-	cb_handler.__set__('db', db_mock);
-	cb_handler.__set__('acc_proxy', acc_proxy_mock);
-	cb_handler.__set__('proxy', proxy_mock);
-
-	describe("run", function(){
+	describe('run', function() {
+		var implementations;
 
 		it('correct', function() {
-			spyOn(app_mock, 'listen').andCallThrough();
-			cb_handler.run();
-			expect(app_mock.listen.callCount).toEqual(1);
-			expect(app_mock.listen.calls[0].args).toEqual([config_mock.resources.notification_port])
-		});
-	});
+			implementations = {
+				app: {
+					listen: function(port) {},
+					get: function(prop) {
+						return 9002;
+					}
+				},
+				config: {
+					database: './db'
+				}
+			}
 
-	describe(";", function() {
-
-		beforeEach(function() {
-			req_mock.resetBody();
-			callback = jasmine.createSpy('callback');
-		});
-
-		args = [ ['/wrong', {method: 'POST'}, undefined], 
-				 ['/v1/subscribeContext', {method: 'POST'}, 'subscribe'],
-				 ['/v1/registry/unsubscribeContextAvailability', {method: 'POST'}, 'unsubscribe'],
-				 ['/v1/registry/unsubscribeContextAvailability', {method: 'POST'}, 'unsubscribe'], ];
-
-		args.forEach(function(entry) {
-			it("CBSubscriptionPath( " +  entry[0] + " , " + entry[1].method + ") , should return " + entry[2], function(){
-				cb_handler.CBSubscriptionPath(entry[0], entry[1], callback);
-				expect(callback.callCount).toEqual(1);
-				expect(callback.calls[0].args).toEqual([entry[2]]);
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.run();
+				assert.equal(spies.app.listen.callCount, 1);
+				assert.equal(spies.app.get.callCount, 1);
+				assert.equal(spies.app.listen.getCall(0).args[0], 9002);
+				assert.equal(spies.app.get.getCall(0).args[0], 'port');
 			});
 		});
 	});
 
-	describe("notification handler;", function() {
+	describe('notificationHandler', function() {
+		var implementations, count_args;
 
-		beforeEach(function() {
-			req_mock.resetBody();
-			spyOn(db_mock, 'getCBSubscription').andCallThrough();
-			spyOn(acc_proxy_mock, 'count').andCallThrough();
-			spyOn(proxy_mock, 'sendData').andCallThrough();
-			spyOn(resp_mock, 'send').andCallThrough();
-		});
-
-		it('error while obtaining the subscriptionId', function(){
-			req_mock.body.subscriptionId = 'err_getCBSubscription';
-			cb_handler.notificationHandler(req_mock, resp_mock);
-				expect(db_mock.getCBSubscription.callCount).toEqual(1);
-		});
-
-		it('error while making the accounting', function(){
-			req_mock.body.subscriptionId = 'err_count';
-			cb_handler.notificationHandler(req_mock, resp_mock);
-			expect(db_mock.getCBSubscription.callCount).toEqual(1);
-			expect(acc_proxy_mock.count.callCount).toEqual(1);
-		});
-
-		it('error while notifying the subscriptor', function(){
-			req_mock.body.subscriptionId = 'err_notifying';
-			cb_handler.notificationHandler(req_mock, resp_mock);
-			expect(db_mock.getCBSubscription.callCount).toEqual(1);
-			expect(acc_proxy_mock.count.callCount).toEqual(1);
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-		});
-
-		it('correct notification to the subscriber', function(){
-			req_mock.body.subscriptionId = 'err_notifying';
-			cb_handler.notificationHandler(req_mock, resp_mock);
-			expect(db_mock.getCBSubscription.callCount).toEqual(1);
-			expect(acc_proxy_mock.count.callCount).toEqual(1);
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-		});
-	});
-
-	describe("(un)subscribe request handler;", function() {
-
-		beforeEach(function() {
-			req_mock.resetBody();
-			spyOn(proxy_mock, 'sendData').andCallThrough();
-			spyOn(resp_mock, 'send').andCallThrough();
-			spyOn(db_mock, 'addCBSubscription').andCallThrough();
-			spyOn(db_mock, 'deleteCBSubscription').andCallThrough();
-			this.accounting = {
-				port: 9000,
-				privatePath: '/path'
+		it('error getting the subscriptionID', function(done) {
+			implementations = {
+				req: {
+					body: {
+						subscriptionID: 'subscriptionID'
+					}
+				},
+				res: {},
+				db: {
+					getCBSubscription: function(subscriptionID, callback) {
+						return callback('Error', null);
+					}
+				},
+				app: {
+					post: function(path, handler) {
+						return handler(implementations.req, implementations.res);
+					}
+				},
+				config: {
+					database: './db'
+				}
 			}
+			mocker(implementations, function(cb_handler, spies) {
+				assert.equal(spies.db.getCBSubscription.callCount, 1);
+				assert.equal(spies.logger.error.callCount, 1);
+				assert.equal(spies.logger.error.getCall(0).args[0], 
+					'An error ocurred while making the accounting: Invalid subscriptionId');
+				done();
+			});
 		});
 
-		it('[subscription] response to the client or CB fail', function() {
-			this.accounting.privatePath = 'err_response_subs';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.addCBSubscription.callCount).toEqual(0);
-		});
+		it('error making the accounting', function(done) {
+			count_args = ['api_key', '/path', 'megabyte', { subscriptionID: 'subscriptionID' }];
 
-		it('[subscription] add subscription to the db fail', function() {
-			req_mock['X-API-KEY'] = 'err_addCBSubs';
-			req_mock.path = '/private';
-			req_mock.body.reference = 'http://subscriptor:9000/notify';
-			this.accounting.unit = 'unit';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.addCBSubscription.callCount).toEqual(1);
+			implementations.server = {
+				count: function(api_key, path, unit, body, callback) {
+					return callback('Error');
+				}
+			}
+			implementations.db.getCBSubscription = function(subscriptionID, callback) {
+				return callback(null, {
+					API_KEY: 'api_key',
+					publicPath: '/path',
+					unit: 'megabyte',
+					ref_host: 'localhost',
+					ref_port: 9030,
+					ref_path: '/path'
+				});
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				assert.equal(spies.db.getCBSubscription.callCount, 1);
+				assert.equal(spies.logger.error.callCount, 1);
+				assert.equal(spies.server.count.callCount, 1);
+				assert.equal(spies.logger.error.getCall(0).args[0], 
+					'An error ocurred while making the accounting');
+				async.forEachOf(count_args, function(arg, i, task_callback) {
+					if (typeof arg != 'object') {
+						assert.equal(spies.server.count.getCall(0).args[i], count_args[i]);
+					} else {
+						assert.deepEqual(spies.server.count.getCall(0).args[i], count_args[i]);
+					}
+					task_callback();
+				});
+				done();
+			});
 		});
+		
+		it('correct notification, but error notifying the client', function(done) {
+			var sendData_args = ['http', {
+				host: 'localhost',
+				port: 9030,
+				path: '/path',
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json'
+				}
+			}];
 
-		it('[subscription] add subscription to the db correct', function() {
-			req_mock['X-API-KEY'] = 'api_key';
-			req_mock.path = '/private';
-			req_mock.body.reference = 'http://subscriptor:9000/notify';
-			this.accounting.unit = 'unit';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'subscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.addCBSubscription.callCount).toEqual(1);
-			expect(db_mock.addCBSubscription.calls[0].args[0]).toEqual('api_key');
-		});
-
-		it('[unsubscribe | POST ] response to the client or CB fail', function() {
-			req_mock.method = 'POST';
-			this.accounting = 
-			privatePath = 'err_response_subs';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.addCBSubscription.callCount).toEqual(0);
-		});
-
-		it('[unsubscribe | DELETE ] response to the client or CB fail', function() {
-			req_mock.method = 'DELETE';
-			req_mock.path = '/path'
-			this.accounting.privatePath = 'err_response_subs';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.deleteCBSubscription.callCount).toEqual(0);
-		});
-
-		it('[unsubscribe | POST ] delete subscription from DB fail', function() {
-			req_mock.method = 'POST';
-			req_mock.body.subscriptionId = 'err_deleteCBSubs';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.deleteCBSubscription.callCount).toEqual(1);
-			expect(db_mock.deleteCBSubscription.calls[0].args[0]).toEqual('err_deleteCBSubs');
-		});
-
-		it('[unsubscribe | POST ] delete subscription correct', function() {
-			req_mock.method = 'POST';
-			req_mock.body.subscriptionId = 'subscriptionId';
-			req_mock.body = JSON.stringify(req_mock.body);
-			cb_handler.CBRequestHandler(req_mock, resp_mock, this.accounting, 'unsubscribe');
-			expect(proxy_mock.sendData.callCount).toEqual(1);
-			expect(resp_mock.send.callCount).toEqual(1);
-			expect(db_mock.deleteCBSubscription.callCount).toEqual(1);
-			expect(db_mock.deleteCBSubscription.calls[0].args[0]).toEqual('subscriptionId');
+			implementations.server.count = function(api_key, path, unit, body, callback) {
+				return callback(null);
+			}
+			implementations.proxy = {
+				sendData: function(proto, options, body, response, callback) {
+					return callback(400, { statusMessage: 'Wrong'}, ['header1']);
+				}
+			}
+			implementations.res = {
+				send: function(msg) {},
+				setHeader: function(key, value) {}
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				assert.equal(spies.db.getCBSubscription.callCount, 1);
+				assert.equal(spies.logger.error.callCount, 1);
+				assert.equal(spies.server.count.callCount, 1);
+				assert.equal(spies.proxy.sendData.callCount, 1);
+				assert.equal(spies.res.setHeader.callCount, 1);
+				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.logger.error.getCall(0).args[0], 
+					'An error ocurred while notifying the subscription to: http://localhost:9030/path. Status: 400 Wrong');
+				async.forEachOf(count_args, function(arg, i, task_callback) {
+					if (typeof arg != 'object') {
+						assert.equal(spies.server.count.getCall(0).args[i], count_args[i]);
+					} else {
+						assert.deepEqual(spies.server.count.getCall(0).args[i], count_args[i]);
+					}
+					task_callback();
+				});
+				async.forEachOf(sendData_args, function(arg, i, task_callback) {
+					if (typeof sendData_args[i] != 'object') {
+						assert.equal(spies.proxy.sendData.getCall(0).args[i], sendData_args[i]);
+					} else {
+						assert.deepEqual(spies.proxy.sendData.getCall(0).args[i], sendData_args[i]);
+					}
+					task_callback();
+				});
+				done();
+			});
 		});
 	});
-});
+
+	describe('getOperation', function() {
+		var implementations, request;
+
+		it('correct, subscription operation', function(done) {
+			request = {
+				method: 'POST'
+			}
+			implementations = {
+				subsUrls: 
+					[
+						['DELETE', '/unsubs_path', 'unsubscribe'],
+						['POST', '/subs_path', 'subscribe']
+					]
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.getOperation('/subs_path', request, function(err, operation) {
+					assert.equal(err, null);
+					assert.equal(operation, 'subscribe');
+					assert.equal(spies.async.forEachOf.callCount, 1);
+					done();
+				});
+			});
+		});
+
+		it('correct, no subscription/unsubscription operation', function(done) {
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.getOperation('/no_subscription_path', request, function(err, operation) {
+					assert.equal(err, null);
+					assert.equal(operation, null);
+					assert.equal(spies.async.forEachOf.callCount, 1);
+					done();
+				});
+			});
+		});
+	});
+
+	describe('requestHandler', function() {
+		var implementations, addCBSubscription_args; 
+
+		it('[subscription] error adding the CBSubscription to db', function(done) {
+			addCBSubscription_args = ['api_key', '/path', 'subscriptionID', 'localhost', 9010, '/path', 'megabyte'];
+
+			implementations = {
+				config: {
+					database: './db',
+					resources: {
+						host: 'localhost',
+						notification_port: 9030
+					}
+				},
+				url: {
+					parse: function(url) {
+						return {
+							pathname: '/path',
+							host: 'localhost',
+							port: 9010,
+						}
+					}
+				},
+				req: {
+					method: 'POST',
+					path: '/path',
+					body: {
+						reference: 'http://localhost/path'
+					},
+					get: function(prop) {
+						return 'api_key';
+					}
+				},
+				res: {
+					setHeader: function(key, value) {},
+					send: function(msg) {}
+				},
+				db: {
+					addCBSubscription: function(api_key, path, subscriptionID, host, port, pathRef, unit, callback) {
+						return callback('Error');
+					}
+				},
+				proxy: {
+					sendData: function(proto, options, body, response, callback) {
+						return callback(200, {
+							subscribeResponse: {
+								subscriptionId: 'subscriptionID'
+							}
+						}, ['header1']);
+					}
+				}
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.requestHandler(implementations.req, implementations.res, {port: 9010, url: 'http://localhost/path'}, 'megabyte', 'subscribe', function(err) {
+					assert.equal(err, 'Error');
+					assert.equal(spies.proxy.sendData.callCount, 1);
+					assert.equal(spies.res.setHeader.callCount, 1);
+					assert.equal(spies.db.addCBSubscription.callCount, 1);
+					assert.equal(spies.res.send.callCount, 1);
+					assert.equal(spies.url.parse.callCount, 4);
+					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
+					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
+						headers: {
+							accept: 'application/json',
+							'content-type': 'application/json'
+						},
+						host: 'localhost',
+						method: 'POST',
+						path: '/path',
+						port: 9010
+					});
+					assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
+					assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+					assert.deepEqual(spies.res.send.getCall(0).args[0], {
+						subscribeResponse: {
+							subscriptionId: "subscriptionID"
+						}
+					});
+					async.forEachOf(addCBSubscription_args, function(arg, i, callback) {
+						assert.equal(spies.db.addCBSubscription.getCall(0).args[i], addCBSubscription_args[i]);
+					});
+					assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(1).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(2).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(3).args[0], 'http://localhost/path');
+					done();
+				});
+			});
+		});
+
+		it('[subscription] correct request', function(done) {
+			implementations.db.addCBSubscription = function(api_key, path, subscriptionID, host, port, pathRef, unit, callback) {
+				return callback(null);
+			}
+			implementations.req = {
+				method: 'POST',
+				path: '/path',
+				body: {
+					reference: 'http://localhost/path'
+				},
+				get: function(prop) {
+					return 'api_key';
+				}
+			}
+			implementations.res = {
+				setHeader: function(key, value) {},
+				send: function(msg) {}
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.requestHandler(implementations.req, implementations.res, {port: 9010, url: 'http://localhost/path'}, 'megabyte', 'subscribe', function(err) {
+					assert.equal(err, null);
+					assert.equal(spies.proxy.sendData.callCount, 1);
+					assert.equal(spies.res.setHeader.callCount, 1);
+					assert.equal(spies.db.addCBSubscription.callCount, 1);
+					assert.equal(spies.res.send.callCount, 1);
+					assert.equal(spies.url.parse.callCount, 4);
+					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
+					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
+						headers: {
+							accept: 'application/json',
+							'content-type': 'application/json'
+						},
+						host: 'localhost',
+						method: 'POST',
+						path: '/path',
+						port: 9010
+					});
+					assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
+					assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+					assert.deepEqual(spies.res.send.getCall(0).args[0], {
+						subscribeResponse: {
+							subscriptionId: "subscriptionID"
+						}
+					});
+					async.forEachOf(addCBSubscription_args, function(arg, i, callback) {
+						assert.equal(spies.db.addCBSubscription.getCall(0).args[i], addCBSubscription_args[i]);
+					});
+					assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(1).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(2).args[0], 'http://localhost/path');
+					assert.equal(spies.url.parse.getCall(3).args[0], 'http://localhost/path');
+					done();
+				});
+			});
+		});
+
+		it('[unsubscription] error removing the CBSubscription to db', function(done) {
+			implementations.req = {
+				method: 'POST',
+				path: '/path',
+				body: {
+					reference: 'http://localhost/path',
+					subscriptionId: 'subscriptionId'
+				},
+				get: function(prop) {
+					return 'api_key';
+				}
+			}
+			implementations.res = {
+				setHeader: function(key, value) {},
+				send: function(msg) {}
+			}
+			implementations.db.deleteCBSubscription = function(subscriptionID, callback) {
+				return callback('Error');
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.requestHandler(implementations.req, implementations.res, {port: 9010, url: 'http://localhost/path'}, 'megabyte', 'unsubscribe', function(err) {
+					assert.equal(err, 'Error');
+					assert.equal(spies.proxy.sendData.callCount, 1);
+					assert.equal(spies.res.setHeader.callCount, 1);
+					assert.equal(spies.res.send.callCount, 1);
+					assert.equal(spies.db.deleteCBSubscription.callCount, 1);
+					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
+					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
+						headers: {
+							accept: 'application/json',
+							'content-type': 'application/json'
+						},
+						host: 'localhost',
+						method: 'POST',
+						path: '/path',
+						port: 9010
+					});
+					assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
+					assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+					assert.deepEqual(spies.res.send.getCall(0).args[0], {
+						subscribeResponse: {
+							subscriptionId: "subscriptionID"
+						}
+					});
+					assert.equal(spies.db.deleteCBSubscription.getCall(0).args[0], 'subscriptionId');
+					done();
+				});
+			});
+		});
+
+		it('[unsubscription] correct request', function(done) {
+			implementations.req = {
+				method: 'DELETE',
+				path: '/v1/contextSubscriptions/subscriptionID',
+				body: {
+					reference: 'http://localhost/path',
+					subscriptionId: 'subscriptionId'
+				},
+				get: function(prop) {
+					return 'api_key';
+				}
+			}
+			implementations.res = {
+				setHeader: function(key, value) {},
+				send: function(msg) {}
+			}
+			implementations.db.deleteCBSubscription = function(subscriptionID, callback) {
+				return callback(null);
+			}
+			mocker(implementations, function(cb_handler, spies) {
+				cb_handler.requestHandler(implementations.req, implementations.res, {port: 9010, url: 'http://localhost/path'}, 'megabyte', 'unsubscribe', function(err) {
+					assert.equal(err, null);
+					assert.equal(spies.proxy.sendData.callCount, 1);
+					assert.equal(spies.res.setHeader.callCount, 1);
+					assert.equal(spies.res.send.callCount, 1);
+					assert.equal(spies.db.deleteCBSubscription.callCount, 1);
+					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
+					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
+						headers: {
+							accept: 'application/json',
+							'content-type': 'application/json'
+						},
+						host: 'localhost',
+						method: 'DELETE',
+						path: '/path',
+						port: 9010
+					});
+					assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
+					assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+					assert.deepEqual(spies.res.send.getCall(0).args[0], {
+						subscribeResponse: {
+							subscriptionId: "subscriptionID"
+						}
+					});
+					assert.equal(spies.db.deleteCBSubscription.getCall(0).args[0], 'subscriptionID');
+					done();
+				});
+			});
+		});
+	});
+})

@@ -1,3 +1,4 @@
+/** Accounting module for unit: MEGABYTE */
 
 exports.count = function(response, callback) {
 

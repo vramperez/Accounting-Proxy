@@ -4,7 +4,14 @@ var proxyquire = require('proxyquire'),
 	async = require('async');
 
 var mocker = function(implementations, callback) {
-	var spies = {
+	var spies, api_server, mocks;
+
+	// Create mocks and spies
+	var log_mock = {
+		log: function(level, msg) {},
+		warn: function(msg) {}
+	}
+	spies = {
 		app: {},
 		db: {},
 		req: {},
@@ -12,10 +19,13 @@ var mocker = function(implementations, callback) {
 		async: {},
 		url: {},
 		config: {},
+		logger: {
+			log: sinon.spy(log_mock, 'log'),
+			warn: sinon.spy(log_mock, 'warn')
+		}
 	};
-	var api_server;
 	// Define default mockers
-	var mocks = {
+	mocks = {
 		app: {
 			set: function(prop, value) {},
 			use: function(middleware) {},
@@ -27,7 +37,12 @@ var mocker = function(implementations, callback) {
 		res: {},
 		url: {},
 		config: {},
-		async: {}
+		async: {},
+		logger: {
+			Logger: function(transports) {
+				return log_mock;
+			}
+		}
 	};
 	// Complete app_mock implementation and add spies
 	async.each(Object.keys(implementations), function(obj, task_callback1) {
@@ -54,6 +69,7 @@ var mocker = function(implementations, callback) {
 			'./config': mocks.config,
 			'./db': mocks.db,
 			'url': mocks.url,
+			'winston': mocks.logger,
 			'async': mocks.async
 		});
 		return callback(api_server, spies);
@@ -259,7 +275,10 @@ describe('Testing APIServer', function() {
 	describe('newResourceHandler', function() {
 		var implementations = {
 			req: {
-				body: {}
+				body: {},
+				is: function(type) {
+					return false;
+				}
 			},
 			db: {
 				getService: function(publicPath, callback) {
@@ -287,8 +306,33 @@ describe('Testing APIServer', function() {
 			}
 		}
 
+		it('error (415), incorrect content-type (no "application/json")', function(done) {
+			implementations.res = {
+				status: function(stat) {
+					return this;
+				},
+				send: function() {}
+			}
+
+			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.res.status.getCall(0).args[0], 415);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
+				done();
+			});
+		});
+
 		it('error (400), incorrect body', function(done) {
-			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req = {
+				body: {},
+				is: function(type) {
+					return true;
+				},
+				setEncoding: function(type_encoding) {}
+			}
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -296,9 +340,12 @@ describe('Testing APIServer', function() {
 				send: function() {}
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
 				done();
@@ -306,18 +353,23 @@ describe('Testing APIServer', function() {
 		});
 
 		it('error (400), no service available', function(done) {
-			implementations.req.body = {
-				record_type: 'rec_type',
-				unit: 'megabyte',
-				component_label: 'com_label',
-				url: 'http://localhost/path',
-				offering: {
-					organization: 'org',
-					name: 'name',
-					version: 1.0
-				}
+			implementations.req = {
+				body: {
+					record_type: 'rec_type',
+					unit: 'megabyte',
+					component_label: 'com_label',
+					url: 'http://localhost/path',
+					offering: {
+						organization: 'org',
+						name: 'name',
+						version: 1.0
+					}
+				},
+				is: function(type) {
+					return true;
+				},
+				setEncoding: function(type_encoding) {}
 			}
-			implementations.req.setEncoding = function(type_encoding) {};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -325,10 +377,13 @@ describe('Testing APIServer', function() {
 				send: function() {}
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
@@ -337,6 +392,7 @@ describe('Testing APIServer', function() {
 		});
 
 		it('error (400), unsupported accounting unit', function(done) {
+			implementations.req.is = function(type) { return true};
 			implementations.req.setEncoding = function(type_encoding) {};
 			implementations.res = {
 				status: function(stat) {
@@ -355,10 +411,13 @@ describe('Testing APIServer', function() {
 				}
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
@@ -368,6 +427,7 @@ describe('Testing APIServer', function() {
 		});
 
 		it('error (400) adding the information to db', function(done) {
+			implementations.req.is = function(type) { return true};
 			implementations.req.setEncoding = function(type_encoding) {};
 			implementations.res = {
 				status: function(stat) {
@@ -382,10 +442,13 @@ describe('Testing APIServer', function() {
 				return 1;
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
@@ -401,6 +464,7 @@ describe('Testing APIServer', function() {
 		});
 
 		it('correct (201), resource added succesfully', function(done) {
+			implementations.req.is = function(type) { return true};
 			implementations.req.setEncoding = function(type_encoding) {};
 			implementations.res = {
 				status: function(stat) {
@@ -412,10 +476,13 @@ describe('Testing APIServer', function() {
 				return callback(null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.res.status.getCall(0).args[0], 201);
@@ -480,22 +547,53 @@ describe('Testing APIServer', function() {
 			}
 		}
 
-		it('error (500), error getting the API_KEY form db', function(done) {
+		it('error (415), incorrect content-type (no "application/json")', function(done) {
+			implementations.req.is = function(type) { return false};
+
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
+				assert.equal(spies.res.status.getCall(0).args[0], 415);
+				done();
+			});
+		});
+
+		it('error (500), error getting the API_KEY form db', function(done) {
+			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
+			implementations.res = {
+				status: function(stat) {
+					return this;
+				},
+				send: function() {}
+			}
+
+			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.logger.warn.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
+				assert.equal(spies.logger.warn.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
+				assert.equal(spies.logger.warn.getCall(0).args[0], 'Error getting the api_key');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
 				assert.equal(spies.res.status.getCall(0).args[0], 500);
+				assert.equal(spies.logger.warn.getCall(0).args[0], 'Error getting the api_key');
 				done();
 			});
 		});
 
 		it('error (500), error checking the info', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -523,12 +621,15 @@ describe('Testing APIServer', function() {
 				}
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -542,6 +643,7 @@ describe('Testing APIServer', function() {
 
 		it('error (500), error getting the unit', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -555,12 +657,15 @@ describe('Testing APIServer', function() {
 				return callback('Error', null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -578,6 +683,7 @@ describe('Testing APIServer', function() {
 		
 		it('error (400), wrong path in the offer', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -588,12 +694,17 @@ describe('Testing APIServer', function() {
 				return callback(null, null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 2);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
+				assert.equal(spies.logger.log.getCall(1).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(1).args[1], '%s');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -611,6 +722,7 @@ describe('Testing APIServer', function() {
 
 		it('error(500), error getting the service', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -624,12 +736,15 @@ describe('Testing APIServer', function() {
 				return callback('Error', null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -648,6 +763,7 @@ describe('Testing APIServer', function() {
 
 		it('error (400), error adding the accounting information', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -664,12 +780,15 @@ describe('Testing APIServer', function() {
 				return callback('Error');
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -706,6 +825,7 @@ describe('Testing APIServer', function() {
 
 		it('correct (201), offer not bought', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -722,12 +842,15 @@ describe('Testing APIServer', function() {
 				return callback(null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -764,6 +887,7 @@ describe('Testing APIServer', function() {
 
 		it('error (400), error getting the information from an offer already bought', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -777,6 +901,7 @@ describe('Testing APIServer', function() {
 				return callback('Error', null);
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
@@ -784,6 +909,8 @@ describe('Testing APIServer', function() {
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
 				assert.equal(spies.db.getNotificationInfo.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -805,6 +932,7 @@ describe('Testing APIServer', function() {
 		
 		it('correct (201), offer already bought', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
 			implementations.res = {
 				status: function(stat) {
 					return this;
@@ -819,6 +947,7 @@ describe('Testing APIServer', function() {
 				});
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
@@ -826,6 +955,8 @@ describe('Testing APIServer', function() {
 				assert.equal(spies.db.checkBuy.callCount, 1);
 				assert.equal(spies.async.each.callCount, 1);
 				assert.equal(spies.db.getNotificationInfo.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.req.setEncoding.getCall(0).args[0], 'utf-8');
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001');
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], implementations.req.body.offering);
@@ -846,6 +977,7 @@ describe('Testing APIServer', function() {
 		});
 
 		it('correct (201), api_key already generated', function(done) {
+			implementations.req.is = function(type) { return true};
 			implementations.db.getApiKey = function(user, offer, callback) {
 				return callback(null, 'api_key');
 			}
@@ -857,10 +989,13 @@ describe('Testing APIServer', function() {
 				send: function() {}
 			}
 			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.setEncoding.callCount, 1);
 				assert.equal(spies.db.getApiKey.callCount, 1);
 				assert.equal(spies.res.status.callCount, 1);
 				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
 				assert.equal(spies.res.status.getCall(0).args[0], 201);
 				assert.equal(spies.db.getApiKey.getCall(0).args[0], '0001'); 
 				assert.deepEqual(spies.db.getApiKey.getCall(0).args[1], { 

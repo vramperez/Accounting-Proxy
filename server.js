@@ -177,7 +177,6 @@ app.use( function(request, response) {
     var publicPath = request.path;
 
     logger.log('debug', "[%s] New request", API_KEY); 
-
     if(userID === undefined) {
         logger.log('debug', "[%s] Undefined username", API_KEY);
         response.status(400).end();

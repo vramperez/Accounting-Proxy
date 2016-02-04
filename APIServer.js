@@ -26,7 +26,7 @@ var logger = new winston.Logger({
 "use strict";
 
 exports.run = function(){
-    app.listen(app.get('port'));
+    //app.listen(app.get('port'));
 };
 
 var newResourceHandler = function(req, res) {
@@ -78,7 +78,7 @@ var newBuyHandler = function(req, res){
     } else {
         validation.validate('offer', req.body, function(err) { // Validate the request body
             if (err) {
-                res.status(400).send({error: 'Invalid json'});
+                res.status(400).json({error: 'Invalid json'});
             } else {
                 req.setEncoding('utf-8');
                 body = req.body;
@@ -185,7 +185,7 @@ var keysHandler = function(req, res){
         res.status(400).json({error: 'Header "X-Actor-ID" missed'});
     } else {
         db.getInfo(userID, function(err, data) {
-            if (err != undefined || data.length == 0) {
+            if (err != null || data.length == 0) {
                 res.status(400).json({ error: 'No data available for that user'});
             } else {
                 var result = [];

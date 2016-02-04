@@ -56,7 +56,7 @@ var sqlite_mocker = function(implementations, callback) {
 	return callback(db, spies);
 }
 
-describe('Testing SQLITE database,', function() {
+describe('Testing Sqlite database,', function() {
 
 	describe('init', function() {
 		var implementations;
@@ -769,7 +769,7 @@ describe('Testing SQLITE database,', function() {
 	describe('getApiKey', function() {
 		var sentence = 'SELECT API_KEY \
         FROM offerAccount \
-        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref';
+        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID';
         var offer = {
         	organization: 'organization',
         	name: 'name',

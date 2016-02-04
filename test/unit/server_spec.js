@@ -327,7 +327,8 @@ describe('Testing Server', function() {
 					status: function(status) {
 						return this;
 					},
-					end: function() {}
+					end: function() {},
+					json: function(msg) {}
 				},
 				app: {
 					use: function(callback) {
@@ -345,7 +346,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.logger.log.callCount, 2);
 				assert.equal(spies.req.get.callCount, 2);
 				assert.equal(spies.res.status.callCount, 1);
-				assert.equal(spies.res.end.callCount, 1);
+				assert.equal(spies.res.json.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
 				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
@@ -354,6 +355,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
+				assert.deepEqual(spies.res.json.getCall(0).args[0], { error: 'Undefined "X-Actor-ID" header' });
 				done();
 			});
 		});
@@ -373,7 +375,8 @@ describe('Testing Server', function() {
 					status: function(status) {
 						return this;
 					},
-					end: function() {}
+					end: function() {},
+					json: function(msg) {}
 				},
 				app: {
 					use: function(callback) {
@@ -391,7 +394,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.logger.log.callCount, 2);
 				assert.equal(spies.req.get.callCount, 2);
 				assert.equal(spies.res.status.callCount, 1);
-				assert.equal(spies.res.end.callCount, 1);
+				assert.equal(spies.res.json.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
 				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
@@ -400,6 +403,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
 				assert.equal(spies.res.status.getCall(0).args[0], 400);
+				assert.deepEqual(spies.res.json.getCall(0).args[0], { error: 'Undefined "X-API-KEY" header' });
 				done();
 			});
 		});

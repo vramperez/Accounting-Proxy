@@ -1,10 +1,10 @@
 var sqlite = require('sqlite3').verbose(), // Debug enable
+    config = require('./config'),
     async = require('async');
 
-var db = new sqlite.Database('accountingDB.sqlite');
+var db = new sqlite.Database(config.database_name);
 
 exports.init = function() {
-
     db.serialize(function() {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
@@ -34,8 +34,7 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     reference       TEXT, \
-                    PRIMARY KEY (API_KEY), \
-                    FOREIGN KEY (actorID) REFERENCES accounts (actorID) \
+                    PRIMARY KEY (API_KEY, actorID) \
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
@@ -44,9 +43,7 @@ exports.init = function() {
                     num                 INT,  \
                     publicPath          TEXT, \
                     correlation_number  INT,  \
-                    PRIMARY KEY (actorID, API_KEY, publicPath), \
-                    FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
-                    FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
+                    PRIMARY KEY (actorID, API_KEY, publicPath) \
                )');
         });
 
@@ -92,11 +89,11 @@ exports.newService = function(publicPath, url, port, callback) {
             $url: url,
             $port: port
         }, function(err) {
-        if (err) {
-            return callback(err);
-        } else {
-            return callback(null);
-        }
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
     });
 };
 
@@ -142,7 +139,7 @@ exports.getInfo = function(user, callback) {
                 if (err) {
                     return callback(err, null);
                 } else if (row.length === 0) {
-                    return callback(null, {});
+                    return callback(null, []);
                 } else {
                     return callback(null, row);
                 }
@@ -297,7 +294,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
 exports.getApiKey = function(user, offer, callback) {
     db.all('SELECT API_KEY \
         FROM offerAccount \
-        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
+        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID',
         {
             $org: offer.organization,
             $name: offer.name,

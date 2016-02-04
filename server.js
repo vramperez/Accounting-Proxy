@@ -26,11 +26,11 @@ var logger = new winston.Logger( {
 });
 
 var db = require(config.database);
+db.init(); // Initialize the database
 var app = express();
 var acc_modules = {};
 
 "use strict";
-
 
 
 var notify = function(callback) {
@@ -179,18 +179,18 @@ app.use( function(request, response) {
     logger.log('debug', "[%s] New request", API_KEY); 
     if(userID === undefined) {
         logger.log('debug', "[%s] Undefined username", API_KEY);
-        response.status(400).end();
+        response.status(400).json({ error: 'Undefined "X-Actor-ID" header'});
 
     } else if (API_KEY === undefined) {
         logger.log('debug', "[%s] Undefined API_KEY", API_KEY);
-        response.status(400).end();
+        response.status(400).json({ error: 'Undefined "X-API-KEY" header'});
 
     } else {
         db.checkInfo(userID, API_KEY, publicPath, function(err, unit) {
             if (err) {
                 response.status(500).end();
             } else if (unit === null) { // Invalid API_KEY, user or path
-                response.status(401).end();
+                response.status(401).json({ error: 'Invalid API_KEY, user or path'});
             } else {
                 db.getService(publicPath ,function(err, service) {
                     if (err) {
@@ -217,6 +217,7 @@ app.use( function(request, response) {
 });
 
 app.set('port', config.accounting_proxy.port);
-app.listen(app.get('port'));
+//app.listen(app.get('port'));
 app.use(bodyParser.json());
 api.run();
+module.exports.app = app;

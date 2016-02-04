@@ -333,6 +333,33 @@ describe('Testing APIServer', function() {
 			});
 		});
 
+		it('error (400) invalid json', function(done) {
+			implementations.res = {
+				status: function(stat) {
+					return this;
+				},
+				json: function(msg) {}
+			}
+			implementations.req = {
+				body: {},
+				is: function(type) {
+					return true;
+				},
+				setEncoding: function(type_encoding) {}
+			}
+
+			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.res.json.callCount, 1);
+				assert.equal(spies.res.status.getCall(0).args[0], 400);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'New resource notification recieved');
+				assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Invalid json'})
+				done();
+			});
+		});
+
 		it('error (400), incorrect body', function(done) {
 			implementations.req = {
 				body: {},
@@ -566,6 +593,11 @@ describe('Testing APIServer', function() {
 						return;
 					}
 				}
+			},
+			validation: {
+				validate: function(type, body, callback) {
+					return callback('Error');
+				}
 			}
 		}
 
@@ -584,6 +616,29 @@ describe('Testing APIServer', function() {
 			});
 		});
 
+		it('error (400), invalid json', function(done) {
+			implementations.req.setEncoding = function(type_encoding) {};
+			implementations.req.is = function(type) { return true};
+			implementations.res = {
+				status: function(stat) {
+					return this;
+				},
+				send: function() {},
+				json: function(msg) {}
+			}
+
+			mocker(implementations, function(api_server, spies) {
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.res.json.callCount, 1);
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], 'WStore notification recieved');
+				assert.equal(spies.res.status.getCall(0).args[0], 400);
+				assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Invalid json'});
+				done();
+			});
+		});
+
 		it('error (500), error getting the API_KEY form db', function(done) {
 			implementations.req.setEncoding = function(type_encoding) {};
 			implementations.req.is = function(type) { return true};
@@ -592,6 +647,9 @@ describe('Testing APIServer', function() {
 					return this;
 				},
 				send: function() {}
+			}
+			implementations.validation.validate = function(type, body, callback) {
+				return callback(null);
 			}
 
 			mocker(implementations, function(api_server, spies) {

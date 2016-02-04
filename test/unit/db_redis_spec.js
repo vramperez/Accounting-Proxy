@@ -132,7 +132,7 @@ var redis_mocker = function(implementations, callback) {
 	return callback(db, spies);
 }
 
-describe('Testing REDIS database,', function() {
+describe('Testing Redis database,', function() {
 
 	describe('init', function() {
 		var db;

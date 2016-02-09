@@ -88,6 +88,15 @@ describe('Testing the administration API', function(done) {
 					prepare_tests(database);
 				});
 
+				after(function() {
+					// Remove the database for testing
+					fs.access('testDB_administration.sqlite1', fs.F_OK, function(err) {
+						if (!err) {
+							fs.unlinkSync('testDB_administration.sqlite1');
+						}
+					});
+				})
+
 				it('error (415) no json content-type', function(done) {
 					request(api_server.app)
 						.post('/api/resources')
@@ -251,6 +260,7 @@ describe('Testing the administration API', function(done) {
 				beforeEach(function() { // Mock the database
 					prepare_tests(database);
 				});
+
 
 				it('error (400) "X-Actor-ID" header missed', function(done) {
 					request(api_server.app)

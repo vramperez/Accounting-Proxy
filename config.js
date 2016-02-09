@@ -24,6 +24,8 @@ config.accounting_proxy = {
 //  * './db': sqlite database
 config.database = './db';
 
+config.database_name = 'accountingDB.sqlite';
+
 // Accouning Modules configuration
 //--------------------------------------------------
 // Configures the accounting modules used by the accounting proxy

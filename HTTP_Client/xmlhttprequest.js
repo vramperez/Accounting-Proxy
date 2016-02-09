@@ -189,7 +189,7 @@ exports.XMLHttpRequest = function() {
       throw "INVALID_STATE_ERR: setRequestHeader can only be called when state is OPEN";
     }
     if (!isAllowedHttpHeader(header)) {
-      console.warn('Refused to set unsafe header "' + header + '"');
+      //console.warn('Refused to set unsafe header "' + header + '"');
       return;
     }
     if (sendFlag) {

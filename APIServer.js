@@ -26,7 +26,7 @@ var logger = new winston.Logger({
 "use strict";
 
 exports.run = function(){
-    //app.listen(app.get('port'));
+    app.listen(app.get('port'));
 };
 
 var newResourceHandler = function(req, res) {
@@ -72,7 +72,6 @@ var newResourceHandler = function(req, res) {
 
 var newBuyHandler = function(req, res){
     logger.log('debug', "WStore notification recieved");
-
     if (! req.is('application/json')) {
         res.status(415).json({ error: 'Content-Type must be "application/json"'});
     } else {

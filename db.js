@@ -24,7 +24,8 @@ exports.init = function() {
                     record_type     TEXT, \
                     unit            TEXT, \
                     component_label TEXT, \
-                    PRIMARY KEY (publicPath, organization, name, version)\
+                    PRIMARY KEY (publicPath, organization, name, version), \
+                    FOREIGN KEY (publicPath) REFERENCES public (publicPath)\
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offerAccount ( \
@@ -34,7 +35,7 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     reference       TEXT, \
-                    PRIMARY KEY (API_KEY, actorID) \
+                    PRIMARY KEY (API_KEY, actorID)\
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
@@ -43,7 +44,8 @@ exports.init = function() {
                     num                 INT,  \
                     publicPath          TEXT, \
                     correlation_number  INT,  \
-                    PRIMARY KEY (actorID, API_KEY, publicPath) \
+                    PRIMARY KEY (actorID, API_KEY, publicPath), \
+                    FOREIGN KEY (actorID, API_KEY) REFERENCES offerAccount (actorID, API_KEY)\
                )');
         });
 
@@ -55,7 +57,7 @@ exports.init = function() {
                     ref_port            TEXT, \
                     ref_path            TEXT, \
                     unit                TEXT, \
-                    PRIMARY KEY (subscriptionID) \
+                    PRIMARY KEY (subscriptionID)\
                 )');
 };
 
@@ -400,7 +402,7 @@ exports.addCBSubscription = function( API_KEY, publicPath, subscription_id, ref_
 };
 
 exports.getCBSubscription = function(subscription_id, callback) {
-    db.all('SELECT subscriptionID \
+    db.all('SELECT API_KEY, publicPath, ref_host, ref_path, ref_port, unit \
         FROM subscriptions \
         WHERE subscriptionID=$subs_id',
         {

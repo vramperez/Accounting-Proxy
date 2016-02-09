@@ -84,7 +84,7 @@ describe('Testing the administration API', function(done) {
 
 			describe('[POST: /api/resources] newResource request', function() {
 
-				before(function() { // Mock the database
+				beforeEach(function() { // Mock the database
 					prepare_tests(database);
 				});
 

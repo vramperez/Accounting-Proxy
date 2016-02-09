@@ -3,12 +3,13 @@ var request = require('supertest'),
 	proxyquire = require('proxyquire'),
 	redis_mock = require('fakeredis'),
 	test_endpoint = require('./test_endpoint'),
-	config_tests = require('../config_tests');
+	config_tests = require('../config_tests'),
+	async = require('async'),
+	databases = require('../config_tests').integration.databases,
+	fs = require('fs');
 
-var server;
-var mock_config = {
-	database: './db_Redis'
-}
+var server, db_mock;
+var mock_config = {};
 
 var logger_mock = { // Avoid display server information while running the tests
 	Logger: function(transports) {
@@ -21,16 +22,137 @@ var logger_mock = { // Avoid display server information while running the tests
 	}
 }
 
+var loadServices = function(services, callback) {
+	if (services.length != 0) {
+		async.each(services, function(service, task_callback) {
+			db_mock.newService(service.path, service.url, service.port, function(err) {
+				if (err) {
+					task_callback(err);
+				} else {
+					task_callback(null);
+				}
+			});
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
+		})
+	} else {	
+		return callback();
+	}
+}
+
+var loadResources = function(resources, callback) {
+	if (resources.length != 0) {
+		async.each(resources, function(resource, task_callback) {
+			db_mock.addResource(resource, function(err) {
+				if (err) {
+					task_callback(err);
+				} else {
+					task_callback();
+				}
+			})
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
+		})
+	} else {	
+		return callback();
+	}
+}
+
+var loadAccountingInfo = function(accountingInfo, callback) {
+	if (accountingInfo.length != 0) {
+		async.each(accountingInfo, function(accounting, task_callback) {
+			db_mock.addInfo(accounting.api_key, accounting.info, function(err) {
+				if (err) {
+					task_callback(err);
+				} else {
+					task_callback();
+				}
+			})
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
+		})
+	} else {	
+		return callback();
+	}
+}
+
+var loadSubscriptions = function(subscriptions, callback) {
+	if (subscriptions.length != 0) {
+		async.each(subscriptions, function(subs, task_callback) {
+			db_mock.addCBSubscription(subs.api_key, subs.path, subs.id, subs.host, 
+				subs.port, subs.path, subs.unit, function(err) {
+				if (err) {
+					task_callback(err);
+				} else {
+					task_callback();
+				}
+			})
+			}, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					return callback(null);
+				}
+		})
+	} else {	
+		return callback();
+	}
+}
+
+var prepareDatabase = function(services, resources, accounting, subscriptions, callback) {
+	loadServices(services, function(err) {
+		if (err) {
+			return callback(err);
+		} else {
+			loadResources(resources, function(err) {
+				if (err) {
+					return callback(err);
+				} else {
+					loadAccountingInfo(accounting, function(err) {
+						if (err) {
+							return callback(err);
+						} else {
+							loadSubscriptions(subscriptions, function(err) {
+								if (err) {
+									return callback(err);
+								} else {
+									return callback(null);
+								}
+							});
+						}
+					});
+				}
+			})
+		}
+	});
+}
+
 console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run();
 
+var api_mock = {
+	run: function(){}
+}
+var notifier_mock = {
+	notify: function(info) {}
+}
 
-describe('Testing the accounting API', function() {
-
-	describe('generic REST use', function() {
-
-		beforeEach(function() {
-			var mock_config = {
+var prepare_tests = function(database) {
+	switch (database) {
+		case 'sql':
+			mock_config = {
 				database: './db',
 				database_name: 'testDB_accounting.sqlite'
 			}
@@ -40,40 +162,80 @@ describe('Testing the accounting API', function() {
 			server = proxyquire('../../server', {
 				'./config': mock_config,
 				'./db': db_mock,
+				'./APIServer': api_mock,
+				'./notifier': notifier_mock,
 				'winston': logger_mock
 			});
 			db_mock.init();
-		});
+			break;
+		case 'redis':
+			mock_config = {
+				database: './db_Redis'
+			}
+			db_mock = proxyquire('../../db_Redis', {
+				'redis': require('fakeredis')
+			});
+			server = proxyquire('../../server', {
+				'./config': mock_config,
+				'./db_Redis': db_mock,
+				'./APIServer': api_mock,
+				'./notifier': notifier_mock,
+				'winston': logger_mock
+			});
+			break;
+	}
+}
 
-		it('error (400) undefined "X-Actor-ID" header', function(done) {
-			request(server.app)
-				.post('/public')
-				.expect(400, { error: 'Undefined "X-Actor-ID" header' }, done);
-		});
 
-		it('error (400) undefined "X-API-KEY" header', function(done) {
-			request(server.app)
-				.post('/public')
-				.set('X-Actor-ID', 'actor_id')
-				.expect(400, { error: 'Undefined "X-API-KEY" header' }, done);
-		});
+describe('Testing the accounting API', function() {
 
-		it('error (401) invalid API_KEY, user or path', function(done) {
-			request(server.app)
-				.post('/public')
-				.set('X-Actor-ID', 'wrong_actorID')
-				.set('X-API-KEY', 'wrong_api_key')
-				.expect(401, { error: 'Invalid API_KEY, user or path' }, done);
-		});
+	describe('generic REST use', function() {
 
-		it('error (400) bad request (response from the service)', function(done) {
-			// Refactor in a preparation function for tests
-			db_mock.newService('/public', 'http://localhost/rest/example1', 9020, function(err) {
-				if (err) {
-					console.log('Error adding service');
-					process.exit(1);
-				} else {
-					db_mock.addResource({
+		async.each(databases, function(database, task_callback) { 
+
+			describe('with database ' + database, function() {
+
+				beforeEach(function() {
+					prepare_tests(database);
+				});
+
+				after(function() {
+					// Remove the database for testing
+					fs.access('./testDB_accounting.sqlite', fs.F_OK, function(err) {
+						if (!err) {
+							fs.unlinkSync('./testDB_accounting.sqlite');
+						}
+					});
+				});
+
+				it('error (400) undefined "X-Actor-ID" header', function(done) {
+					request(server.app)
+						.post('/public')
+						.expect(400, { error: 'Undefined "X-Actor-ID" header' }, done);
+				});
+
+				it('error (400) undefined "X-API-KEY" header', function(done) {
+					request(server.app)
+						.post('/public')
+						.set('X-Actor-ID', 'actor_id')
+						.expect(400, { error: 'Undefined "X-API-KEY" header' }, done);
+				});
+
+				it('error (401) invalid API_KEY, user or path', function(done) {
+					request(server.app)
+						.post('/public')
+						.set('X-Actor-ID', 'wrong_actorID')
+						.set('X-API-KEY', 'wrong_api_key')
+						.expect(401, { error: 'Invalid API_KEY, user or path' }, done);
+				});
+
+				it('correct (200) response from the service, call accounting', function(done) {
+					var services = [{
+						path: '/public',
+						url: 'http://localhost/rest/example1',
+						port: 9020
+					}];
+					var resources = [{
 						offering: {
 							organization: 'test_org',
 							name: 'test_name',
@@ -83,51 +245,170 @@ describe('Testing the accounting API', function() {
 						record_type: 'rec_type',
 						unit: 'call',
 						component_label: 'callusage'
-					}, function(err) {
+					}];
+					var info = [{
+						api_key: 'api_key1',
+						info: {
+							organization: 'test_org',
+							name: 'test_name',
+							version: '1.0',
+							reference: '000000000000002',
+							actorID: '0001',
+							accounting: {
+								'/public': {
+									url: 'http://localhost/public',
+									port: 9020,
+									num: 0,
+									unit: 'call',
+									correlation_number: '0002'
+								}
+							}
+						}
+					}];
+					prepareDatabase(services, resources, info, [], function(err) {
 						if (err) {
-							console.log('Error');
+							console.log('Error preparing the database');
 							process.exit(1);
 						} else {
-							db_mock.addInfo('api_key1', {
-								offering: {
-									organization: 'test_org',
-									name: 'test_name',
-									version: '1.0'
-								},
-								reference: "000000000000002",
-								customer: '0001',
-								customer_name: 'user1',
-								resources: [
-									{
-										provider: "provider1",
-										name: "resource2",
-										version: "1.0",
-										content_type:"application/json",
-										url: "http://localhost/public"
-									}
-								]
-							}, function(err) {
-								if (err) {
-									console.log('Error adding new information');
-									process.exit(1);
-								} else {
-									request(server.app)
-										.post('/public1')
-										.set('X-Actor-ID', 'wrong_actorID')
-										.set('X-API-KEY', 'wrong_api_key')
-										.expect(400, { error: 'bad request'}, done);
-								}
-							});
+							request(server.app)
+								.get('/public')
+								.set('X-Actor-ID', '0001')
+								.set('X-API-KEY', 'api_key1')
+								.expect(200, function() {
+									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
+										if (err) {
+											console.log('Error checking the accounting');
+											process.exit(1);
+										} else {
+											assert.equal(info['num'], 1);
+											done();
+										}
+									})
+								});
 						}
 					});
-				}
-			});
+				});
+
+				it('correct (200) response from the service, megabyte accounting', function(done) {
+					var services = [{
+						path: '/public',
+						url: 'http://localhost/rest/example2',
+						port: 9020
+					}];
+					var resources = [{
+						offering: {
+							organization: 'test_org',
+							name: 'test_name',
+							version: '1.0'
+						},
+						publicPath: '/public',
+						record_type: 'rec_type',
+						unit: 'megabyte',
+						component_label: 'megabyteCounting'
+					}];
+					var info = [{
+						api_key: 'api_key1',
+						info: {
+							organization: 'test_org',
+							name: 'test_name',
+							version: '1.0',
+							reference: '000000000000002',
+							actorID: '0001',
+							accounting: {
+								'/public': {
+									url: 'http://localhost/public',
+									port: 9020,
+									num: 0,
+									unit: 'megabyte',
+									correlation_number: '0002'
+								}
+							}
+						}
+					}];
+					prepareDatabase(services, resources, info, [], function(err) {
+						if (err) {
+							console.log('Error preparing the database');
+							process.exit(1);
+						} else {
+							request(server.app)
+								.get('/public')
+								.set('X-Actor-ID', '0001')
+								.set('X-API-KEY', 'api_key1')
+								.expect(200, function() {
+									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
+										if (err) {
+											console.log('Error checking the accounting');
+											process.exit(1);
+										} else {
+											assert.equal(info['num'], 0.00000858306884765625);
+											done();
+										}
+									})
+								});
+						}
+					});
+				});
+
+				it('error (400) response from the service', function(done) {
+					var services = [{
+						path: '/public',
+						url: 'http://localhost/rest/wrong',
+						port: 9020
+					}];
+					var resources = [{
+						offering: {
+							organization: 'test_org',
+							name: 'test_name',
+							version: '1.0'
+						},
+						publicPath: '/public',
+						record_type: 'rec_type',
+						unit: 'megabyte',
+						component_label: 'callusage'
+					}];
+					var info = [{
+						api_key: 'api_key1',
+						info: {
+							organization: 'test_org',
+							name: 'test_name',
+							version: '1.0',
+							reference: '000000000000002',
+							actorID: '0001',
+							accounting: {
+								'/public': {
+									url: 'http://localhost/public',
+									port: 9020,
+									num: 0,
+									unit: 'megabyte',
+									correlation_number: '0002'
+								}
+							}
+						}
+					}];
+					prepareDatabase(services, resources, info, [], function(err) {
+						if (err) {
+							console.log('Error preparing the database');
+							process.exit(1);
+						} else {
+							request(server.app)
+								.get('/public')
+								.set('X-Actor-ID', '0001')
+								.set('X-API-KEY', 'api_key1')
+								.expect(400, function() {
+									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
+										if (err) {
+											console.log('Error checking the accounting');
+											process.exit(1);
+										} else {
+											assert.equal(info['num'], 0.00000858306884765625);
+											done();
+										}
+									});
+								});
+						}
+					});
+				});
+			})
 		});
-
-		it('correct (200) correct response from the service');
-	});
-
-	describe('orion Context-Broker requests', function() {
-
 	});
 });

@@ -242,7 +242,7 @@ exports.getNotificationInfo = function(api_key, path, callback) {
 			db.hgetall(api_key_info.actorID + api_key + path, function(err, resource) {
 				if (err) {
 					return callback(err, null);
-				}else{
+				} else {
 					return callback(null, {
 						"actorID": api_key_info.actorID, 
 	                    "API_KEY": api_key,
@@ -294,7 +294,6 @@ exports.addInfo = function(api_key, data, callback) {
 	});
 	multi.sadd([data.actorID, api_key]);
 	async.forEachOf(data.accounting, function(acc, p, task_callback) {
-		//console.log(acc)
 		multi.sadd([api_key + '_paths', p]);
 		multi.hmset(data.actorID + api_key + p, {
 			'actorID': data.actorID,

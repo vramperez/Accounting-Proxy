@@ -12,7 +12,6 @@ exports.init = function() {
         db.run('CREATE TABLE IF NOT EXISTS public ( \
                     publicPath      TEXT, \
                     url             TEXT, \
-                    port            TEXT, \
                     PRIMARY KEY (publicPath) \
                )');
 
@@ -82,14 +81,13 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
     });
 }
 
-// CLI: addService [path] [url] [port]
-exports.newService = function(publicPath, url, port, callback) {
+// CLI: addService [path] [url]
+exports.newService = function(publicPath, url, callback) {
     db.run('INSERT OR REPLACE INTO public \
-            VALUES ($path, $url, $port)',
+            VALUES ($path, $url)',
         {
             $path: publicPath,
-            $url: url,
-            $port: port
+            $url: url
         }, function(err) {
             if (err) {
                 return callback(err);
@@ -116,7 +114,7 @@ exports.deleteService = function(path, callback) {
 
 // CLI: getService [publicPath]
 exports.getService = function(path, callback) {
-    db.all('SELECT url, port \
+    db.all('SELECT url \
             FROM public \
             WHERE publicPath=$path', {
                 $path: path

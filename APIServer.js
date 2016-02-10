@@ -12,7 +12,7 @@ var logger = new winston.Logger({
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: './logs/all-log',
+            filename: './log/all-log',
             colorize: false
         }),
         new winston.transports.Console({
@@ -116,37 +116,25 @@ var newBuyHandler = function(req, res){
                                             } else if (unit === null ){ // Incorrect service
                                                 task_callback('Wrong path in the offer'); // If one path in the offer is wrong, send 400
                                             } else {
-                                                db.getService(publicPath, function(err, service) {
-                                                    if (err) {
-                                                        task_callback('Error in db');
-                                                    } else {
-                                                        if (! bought) { // New resource for the client
+                                                if (! bought) { // New resource for the client
+                                                    accounting_info[api_key].accounting[publicPath] = {
+                                                        num: 0,
+                                                        correlation_number: 0,
+                                                    };
+                                                    task_callback(null);
+                                                } else { // Already bought 
+                                                    db.getNotificationInfo(api_key, publicPath, function(err, info) {
+                                                        if (err) {
+                                                            task_callback('Error in db');
+                                                        } else {
                                                             accounting_info[api_key].accounting[publicPath] = {
-                                                                url: service.url,
-                                                                port: service.port,
-                                                                num: 0,
-                                                                correlation_number: 0,
-                                                                unit: unit
-                                                            };
+                                                                num: info.num,
+                                                                correlation_number: info.correlation_number,
+                                                            }
                                                             task_callback(null);
-                                                        } else { // Already bought 
-                                                            db.getNotificationInfo(api_key, publicPath, function(err, info) {
-                                                                if (err) {
-                                                                    task_callback('Error in db');
-                                                                } else {
-                                                                    accounting_info[api_key].accounting[publicPath] = {
-                                                                        url: service.url,
-                                                                        port: service.port,
-                                                                        num: info.num,
-                                                                        correlation_number: info.correlation_number,
-                                                                        unit: unit
-                                                                    }
-                                                                    task_callback(null);
-                                                                }
-                                                            });
                                                         }
-                                                    }
-                                                });
+                                                    });
+                                                }
                                             }
                                         });
                                     }

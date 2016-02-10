@@ -14,7 +14,7 @@ var logger = new winston.Logger( {
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: '../logs/all-log',
+            filename: '../log/all-log',
             colorize: false
         }),
         new winston.transports.Console({
@@ -93,7 +93,7 @@ exports.getOperation = function(privatePath, request, callback) {
 exports.requestHandler = function(request, response, service, unit, operation, callback) {
 	var options = {
 		host: url.parse(service.url).host,
-		port: service.port,
+		port: url.parse(service.url).port,
 		path: url.parse(service.url).pathname,
 		method: request.method,
 		headers: {

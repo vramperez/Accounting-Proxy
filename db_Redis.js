@@ -8,7 +8,7 @@ var logger = new winston.Logger({
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: './logs/all-log',
+            filename: './log/all-log',
             colorize: false
         })
     ],
@@ -131,12 +131,12 @@ exports.getService = function(publicPath, callback) {
 	});
 };
 
-// CLI: addService [publicPath] [url] [port]
-exports.newService = function(publicPath, url, port, callback){
+// CLI: addService [publicPath] [url]
+exports.newService = function(publicPath, url, callback){
 	var multi = db.multi();
 
 	multi.sadd(['public', publicPath]);
-	multi.hmset(publicPath, { 'url': url, 'port': port });
+	multi.hmset(publicPath, { 'url': url});
 	multi.exec(function(err) {
 		if (err) {
 			return callback(err);

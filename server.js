@@ -8,13 +8,22 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     async = require('async'),
     winston = require('winston'),
-    requester = require('request');
+    requester = require('request'),
+    mkdirp = require('mkdirp');
+
+"use strict";
+
+mkdirp('./log', function(err) {
+    if (err) {
+        logger.info('Error creating "./log" path');
+    }
+});
 
 var logger = new winston.Logger( {
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: './logs/all-log',
+            filename: './log/all-log',
             colorize: false
         }),
         new winston.transports.Console({
@@ -30,8 +39,9 @@ db.init(); // Initialize the database
 var app = express();
 var acc_modules = {};
 
-"use strict";
-
+exports.init = function() {
+    app.listen(app.get('port'));
+}
 
 var notify = function(callback) {
     db.getApiKeys(function(err, api_keys) {
@@ -136,16 +146,20 @@ var CBrequestHandler = function(request, response, service, options, unit) {
             });
         } else {
             requester(options, function(error, resp, body) {
-                // Check error
-                for (var i in resp.headers) {
-                    response.setHeader(i, resp.headers[i])
-                }
-                exports.count(userID, API_KEY, publicPath, unit, body, function(err){
-                    if(err) {
-                        logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                if (err) {
+                    response.status(500).send(error);
+                    logger.warn("An error ocurred requesting Context-Broker");
+                } else {
+                    for (var i in resp.headers) {
+                        response.setHeader(i, resp.headers[i])
                     }
-                    response.send(body);
-                });
+                    exports.count(userID, API_KEY, publicPath, unit, body, function(err){
+                        if(err) {
+                            logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                        }
+                        response.send(body);
+                    });
+                }
             });
         }
     });
@@ -158,16 +172,20 @@ var requestHandler = function(request, response, options, unit) {
     var publicPath = request.path;
 
     requester(options, function(error, resp, body) {
-        // Check error
-        for (var i in resp.headers) {
-            response.setHeader(i, resp.headers[i])
-        }
-        exports.count(userID, API_KEY, publicPath, unit, body, function(err){
-            if(err) {
-                logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+        if (error) {
+            response.status(500).send(error);
+            logger.warn("An error ocurred requesting the endpoint");
+        } else {
+            for (var i in resp.headers) {
+                response.setHeader(i, resp.headers[i])
             }
-            response.send(body);
-        });
+            exports.count(userID, API_KEY, publicPath, unit, body, function(err){
+                if(err) {
+                    logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                }
+                response.send(body);
+            });
+        }
     });
 }
 
@@ -197,7 +215,7 @@ var handler = function(request, response) {
                         response.status(500).end();
                     } else {
                         var options = {
-                            url: 'http://' +  url.parse(service.url).host + ':' + service.port + url.parse(service.url).pathname,
+                            url: service.url,
                             json: true,
                             method: request.method,
                             headers: request.headers,
@@ -218,9 +236,5 @@ var handler = function(request, response) {
 app.set('port', config.accounting_proxy.port);
 app.use(bodyParser.json());
 app.use('/', handler);
-
-exports.init = function() {
-    app.listen(app.get('port'));
-}
 api.run();
 module.exports.app = app;

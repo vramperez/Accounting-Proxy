@@ -166,4 +166,4 @@ app.get('/rest/wrong', wrong_handler);
 app.post('/v1/updateContext', updateContext);
 app.post('/v1/queryContext', queryContext);
 app.post('/v1/subscribeContext', subscribeContext_handler);
-app.post('/v1/unsubscribeContext', unsubscribeContext_handler)
+app.post('/v1/unsubscribeContext', unsubscribeContext_handler);

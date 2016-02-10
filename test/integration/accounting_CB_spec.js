@@ -6,7 +6,8 @@ var request = require('supertest'),
 	config_tests = require('../config_tests'),
 	async = require('async'),
 	databases = require('../config_tests').integration.databases,
-	fs = require('fs');
+	fs = require('fs'),
+	prepare_test = require('./prepareDatabase');
 
 var server, db_mock, cb_handler_mock;
 var mock_config = {};
@@ -22,123 +23,6 @@ var logger_mock = { // Avoid display server information while running the tests
 	}
 }
 
-var loadServices = function(services, callback) {
-	if (services.length != 0) {
-		async.each(services, function(service, task_callback) {
-			db_mock.newService(service.path, service.url, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback(null);
-				}
-			});
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadResources = function(resources, callback) {
-	if (resources.length != 0) {
-		async.each(resources, function(resource, task_callback) {
-			db_mock.addResource(resource, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadAccountingInfo = function(accountingInfo, callback) {
-	if (accountingInfo.length != 0) {
-		async.each(accountingInfo, function(accounting, task_callback) {
-			db_mock.addInfo(accounting.api_key, accounting.info, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadSubscriptions = function(subscriptions, callback) {
-	if (subscriptions.length != 0) {
-		async.each(subscriptions, function(subs, task_callback) {
-			db_mock.addCBSubscription(subs.api_key, subs.publicPath, subs.id, subs.host, 
-				subs.port, subs.path, subs.unit, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var prepareDatabase = function(services, resources, accounting, subscriptions, callback) {
-	loadServices(services, function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			loadResources(resources, function(err) {
-				if (err) {
-					return callback(err)
-				} else {
-					loadAccountingInfo(accounting, function(err) {
-						if (err) {
-							return callback(err);
-						} else {
-							loadSubscriptions(subscriptions, function(err) {
-								if (err) {
-									return callback(err);
-								} else {
-									return callback(null);
-								}
-							});
-						}
-					});
-				}
-			})
-		}
-	});
-}
-
 var api_mock = {
 	run: function(){}
 }
@@ -146,7 +30,7 @@ var notifier_mock = {
 	notify: function(info) {}
 }
 
-var prepare_tests = function(database) {
+var mocker = function(database) {
 	switch (database) {
 		case 'sql':
 			mock_config = {
@@ -213,7 +97,7 @@ describe('Testing the accounting API', function() {
 			describe('with database ' + database, function() { 
 
 				beforeEach(function() {
-					prepare_tests(database);
+					mocker(database);
 				});
 
 				afterEach(function() {
@@ -223,6 +107,10 @@ describe('Testing the accounting API', function() {
 							fs.unlinkSync('./testDB_accounting.sqlite');
 						}
 					});
+				});
+
+				after(function() {
+					task_callback();
 				});
 
 				it('correct entity creation', function(done) {
@@ -251,10 +139,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/updateContext': {
-									url: 'http://localhost/v1/updateContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -282,7 +167,7 @@ describe('Testing the accounting API', function() {
 					    ],
 					    updateAction: "APPEND"
 					} 
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -363,10 +248,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/updateContext': {
-									url: 'http://localhost/v1/updateContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -375,7 +257,7 @@ describe('Testing the accounting API', function() {
 					var payload = {
 					    correct: 'wrong'
 					} 
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -430,10 +312,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/queryContext': {
-									url: 'http://localhost/v1/queryContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -448,7 +327,7 @@ describe('Testing the accounting API', function() {
 				        }
 				    	]
 					}
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -529,10 +408,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/queryContext': {
-									url: 'http://localhost/v1/queryContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -541,7 +417,7 @@ describe('Testing the accounting API', function() {
 					var payload = {
 					    correct: 'wrong'
 					}
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -596,10 +472,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/updateContext': {
-									url: 'http://localhost/v1/updateContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -627,7 +500,7 @@ describe('Testing the accounting API', function() {
 					    ],
 					    updateAction: "UPDATE"
 					}
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -708,10 +581,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/unsubscribeContext': {
-									url: 'http://localhost/v1/unsubscribeContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -720,7 +590,7 @@ describe('Testing the accounting API', function() {
 					var payload = {
 					    "subscriptionId": "51c0ac9ed714fb3b37d7d5a8"
 					}
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -781,10 +651,7 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/v1/subscribeContext': {
-									url: 'http://localhost/v1/subscribeContext',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
@@ -813,7 +680,7 @@ describe('Testing the accounting API', function() {
 					    ],
 					    "throttling": "PT5S"
 					}
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -834,23 +701,6 @@ describe('Testing the accounting API', function() {
 									    }
 									});
 									done();
-									/*db_mock.getCBSubscription('51c0ac9ed714fb3b37d7d5a8', function(err, subscription_info) {
-										if (err) {
-											console.log('Error checking the subscription');
-											process.exit(1);
-										} else {
-											assert.deepEqual(subscription_info, 
-											{
-												API_KEY: 'api_key1',
-												publicPath: '/v1/subscribeContext',
-												ref_host: 'localhost:1028',
-												ref_port: '1028',
-												ref_path: '/accumulate',
-												unit: 'call' 
-											});
-											done();
-										}
-									});*/
 								});
 						}
 					});

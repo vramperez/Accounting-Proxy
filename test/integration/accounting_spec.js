@@ -6,7 +6,8 @@ var request = require('supertest'),
 	config_tests = require('../config_tests'),
 	async = require('async'),
 	databases = require('../config_tests').integration.databases,
-	fs = require('fs');
+	fs = require('fs'),
+	prepare_test = require('./prepareDatabase');
 
 var server, db_mock;
 var mock_config = {};
@@ -22,123 +23,6 @@ var logger_mock = { // Avoid display server information while running the tests
 	}
 }
 
-var loadServices = function(services, callback) {
-	if (services.length != 0) {
-		async.each(services, function(service, task_callback) {
-			db_mock.newService(service.path, service.url, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback(null);
-				}
-			});
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadResources = function(resources, callback) {
-	if (resources.length != 0) {
-		async.each(resources, function(resource, task_callback) {
-			db_mock.addResource(resource, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadAccountingInfo = function(accountingInfo, callback) {
-	if (accountingInfo.length != 0) {
-		async.each(accountingInfo, function(accounting, task_callback) {
-			db_mock.addInfo(accounting.api_key, accounting.info, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var loadSubscriptions = function(subscriptions, callback) {
-	if (subscriptions.length != 0) {
-		async.each(subscriptions, function(subs, task_callback) {
-			db_mock.addCBSubscription(subs.api_key, subs.path, subs.id, subs.host, 
-				subs.port, subs.path, subs.unit, function(err) {
-				if (err) {
-					task_callback(err);
-				} else {
-					task_callback();
-				}
-			})
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-		})
-	} else {	
-		return callback();
-	}
-}
-
-var prepareDatabase = function(services, resources, accounting, subscriptions, callback) {
-	loadServices(services, function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			loadResources(resources, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					loadAccountingInfo(accounting, function(err) {
-						if (err) {
-							return callback(err);
-						} else {
-							loadSubscriptions(subscriptions, function(err) {
-								if (err) {
-									return callback(err);
-								} else {
-									return callback(null);
-								}
-							});
-						}
-					});
-				}
-			})
-		}
-	});
-}
-
 console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run();
 
@@ -149,7 +33,7 @@ var notifier_mock = {
 	notify: function(info) {}
 }
 
-var prepare_tests = function(database) {
+var mocker = function(database) {
 	switch (database) {
 		case 'sql':
 			mock_config = {
@@ -191,12 +75,12 @@ describe('Testing the accounting API', function() {
 
 	describe('generic REST use', function() {
 
-		async.each(databases, function(database, task_callback) { 
+		async.each(databases, function(database, task_callback) {
 
 			describe('with database ' + database, function() {
 
 				beforeEach(function() {
-					prepare_tests(database);
+					mocker(database);
 				});
 
 				after(function() {
@@ -206,6 +90,7 @@ describe('Testing the accounting API', function() {
 							fs.unlinkSync('./testDB_accounting.sqlite');
 						}
 					});
+					task_callback();
 				});
 
 				it('error (400) undefined "X-Actor-ID" header', function(done) {
@@ -255,16 +140,13 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/public': {
-									url: 'http://localhost/public',
-									port: 9020,
 									num: 0,
-									unit: 'call',
 									correlation_number: '0002'
 								}
 							}
 						}
 					}];
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -314,16 +196,13 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/public': {
-									url: 'http://localhost/public',
-									port: 9020,
 									num: 0,
-									unit: 'megabyte',
 									correlation_number: '0002'
 								}
 							}
 						}
 					}];
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -373,16 +252,13 @@ describe('Testing the accounting API', function() {
 							actorID: '0001',
 							accounting: {
 								'/public': {
-									url: 'http://localhost/public',
-									port: 9020,
 									num: 0,
-									unit: 'megabyte',
 									correlation_number: '0002'
 								}
 							}
 						}
 					}];
-					prepareDatabase(services, resources, info, [], function(err) {
+					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
 						if (err) {
 							console.log('Error preparing the database');
 							process.exit(1);
@@ -405,7 +281,7 @@ describe('Testing the accounting API', function() {
 						}
 					});
 				});
-			})
+			});
 		});
 	});
 });

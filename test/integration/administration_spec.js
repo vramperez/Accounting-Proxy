@@ -95,6 +95,7 @@ describe('Testing the administration API', function(done) {
 							fs.unlinkSync('testDB_administration.sqlite1');
 						}
 					});
+					task_callback();
 				})
 
 				it('error (415) no json content-type', function(done) {
@@ -387,6 +388,5 @@ describe('Testing the administration API', function(done) {
 				});
 			});
 		});
-		task_callback();
 	});	
 });

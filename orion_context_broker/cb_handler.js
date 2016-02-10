@@ -92,7 +92,7 @@ exports.getOperation = function(privatePath, request, callback) {
 // Manage the subscribe/unsubscribe Context Broker requests
 exports.requestHandler = function(request, response, service, unit, operation, callback) {
 	var options = {
-		host: url.parse(service.url).host,
+		host: url.parse(service.url).hostname,
 		port: url.parse(service.url).port,
 		path: url.parse(service.url).pathname,
 		method: request.method,
@@ -101,7 +101,7 @@ exports.requestHandler = function(request, response, service, unit, operation, c
 			'accept': 'application/json'
 		}
 	}
-
+	
 	if (operation === 'subscribe') {
 		var req_body = request.body;
 		var reference_url = req_body.reference;

@@ -127,7 +127,7 @@ describe('Testing the administration API', function(done) {
 				it('error (400) unsupported accounting unit', function(done) {
 					var resource_copy = JSON.parse(JSON.stringify(resource));
 					resource_copy.unit = 'no_exist';
-					db_mock.newService('/public', 'http://localhost/private', 9010, function(err) {
+					db_mock.newService('/public', 'http://localhost:9010/private', function(err) {
 						if (err) {
 							console.log('Error creating new service');
 							process.exit(1);
@@ -143,7 +143,7 @@ describe('Testing the administration API', function(done) {
 
 				it('correct (201) successfully created', function(done) {
 					var resource_copy = JSON.parse(JSON.stringify(resource));
-					db_mock.newService('/public', 'http://localhost/private', 9010, function(err) {
+					db_mock.newService('/public', 'http://localhost:9010/private', function(err) {
 						if (err) {
 							console.log('Error creating new service');
 							process.exit(1);
@@ -226,7 +226,7 @@ describe('Testing the administration API', function(done) {
 
 				it('correct (201) new buy', function(done) {
 					var offer_copy = JSON.parse(JSON.stringify(offer));
-					db_mock.newService('/public', 'http://localhost/private', 9010, function(err) {
+					db_mock.newService('/public', 'http://localhost:9010/private', function(err) {
 						if (err) {
 							console.log('Error creating new service');
 							process.exit(1);

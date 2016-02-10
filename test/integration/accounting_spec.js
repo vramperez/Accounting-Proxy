@@ -25,7 +25,7 @@ var logger_mock = { // Avoid display server information while running the tests
 var loadServices = function(services, callback) {
 	if (services.length != 0) {
 		async.each(services, function(service, task_callback) {
-			db_mock.newService(service.path, service.url, service.port, function(err) {
+			db_mock.newService(service.path, service.url, function(err) {
 				if (err) {
 					task_callback(err);
 				} else {
@@ -232,8 +232,7 @@ describe('Testing the accounting API', function() {
 				it('correct (200) response from the service, call accounting', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost/rest/example1',
-						port: 9020
+						url: 'http://localhost:9020/rest/example1'
 					}];
 					var resources = [{
 						offering: {
@@ -292,8 +291,7 @@ describe('Testing the accounting API', function() {
 				it('correct (200) response from the service, megabyte accounting', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost/rest/example2',
-						port: 9020
+						url: 'http://localhost:9020/rest/example2'
 					}];
 					var resources = [{
 						offering: {
@@ -352,8 +350,7 @@ describe('Testing the accounting API', function() {
 				it('error (400) response from the service', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost/rest/wrong',
-						port: 9020
+						url: 'http://localhost:9020/rest/wrong'
 					}];
 					var resources = [{
 						offering: {

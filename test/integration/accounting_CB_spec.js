@@ -25,7 +25,7 @@ var logger_mock = { // Avoid display server information while running the tests
 var loadServices = function(services, callback) {
 	if (services.length != 0) {
 		async.each(services, function(service, task_callback) {
-			db_mock.newService(service.path, service.url, service.port, function(err) {
+			db_mock.newService(service.path, service.url, function(err) {
 				if (err) {
 					task_callback(err);
 				} else {
@@ -228,8 +228,7 @@ describe('Testing the accounting API', function() {
 				it('correct entity creation', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost/v1/updateContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -341,8 +340,7 @@ describe('Testing the accounting API', function() {
 				it('error entity creation', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost/v1/updateContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -409,8 +407,7 @@ describe('Testing the accounting API', function() {
 				it('correct query context operation', function(done) {
 					var services = [{
 						path: '/v1/queryContext',
-						url: 'http://localhost/v1/queryContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/queryContext'
 					}];
 					var resources = [{
 						offering: {
@@ -509,8 +506,7 @@ describe('Testing the accounting API', function() {
 				it('error query context operation (entity invalid entity)', function(done) {
 					var services = [{
 						path: '/v1/queryContext',
-						url: 'http://localhost/v1/queryContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/queryContext'
 					}];
 					var resources = [{
 						offering: {
@@ -577,8 +573,7 @@ describe('Testing the accounting API', function() {
 				it('update context elements', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost/v1/updateContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -690,8 +685,7 @@ describe('Testing the accounting API', function() {
 				it('correct context unsubscription', function(done) {
 					var services = [{
 						path: '/v1/unsubscribeContext',
-						url: 'http://localhost/v1/unsubscribeContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/unsubscribeContext'
 					}];
 					var resources = [{
 						offering: {
@@ -764,8 +758,7 @@ describe('Testing the accounting API', function() {
 				it('correct context subscription', function(done) {
 					var services = [{
 						path: '/v1/subscribeContext',
-						url: 'http://localhost/v1/subscribeContext',
-						port: 9020
+						url: 'http://localhost:9020/v1/subscribeContext'
 					}];
 					var resources = [{
 						offering: {

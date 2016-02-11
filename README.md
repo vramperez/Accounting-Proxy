@@ -2,9 +2,9 @@
 ## Index
 * [Deployment](#deployment)
 	* [Software requiremnts](#softwarerequirements)
-	* [Installation](#installation) 
+	* [Installation](#installation)
 * [Configuration](#configuration)
-	* [Basic configuration](#basicconfiguration) 	
+	* [Basic configuration](#basicconfiguration)
 	* [Orion Context Broker Configuration](#orionconfiguration)
 	* [Customizing Accounting Proxy for other components](#customizeconfiguration)
 * [Running](#running)
@@ -44,8 +44,8 @@ In order to have the accounting proxy running there are some information to fill
  - `store_port`:  port where the accounting proxy is listening to WStore notifications.
 ```
 {
-        port: 9000,
-        store_port: 9001
+		port: 9000,
+    	store_port: 9001
 }
 ```
 * `config.database`: the database used by the proxy. Possible options:
@@ -65,9 +65,9 @@ In order to have the accounting proxy running there are some information to fill
 	- `accounting_port`: Wstore port.
 ```
 {
-    accounting_host: 'localhost',
-    accounting_path: '/api/contracting/',
-    accounting_port: 9010
+        accounting_host: 'localhost',
+        accounting_path: '/api/contracting/',
+        accounting_port: 9010
 }
 ```
 * `config.resources`: configuration of the resources accounted by the proxy.
@@ -75,8 +75,8 @@ In order to have the accounting proxy running there are some information to fill
 	- `notification_port`: port qhere the accounting proxy is listening to subscription notifications from the Orion Context Broker (port 9002 by default).
 ```
 {
-    contextBroker: false,
-    notification_port: 9002
+        contextBroker: false,
+        notification_port: 9002
 }
 ```
 
@@ -90,8 +90,8 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 	- `notification_port`: port where the accounting proxy server is listening to subscription notifications.
 ```
 {
-    contextBroker: true,
-    notification_port: 9002
+		contextBroker: true,
+		notification_port: 9002
 }
 ```
 
@@ -102,8 +102,7 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
 	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
 	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
-
-* ```
+```
 {
         host: 'localhost',
         port: 9000,
@@ -111,7 +110,6 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
         admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
 }
 ```
-
 
 #### <a name="customizeconfiguration"/> Customizing Accounting Proxy for other components
 
@@ -129,12 +127,12 @@ In order to configure the Accounting Proxy working with other components follow 
 	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
 	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
 
-* ```
+```
 {
-        host: 'localhost',
-        port: 9000,
-        admin_port: 9001,
-        admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
+	host: 'localhost',
+    port: 9000,
+    admin_port: 9001,
+    admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
 }
 ```
 

@@ -1,6 +1,5 @@
 var express = require('express'),
     config = require('./config'),
-    proxy = require('./HTTP_Client/HTTPClient'),
     api = require('./APIServer'),
     notifier = require('./notifier'),
     cron = require('node-schedule'),
@@ -8,13 +7,17 @@ var express = require('express'),
     url = require('url'),
     bodyParser = require('body-parser'),
     async = require('async'),
-    winston = require('winston');
+    winston = require('winston'),
+    request = require('request'),
+    mkdirp = require('mkdirp');
+
+"use strict";
 
 var logger = new winston.Logger( {
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: './logs/all-log',
+            filename: './log/all-log',
             colorize: false
         }),
         new winston.transports.Console({
@@ -25,13 +28,20 @@ var logger = new winston.Logger( {
     exitOnError: false
 });
 
+mkdirp('./log', function(err) {
+    if (err) {
+        logger.info('Error creating "./log" path');
+    }
+});
+
 var db = require(config.database);
+db.init(); // Initialize the database
 var app = express();
 var acc_modules = {};
 
-"use strict";
-
-
+exports.init = function() {
+    app.listen(app.get('port'));
+}
 
 var notify = function(callback) {
     db.getApiKeys(function(err, api_keys) {
@@ -120,58 +130,66 @@ exports.count = function(user, API_KEY, publicPath, unit, response, callback) {
 };
 
 // Auxiliar functon that handles ContextBroker request
-var CBrequestHandler = function(request, response, service, options, unit) {
-    var userID = request.get('X-Actor-ID');
-    var API_KEY = request.get('X-API-KEY');
-    var publicPath = request.path;
+var CBrequestHandler = function(req, response, service, options, unit) {
+    var userID = req.get('X-Actor-ID');
+    var API_KEY = req.get('X-API-KEY');
+    var publicPath = req.path;
 
-    contextBroker.getOperation(service.url, request, function(err, operation) {
+    contextBroker.getOperation(service.url, req, function(err, operation) {
         if (err) {
-            logger.error('Error obtaining the operation based on CB path %s', options.path);
+            logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
         } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
-            contextBroker.requestHandler(request, response, service, unit, operation, function(err) {
+            contextBroker.requestHandler(req, response, service, unit, operation, function(err) {
                 if (err) {
                     logger.error('Error processing CB request');
                 } 
             });
         } else {
-            proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Orion ConextBroker request ( no (un)subscription)
-                response.statusCode = status;
-                for(var idx in headers) {
-                    response.setHeader(idx, headers[idx]);
-                }
-                response.send(resp);
-                exports.count(userID, API_KEY, publicPath, unit, resp, function(err){
-                    if(err) {
-                        logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+            request(options, function(error, resp, body) {
+                if (error) {
+                    response.status(500).send(error);
+                    logger.warn("An error ocurred requesting Context-Broker");
+                } else {
+                    for (var i in resp.headers) {
+                        response.setHeader(i, resp.headers[i])
                     }
-                });
+                    exports.count(userID, API_KEY, publicPath, unit, body, function(err){
+                        if(err) {
+                            logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                        }
+                        response.send(body);
+                    });
+                }
             });
         }
     });
 }
 
 // Auxiliar function that handles generic requests (no ContextBroker)
-var requestHandler = function(request, response, options, unit) {
-    var userID = request.get('X-Actor-ID');
-    var API_KEY = request.get('X-API-KEY');
-    var publicPath = request.path;
+var requestHandler = function(req, response, options, unit) {
+    var userID = req.get('X-Actor-ID');
+    var API_KEY = req.get('X-API-KEY');
+    var publicPath = req.path;
 
-    proxy.sendData('http', options, request.body, response, function(status, resp, headers) { // Other requests
-        response.statusCode = status;
-        for (var idx in headers) {
-            response.setHeader(idx, headers[idx]);
-        }
-        response.send(resp);
-        exports.count(userID, API_KEY, publicPath, unit, resp, function(err){
-            if (err) {
-                logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+    request(options, function(error, resp, body) {
+        if (error) {
+            response.status(500).send(error);
+            logger.warn("An error ocurred requesting the endpoint");
+        } else {
+            for (var i in resp.headers) {
+                response.setHeader(i, resp.headers[i])
             }
-        });
+            exports.count(userID, API_KEY, publicPath, unit, body, function(err){
+                if(err) {
+                    logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                }
+                response.send(body);
+            });
+        }
     });
 }
 
-app.use( function(request, response) {
+var handler = function(request, response) {
     var userID = request.get('X-Actor-ID');
     var API_KEY = request.get('X-API-KEY');
     var publicPath = request.path;
@@ -179,32 +197,31 @@ app.use( function(request, response) {
     logger.log('debug', "[%s] New request", API_KEY); 
     if(userID === undefined) {
         logger.log('debug', "[%s] Undefined username", API_KEY);
-        response.status(400).end();
+        response.status(400).json({ error: 'Undefined "X-Actor-ID" header'});
 
     } else if (API_KEY === undefined) {
         logger.log('debug', "[%s] Undefined API_KEY", API_KEY);
-        response.status(400).end();
+        response.status(400).json({ error: 'Undefined "X-API-KEY" header'});
 
     } else {
         db.checkInfo(userID, API_KEY, publicPath, function(err, unit) {
             if (err) {
                 response.status(500).end();
             } else if (unit === null) { // Invalid API_KEY, user or path
-                response.status(401).end();
+                response.status(401).json({ error: 'Invalid API_KEY, user or path'});
             } else {
                 db.getService(publicPath ,function(err, service) {
                     if (err) {
                         response.status(500).end();
                     } else {
                         var options = {
-                            host: url.parse(service.url).host,
-                            port: service.port,
-                            path: url.parse(service.url).pathname,
+                            url: service.url,
+                            json: true,
                             method: request.method,
-                            headers: proxy.getClientIp(request, request.headers)
+                            headers: request.headers,
+                            body: request.body
                         };
-
-                        if (config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(options.path)) { // Orion ContextBroker request
+                        if (config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(url.parse(options.url).pathname)) { // Orion ContextBroker request
                             CBrequestHandler(request, response, service, options, unit);
                         } else {
                             requestHandler(request, response, options, unit)
@@ -214,9 +231,10 @@ app.use( function(request, response) {
             }
         });
     }
-});
+};
 
 app.set('port', config.accounting_proxy.port);
-app.listen(app.get('port'));
 app.use(bodyParser.json());
+app.use('/', handler);
 api.run();
+module.exports.app = app;

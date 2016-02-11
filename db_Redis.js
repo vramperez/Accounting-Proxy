@@ -8,7 +8,7 @@ var logger = new winston.Logger({
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: './logs/all-log',
+            filename: './log/all-log',
             colorize: false
         })
     ],
@@ -51,6 +51,8 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
 			}, function(err) {
 				if (err) {
 					return callback(err, null);
+				} else if (unit == null) {
+					return callback(null, null);
 				} else {
 					return callback(null, unit);
 				}
@@ -92,6 +94,8 @@ checkInfoAux = function(api_key, publicPath, callback) {
 			}, function(err) {
 				if (err) {
 					return callback(err, null);
+				} else if (unit == undefined) {
+					return callback(null, null);
 				} else {
 					return callback(null, unit);
 				}
@@ -127,12 +131,12 @@ exports.getService = function(publicPath, callback) {
 	});
 };
 
-// CLI: addService [publicPath] [url] [port]
-exports.newService = function(publicPath, url, port, callback){
+// CLI: addService [publicPath] [url]
+exports.newService = function(publicPath, url, callback){
 	var multi = db.multi();
 
 	multi.sadd(['public', publicPath]);
-	multi.hmset(publicPath, { 'url': url, 'port': port });
+	multi.hmset(publicPath, { 'url': url});
 	multi.exec(function(err) {
 		if (err) {
 			return callback(err);
@@ -238,7 +242,7 @@ exports.getNotificationInfo = function(api_key, path, callback) {
 			db.hgetall(api_key_info.actorID + api_key + path, function(err, resource) {
 				if (err) {
 					return callback(err, null);
-				}else{
+				} else {
 					return callback(null, {
 						"actorID": api_key_info.actorID, 
 	                    "API_KEY": api_key,
@@ -323,7 +327,7 @@ exports.getApiKey = function(user, offer, callback) {
 						return callback(err, null);
 					} else if (offerAcc['organization'] === offer['organization'] &&
 						offerAcc['name'] === offer['name'] &&
-						offerAcc['version'] === offer['version']) {
+						offerAcc['version'] == offer['version']) {
 							task_callback(true);
 					} else {
 						task_callback(false);
@@ -337,6 +341,8 @@ exports.getApiKey = function(user, offer, callback) {
 				}
 				
 			});
+		} else {
+			return callback(null, null);
 		}
 	});
 };

@@ -1,5 +1,4 @@
 var proxy = require('../HTTP_Client/HTTPClient'),
-    http = require('http'),
  	subsUrls = require('./subsUrls'),
  	config = require('../config'),
  	express = require('express'),
@@ -15,7 +14,7 @@ var logger = new winston.Logger( {
     transports: [
         new winston.transports.File({
             level: 'debug',
-            filename: '../logs/all-log',
+            filename: '../log/all-log',
             colorize: false
         }),
         new winston.transports.Console({
@@ -93,8 +92,8 @@ exports.getOperation = function(privatePath, request, callback) {
 // Manage the subscribe/unsubscribe Context Broker requests
 exports.requestHandler = function(request, response, service, unit, operation, callback) {
 	var options = {
-		host: config.resources.host,
-		port: service.port,
+		host: url.parse(service.url).hostname,
+		port: url.parse(service.url).port,
 		path: url.parse(service.url).pathname,
 		method: request.method,
 		headers: {
@@ -103,63 +102,69 @@ exports.requestHandler = function(request, response, service, unit, operation, c
 		}
 	}
 
-	switch (operation) {
-		case 'subscribe':
-			var req_body = request.body;
-			var reference_url = req_body.reference;
-			req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
-
-			// Send the request to the CB and redirect the response to the subscriber
-			proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
-				var subscriptionId = resp.subscribeResponse.subscriptionId;
-				response.statusCode = status;
-				for (var i in headers) {
-					response.setHeader(i, headers[i]);
-				}
-				response.send(resp);
-				if (status === 200) {
-					// Store the endpoint information of the subscriber to be notified
-					db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).host, 
-						url.parse(reference_url).port, url.parse(reference_url).pathname, unit, function(err){
-							if (err) {
-								return callback(err);
-							} else {
-								return callback(null);
-							}
-					});
-				}
-			});
-			break;
-
-		case 'unsubscribe':
-			var subscriptionId = '';
-			if (request.method === 'POST') {
-				subscriptionId = request.body.subscriptionId;
-			} else if (request.method === 'DELETE') {
-				var pattern = /\/(\w+)$/;
-				var match = pattern.exec(request.path);
-				subscriptionId = match[0];
-				subscriptionId = subscriptionId.replace('/', '');
+	if (operation === 'subscribe') {
+		var req_body = request.body;
+		var reference_url = req_body.reference;
+		req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
+		// Send the request to the CB and redirect the response to the subscriber
+		proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
+			var resp_body = JSON.parse(resp);
+			var subscriptionId = resp_body.subscribeResponse.subscriptionId;
+			response.statusCode = status;
+			for (var i in headers) {
+				response.setHeader(i, headers[i]);
 			}
+			
+			if (status === 200) {
+				// Store the endpoint information of the subscriber to be notified
 
-			// Sends the request to the CB and redirect the response to the subscriber
-			proxy.sendData('http', options, request, response, function(status, resp, headers) {
-				response.statusCode = status;
-				for (var idx in headers) {
-					response.setHeader(idx, headers[idx]);
-				}
-				response.send(resp);
-				if (status === 200) {
-					db.deleteCBSubscription(subscriptionId, function(err){
+				db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).hostname, 
+					url.parse(reference_url).port, url.parse(reference_url).pathname, unit, function(err){
 						if (err) {
+							response.send(resp_body);
 							return callback(err);
 						} else {
+							response.send(resp_body);
 							return callback(null);
 						}
-					});
-				}
-			});
-			break;
+				});
+			} else {
+				response.send(resp_body);
+				return callback(null);
+			}
+		});
+
+	} else if(operation === 'unsubscribe') {
+		var subscriptionId = '';
+		if (request.method === 'POST') {
+			subscriptionId = request.body.subscriptionId;
+		} else if (request.method === 'DELETE') {
+			var pattern = /\/(\w+)$/;
+			var match = pattern.exec(request.path);
+			subscriptionId = match[0];
+			subscriptionId = subscriptionId.replace('/', '');
+		}
+
+		// Sends the request to the CB and redirect the response to the subscriber
+		proxy.sendData('http', options, JSON.stringify(request.body), response, function(status, resp, headers) {
+			response.statusCode = status;
+			var resp_body = JSON.parse(resp);
+			for (var idx in headers) {
+				response.setHeader(idx, headers[idx]);
+			}
+			response.send(resp_body);
+			if (status === 200) {
+				db.deleteCBSubscription(subscriptionId, function(err){
+					if (err) {
+						return callback(err);
+					} else {
+						return callback(null);
+					}
+				});
+			} else {
+				return callback(null);
+			}
+		});
 	}   
 };
 

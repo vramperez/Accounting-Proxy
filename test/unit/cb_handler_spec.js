@@ -323,7 +323,7 @@ describe('Testing Context-Broker handler', function() {
 					parse: function(url) {
 						return {
 							pathname: '/path',
-							host: 'localhost',
+							hostname: 'localhost',
 							port: 9010,
 						}
 					}
@@ -349,11 +349,11 @@ describe('Testing Context-Broker handler', function() {
 				},
 				proxy: {
 					sendData: function(proto, options, body, response, callback) {
-						return callback(200, {
+						return callback(200, JSON.stringify({
 							subscribeResponse: {
 								subscriptionId: 'subscriptionID'
 							}
-						}, ['header1']);
+						}), ['header1']);
 					}
 				}
 			}
@@ -364,7 +364,7 @@ describe('Testing Context-Broker handler', function() {
 					assert.equal(spies.res.setHeader.callCount, 1);
 					assert.equal(spies.db.addCBSubscription.callCount, 1);
 					assert.equal(spies.res.send.callCount, 1);
-					assert.equal(spies.url.parse.callCount, 4);
+					assert.equal(spies.url.parse.callCount, 6);
 					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
 					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
 						headers: {
@@ -420,7 +420,7 @@ describe('Testing Context-Broker handler', function() {
 					assert.equal(spies.res.setHeader.callCount, 1);
 					assert.equal(spies.db.addCBSubscription.callCount, 1);
 					assert.equal(spies.res.send.callCount, 1);
-					assert.equal(spies.url.parse.callCount, 4);
+					assert.equal(spies.url.parse.callCount, 6);
 					assert.equal(spies.proxy.sendData.getCall(0).args[0], 'http');
 					assert.deepEqual(spies.proxy.sendData.getCall(0).args[1], {
 						headers: {

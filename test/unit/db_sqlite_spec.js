@@ -56,7 +56,7 @@ var sqlite_mocker = function(implementations, callback) {
 	return callback(db, spies);
 }
 
-describe('Testing SQLITE database,', function() {
+describe('Testing Sqlite database,', function() {
 
 	describe('init', function() {
 		var implementations;
@@ -92,7 +92,7 @@ describe('Testing SQLITE database,', function() {
 
 	describe('newService', function() {
 		var sentence = 'INSERT OR REPLACE INTO public \
-            VALUES ($path, $url, $port)';
+            VALUES ($path, $url)';
         var implementations;
 
 		it('error', function(done) {
@@ -102,14 +102,13 @@ describe('Testing SQLITE database,', function() {
 				}
 			}
 			sqlite_mocker(implementations, function(db, spies) {
-				db.newService('/path', 'http://localhost/', '9010',function(err) {
+				db.newService('/path', 'http://localhost/',function(err) {
 					assert.equal(err, 'Error');
 					assert.equal(spies.run.callCount, 1);
 					assert.equal(spies.run.getCall(0).args[0], sentence);
 					assert.deepEqual((spies.run.getCall(0)).args[1], {
 						$path: '/path',
-            			$url: 'http://localhost/',
-            			$port: '9010'
+            			$url: 'http://localhost/'
 					});
 					done();
 				});
@@ -123,14 +122,13 @@ describe('Testing SQLITE database,', function() {
 				}
 			}
 			sqlite_mocker(implementations, function(db, spies) {
-				db.newService('/path', 'http://localhost/', '9010',function(err) {
+				db.newService('/path', 'http://localhost/',function(err) {
 					assert.equal(err, null);
 					assert.equal(spies.run.callCount, 1);
 					assert.equal(spies.run.getCall(0).args[0], sentence);
 					assert.deepEqual((spies.run.getCall(0)).args[1], {
 						$path: '/path',
-            			$url: 'http://localhost/',
-            			$port: '9010'
+            			$url: 'http://localhost/'
 					});
 					done();
 				});
@@ -183,7 +181,7 @@ describe('Testing SQLITE database,', function() {
 	});
 
 	describe('getService', function() {
-		var sentence = 'SELECT url, port \
+		var sentence = 'SELECT url \
             FROM public \
             WHERE publicPath=$path';
         var implementations;
@@ -197,6 +195,26 @@ describe('Testing SQLITE database,', function() {
 			sqlite_mocker(implementations, function(db, spies) {
 				db.getService('/path',function(err, service) {
 					assert.equal(err, 'Error');
+					assert.equal(service, null);
+					assert.equal(spies.all.callCount, 1);
+					assert.equal(spies.all.getCall(0).args[0], sentence);
+					assert.deepEqual((spies.all.getCall(0)).args[1], {
+						$path: '/path',
+					});
+					done();
+				});
+			});
+		});
+
+		it('no service available for the path', function(done) {
+			implementations = {
+				all: function(query, params, callback){
+					return callback(null, []);
+				}
+			}
+			sqlite_mocker(implementations, function(db, spies) {
+				db.getService('/path',function(err, service) {
+					assert.equal(err, null);
 					assert.equal(service, null);
 					assert.equal(spies.all.callCount, 1);
 					assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -769,7 +787,7 @@ describe('Testing SQLITE database,', function() {
 	describe('getApiKey', function() {
 		var sentence = 'SELECT API_KEY \
         FROM offerAccount \
-        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref';
+        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID';
         var offer = {
         	organization: 'organization',
         	name: 'name',
@@ -1226,7 +1244,7 @@ describe('Testing SQLITE database,', function() {
 	});
 
 	describe('getCBSubscription', function(done) {
-		var sentence = 'SELECT subscriptionID \
+		var sentence = 'SELECT API_KEY, publicPath, ref_host, ref_path, ref_port, unit \
         FROM subscriptions \
         WHERE subscriptionID=$subs_id';
         var implementations;

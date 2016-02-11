@@ -27,12 +27,15 @@
     },
     {
       "name": "Víctor Rampérez Martín",
-      "email": "vivctor.ramperez.martin@gmail.com" 
+      "email": "vivctor.ramperez.martin@gmail.com"
     }
   ],
   "scripts": {
     "test": "npm run unit && npm run integration",
     "unit": "istanbul cover _mocha test/unit",
-    "integration": "istanbul cover _mocha test/integration"
+    "integration": "_mocha test/integration"
+  },
+  "devDependencies": {
+    "supertest": "^1.1.0"
   }
 }

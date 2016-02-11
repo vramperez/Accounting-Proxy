@@ -13,13 +13,12 @@ cli
 
 // Add new service command
 cli
-    .command('addService [publicPath] [URL] [port]')
+    .command('addService [publicPath] [URL]')
     .description('Add new service to proxy database.')
-    .action(function(publicPath, url, port) {
+    .action(function(publicPath, url) {
         if (/\/((\w+)\/?)*$/.test(publicPath) &&
-            /^(ftp|http|https):\/\/[^ "]+$/.test(url) &&
-            /^\d*$/.test(port)) {
-                db.newService(publicPath, url, port, function(err) {
+            /^(ftp|http|https):\/\/[^ "]+$/.test(url)) {
+                db.newService(publicPath, url, function(err) {
                     if (err) {
                         console.log(err);
                     } else {
@@ -42,7 +41,7 @@ cli
                 if(err || data === null) {
                     console.log('No data avaliable');
                 } else {
-                    console.log("Url: " + data['url'] + "  Port: " + data['port']);
+                    console.log("Url: " + data['url']);
                 }
             });
         } else {

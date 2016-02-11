@@ -1,10 +1,10 @@
 var sqlite = require('sqlite3').verbose(), // Debug enable
+    config = require('./config'),
     async = require('async');
 
-var db = new sqlite.Database('accountingDB.sqlite');
+var db = new sqlite.Database(config.database_name);
 
 exports.init = function() {
-
     db.serialize(function() {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
@@ -12,7 +12,6 @@ exports.init = function() {
         db.run('CREATE TABLE IF NOT EXISTS public ( \
                     publicPath      TEXT, \
                     url             TEXT, \
-                    port            TEXT, \
                     PRIMARY KEY (publicPath) \
                )');
 
@@ -24,7 +23,8 @@ exports.init = function() {
                     record_type     TEXT, \
                     unit            TEXT, \
                     component_label TEXT, \
-                    PRIMARY KEY (publicPath, organization, name, version)\
+                    PRIMARY KEY (publicPath, organization, name, version), \
+                    FOREIGN KEY (publicPath) REFERENCES public (publicPath)\
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS offerAccount ( \
@@ -34,8 +34,7 @@ exports.init = function() {
                     actorID         TEXT, \
                     API_KEY         TEXT, \
                     reference       TEXT, \
-                    PRIMARY KEY (API_KEY), \
-                    FOREIGN KEY (actorID) REFERENCES accounts (actorID) \
+                    PRIMARY KEY (API_KEY, actorID)\
                )');
 
         db.run('CREATE TABLE IF NOT EXISTS accounting ( \
@@ -45,8 +44,7 @@ exports.init = function() {
                     publicPath          TEXT, \
                     correlation_number  INT,  \
                     PRIMARY KEY (actorID, API_KEY, publicPath), \
-                    FOREIGN KEY (actorID) REFERENCES accounts(actorID), \
-                    FOREIGN KEY (API_KEY) REFERENCES offerAccount(API_KEY) \
+                    FOREIGN KEY (actorID, API_KEY) REFERENCES offerAccount (actorID, API_KEY)\
                )');
         });
 
@@ -58,7 +56,7 @@ exports.init = function() {
                     ref_port            TEXT, \
                     ref_path            TEXT, \
                     unit                TEXT, \
-                    PRIMARY KEY (subscriptionID) \
+                    PRIMARY KEY (subscriptionID)\
                 )');
 };
 
@@ -83,20 +81,19 @@ exports.checkInfo = function(user, api_key, publicPath, callback) {
     });
 }
 
-// CLI: addService [path] [url] [port]
-exports.newService = function(publicPath, url, port, callback) {
+// CLI: addService [path] [url]
+exports.newService = function(publicPath, url, callback) {
     db.run('INSERT OR REPLACE INTO public \
-            VALUES ($path, $url, $port)',
+            VALUES ($path, $url)',
         {
             $path: publicPath,
-            $url: url,
-            $port: port
+            $url: url
         }, function(err) {
-        if (err) {
-            return callback(err);
-        } else {
-            return callback(null);
-        }
+            if (err) {
+                return callback(err);
+            } else {
+                return callback(null);
+            }
     });
 };
 
@@ -117,13 +114,15 @@ exports.deleteService = function(path, callback) {
 
 // CLI: getService [publicPath]
 exports.getService = function(path, callback) {
-    db.all('SELECT url, port \
+    db.all('SELECT url \
             FROM public \
             WHERE publicPath=$path', {
                 $path: path
             }, function(err, service) {
                 if (err) {
                     return callback(err, null);
+                } else if (service[0] == undefined){
+                    return callback(null, null);
                 } else {
                     return callback(null, service[0]);
                 }
@@ -140,7 +139,7 @@ exports.getInfo = function(user, callback) {
                 if (err) {
                     return callback(err, null);
                 } else if (row.length === 0) {
-                    return callback(null, {});
+                    return callback(null, []);
                 } else {
                     return callback(null, row);
                 }
@@ -295,7 +294,7 @@ exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
 exports.getApiKey = function(user, offer, callback) {
     db.all('SELECT API_KEY \
         FROM offerAccount \
-        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID AND reference=$ref',
+        WHERE organization=$org AND name=$name AND version=$version AND actorID=$actorID',
         {
             $org: offer.organization,
             $name: offer.name,
@@ -401,7 +400,7 @@ exports.addCBSubscription = function( API_KEY, publicPath, subscription_id, ref_
 };
 
 exports.getCBSubscription = function(subscription_id, callback) {
-    db.all('SELECT subscriptionID \
+    db.all('SELECT API_KEY, publicPath, ref_host, ref_path, ref_port, unit \
         FROM subscriptions \
         WHERE subscriptionID=$subs_id',
         {

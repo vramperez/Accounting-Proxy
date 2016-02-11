@@ -101,7 +101,7 @@ exports.requestHandler = function(request, response, service, unit, operation, c
 			'accept': 'application/json'
 		}
 	}
-	
+
 	if (operation === 'subscribe') {
 		var req_body = request.body;
 		var reference_url = req_body.reference;
@@ -117,7 +117,8 @@ exports.requestHandler = function(request, response, service, unit, operation, c
 			
 			if (status === 200) {
 				// Store the endpoint information of the subscriber to be notified
-				db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).host, 
+
+				db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).hostname, 
 					url.parse(reference_url).port, url.parse(reference_url).pathname, unit, function(err){
 						if (err) {
 							response.send(resp_body);
@@ -147,10 +148,11 @@ exports.requestHandler = function(request, response, service, unit, operation, c
 		// Sends the request to the CB and redirect the response to the subscriber
 		proxy.sendData('http', options, JSON.stringify(request.body), response, function(status, resp, headers) {
 			response.statusCode = status;
+			var resp_body = JSON.parse(resp);
 			for (var idx in headers) {
 				response.setHeader(idx, headers[idx]);
 			}
-			response.send(resp);
+			response.send(resp_body);
 			if (status === 200) {
 				db.deleteCBSubscription(subscriptionId, function(err){
 					if (err) {

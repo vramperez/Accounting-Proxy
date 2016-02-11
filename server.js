@@ -8,16 +8,10 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     async = require('async'),
     winston = require('winston'),
-    requester = require('request'),
+    request = require('request'),
     mkdirp = require('mkdirp');
 
 "use strict";
-
-mkdirp('./log', function(err) {
-    if (err) {
-        logger.info('Error creating "./log" path');
-    }
-});
 
 var logger = new winston.Logger( {
     transports: [
@@ -32,6 +26,12 @@ var logger = new winston.Logger( {
         })
     ],
     exitOnError: false
+});
+
+mkdirp('./log', function(err) {
+    if (err) {
+        logger.info('Error creating "./log" path');
+    }
 });
 
 var db = require(config.database);
@@ -130,23 +130,23 @@ exports.count = function(user, API_KEY, publicPath, unit, response, callback) {
 };
 
 // Auxiliar functon that handles ContextBroker request
-var CBrequestHandler = function(request, response, service, options, unit) {
-    var userID = request.get('X-Actor-ID');
-    var API_KEY = request.get('X-API-KEY');
-    var publicPath = request.path;
+var CBrequestHandler = function(req, response, service, options, unit) {
+    var userID = req.get('X-Actor-ID');
+    var API_KEY = req.get('X-API-KEY');
+    var publicPath = req.path;
 
-    contextBroker.getOperation(service.url, request, function(err, operation) {
+    contextBroker.getOperation(service.url, req, function(err, operation) {
         if (err) {
-            logger.error('Error obtaining the operation based on CB path %s', options.path);
+            logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
         } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
-            contextBroker.requestHandler(request, response, service, unit, operation, function(err) {
+            contextBroker.requestHandler(req, response, service, unit, operation, function(err) {
                 if (err) {
                     logger.error('Error processing CB request');
                 } 
             });
         } else {
-            requester(options, function(error, resp, body) {
-                if (err) {
+            request(options, function(error, resp, body) {
+                if (error) {
                     response.status(500).send(error);
                     logger.warn("An error ocurred requesting Context-Broker");
                 } else {
@@ -166,12 +166,12 @@ var CBrequestHandler = function(request, response, service, options, unit) {
 }
 
 // Auxiliar function that handles generic requests (no ContextBroker)
-var requestHandler = function(request, response, options, unit) {
-    var userID = request.get('X-Actor-ID');
-    var API_KEY = request.get('X-API-KEY');
-    var publicPath = request.path;
+var requestHandler = function(req, response, options, unit) {
+    var userID = req.get('X-Actor-ID');
+    var API_KEY = req.get('X-API-KEY');
+    var publicPath = req.path;
 
-    requester(options, function(error, resp, body) {
+    request(options, function(error, resp, body) {
         if (error) {
             response.status(500).send(error);
             logger.warn("An error ocurred requesting the endpoint");

@@ -113,7 +113,7 @@ var newBuyHandler = function(req, res){
                                         db.getUnit(publicPath, offer.organization, offer.name, offer.version, function(err, unit) {
                                             if (err) {
                                                 task_callback('Error in db');
-                                            } else if (unit === null ){ // Incorrect service
+                                            } else if (unit === null ) { // Incorrect service
                                                 task_callback('Wrong path in the offer'); // If one path in the offer is wrong, send 400
                                             } else {
                                                 if (! bought) { // New resource for the client

@@ -5,8 +5,8 @@ var express = require('express'),
 
 var app = express();
 
-exports.run = function() {
-	app.listen(config_test.integration.endpoint.port)
+exports.run = function(port) {
+	app.listen(port);
 }
 
 var example1_handler = function(req, res) {

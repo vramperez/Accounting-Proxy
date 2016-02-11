@@ -50,10 +50,17 @@ var mocker = function(implementations, callback) {
 		cron: {},
 		req: {},
 		res: {},
-		proxy: {},
+		requester: {
+			request: {}
+		},
 		db: {},
 		acc_modules: {},
-		url: {}
+		url: {},
+		mkdir: {
+			mkdirp: function(path, callback) {
+				return callback();
+			}
+		}
 	}
 	spies = {
 		notifier: {
@@ -73,10 +80,11 @@ var mocker = function(implementations, callback) {
 		cron: {},
 		req: {},
 		res: {},
-		proxy: {},
+		requester: {},
 		db: {},
 		acc_modules: {},
-		url: {}
+		url: {},
+		mkdir: {}
 	}
 
 	// Complete app_mock implementation and add spies
@@ -102,6 +110,7 @@ var mocker = function(implementations, callback) {
 			express: function() {
 				return mocks.app;
 			},
+			request: mocks.requester.request,
 			'./config': mocks.config,
 			'./db': mocks.db,
 			'async': mocks.async,
@@ -109,11 +118,11 @@ var mocker = function(implementations, callback) {
 			'winston': mocks.logger,
 			'./notifier': mocks.notifier,
 			'node-schedule': mocks.cron,
-			'body-parser': mocks.bodyParser,
-			'./HTTP_Client/HTTPClient': mocks.proxy,
+			'body-parser': mocks.bodyParser, 
 			'./acc_modules/megabyte': mocks.acc_modules,
 			'url': mocks.url,
-			'./orion_context_broker/cb_handler': mocks.contextBroker
+			'./orion_context_broker/cb_handler': mocks.contextBroker,
+			mkdirp: mocks.mkdir.mkdirp
 		});
 		return callback(api_server, spies);
 	});
@@ -123,6 +132,43 @@ describe('Testing Server', function() {
 
 	describe('initialization functions', function() {
 		var implementations;
+
+		it('log directory correct creation', function(done) {
+			implementations = {
+				mkdir: {
+					mkdirp: function(path, callback) {
+						return callback('Error');
+					}
+				}
+			}
+
+			mocker(implementations, function(proxy_server, spies) {
+				assert.equal(spies.mkdir.mkdirp.callCount, 1);
+				assert.equal(spies.logger.info.callCount, 2);
+				assert.equal(spies.logger.info.getCall(0).args[0], 'Error creating "./log" path');
+				done();
+			});
+		});
+
+		it('correct initialization', function(done) {
+			var implementations = {
+				app: {
+					listen: function(port) {},
+					get: function(prop) {
+						return 9010;
+					}
+				}
+			};
+
+			mocker(implementations, function(proxy_server, spies) {
+				proxy_server.init();
+				assert.equal(spies.app.listen.callCount, 1);
+				assert.equal(spies.app.get.callCount, 1);
+				assert.equal(spies.app.get.getCall(0).args[0], 'port');
+				assert.equal(spies.app.listen.getCall(0).args[0], 9010);
+				done();
+			});
+		});
 
 		it('[notify] error obtaining api_keys from db', function(done) {
 			implementations= {
@@ -331,8 +377,8 @@ describe('Testing Server', function() {
 					json: function(msg) {}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
@@ -379,8 +425,8 @@ describe('Testing Server', function() {
 					json: function(msg) {}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
@@ -426,14 +472,14 @@ describe('Testing Server', function() {
 					end: function() {}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
 						}
 					}
-				},
+				}
 			}
 			implementations.db = {
 				checkInfo: function(user, api_key, path, callback) {
@@ -472,17 +518,17 @@ describe('Testing Server', function() {
 					status: function(status) {
 						return this;
 					},
-					end: function() {}
+					json: function(msg) {}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
 						}
 					}
-				},
+				}
 			}
 			implementations.db = {
 				checkInfo: function(user, api_key, path, callback) {
@@ -495,13 +541,14 @@ describe('Testing Server', function() {
 				assert.equal(spies.logger.log.callCount, 1);
 				assert.equal(spies.req.get.callCount, 2);
 				assert.equal(spies.res.status.callCount, 1);
-				assert.equal(spies.res.end.callCount, 1);
+				assert.equal(spies.res.json.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
 				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
 				assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
 				assert.equal(spies.res.status.getCall(0).args[0], 401);
+				assert.deepEqual(spies.res.json.getCall(0).args[0], { error: 'Invalid API_KEY, user or path' });
 				done();
 			});
 		});
@@ -525,8 +572,8 @@ describe('Testing Server', function() {
 					end: function() {}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
@@ -561,7 +608,7 @@ describe('Testing Server', function() {
 			});
 		});
 
-		it('error in accounting module', function(done) {
+		it('error sending the request to the endpoint', function(done) {
 			implementations = {
 				req: {
 					get: function(header) {
@@ -575,23 +622,23 @@ describe('Testing Server', function() {
 				},
 				res: {
 					send: function() {},
-					setHeader: function(header, value) {}
+					setHeader: function(header, value) {},
+					status: function(status) {
+						return this;
+					}
 				},
 				app: {
-					use: function(callback) {
-						if (typeof callback == 'function') {
+					use: function(path, callback) {
+						if (path === '/') {
 							return callback(implementations.req, implementations.res);
 						} else {
 							return;
 						}
 					}
 				},
-				proxy: {
-					getClientIp: function(request, headers) {
-						return 'header';
-					},
-					sendData: function(protocol, options, body, response, callback) {
-						return callback(400, {}, [{header: 'header1'}]);
+				requester: {
+					request: function(options, callback) {
+						return callback('Error', {}, {});
 					}
 				},
 				config: {
@@ -640,8 +687,108 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.callCount, 4);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
-				assert.equal(spies.url.parse.callCount, 2);
-				assert.equal(spies.res.setHeader.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.requester.request.callCount, 1);
+				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
+				assert.equal(spies.logger.warn.getCall(0).args[0], 'An error ocurred requesting the endpoint');
+				assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
+				assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
+				assert.equal(spies.req.get.getCall(2).args[0], 'X-Actor-ID');
+				assert.equal(spies.req.get.getCall(3).args[0], 'X-API-KEY');
+				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
+				assert.equal(spies.res.status.getCall(0).args[0], 500);
+				assert.deepEqual(spies.requester.request.getCall(0).args[0], { url: 'http://localhost/path',
+				  json: true,
+				  method: undefined,
+				  headers: undefined,
+				  body: undefined });
+				done();
+			});
+		});
+
+		it('error in accounting module', function(done) {
+			implementations = {
+				req: {
+					get: function(header) {
+						if (header === 'X-Actor-ID') {
+							return '0001';
+						} else {
+							return 'api_key';
+						}
+					},
+					path: '/path'
+				},
+				res: {
+					send: function() {},
+					setHeader: function(header, value) {},
+					status: function(status) {
+						return this;
+					}
+				},
+				app: {
+					use: function(path, callback) {
+						if (path === '/') {
+							return callback(implementations.req, implementations.res);
+						} else {
+							return;
+						}
+					}
+				},
+				requester: {
+					request: function(options, callback) {
+						return callback(null, { headers: [{ header: 'header1'}]}, {});
+					}
+				},
+				config: {
+					database: './db',
+					resources: {
+						contextBroker: false
+					},
+					modules: {
+						accounting: ['megabyte']
+					}
+				},
+				acc_modules: {
+					count: function(response, callback) {
+						return callback('Error', null);
+					}
+				},
+				url: {
+					parse: function(url) {
+						return {
+							pathname: '/path'
+						}
+					}
+				},
+				db: {
+					getService: function(path, callback) {
+						return callback(null, {
+							url: 'http://localhost/path',
+							port: 9010,
+						});
+					},
+					checkInfo: function(user, api_key, path, callback) {
+						return callback(null, 'megabyte');
+					}
+				}
+			}
+			implementations.db.getService = function(path, callback) {
+				return callback(null, {
+					url: 'http://localhost/path',
+					port: 9010,
+				});
+			}
+			mocker(implementations, function(proxy_server, spies) {
+				assert.equal(spies.logger.info.callCount, 1);
+				assert.equal(spies.logger.warn.callCount, 1);
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.req.get.callCount, 4);
+				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.requester.request.callCount, 1);
+				assert.equal(spies.acc_modules.count.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
 				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
@@ -652,10 +799,11 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.getCall(2).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(3).args[0], 'X-API-KEY');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
-				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.equal(spies.url.parse.getCall(1).args[0], 'http://localhost/path');
-				assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
-				assert.deepEqual(spies.res.setHeader.getCall(0).args[1], {header: 'header1'});
+				assert.deepEqual(spies.requester.request.getCall(0).args[0], { url: 'http://localhost/path',
+				  	json: true,
+				  	method: undefined,
+				  	headers: undefined,
+				  	body: undefined });
 				done();
 			});
 		});
@@ -694,8 +842,8 @@ describe('Testing Server', function() {
 				assert.equal(spies.res.status.callCount, 0);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
-				assert.equal(spies.url.parse.callCount, 2);
 				assert.equal(spies.res.setHeader.callCount, 1);
+				assert.equal(spies.requester.request.callCount, 1);
 				assert.equal(spies.db.count.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
@@ -707,10 +855,13 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.getCall(2).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(3).args[0], 'X-API-KEY');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
-				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.equal(spies.url.parse.getCall(1).args[0], 'http://localhost/path');
 				assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
 				assert.deepEqual(spies.res.setHeader.getCall(0).args[1], {header: 'header1'});
+				assert.deepEqual(spies.requester.request.getCall(0).args[0], { url: 'http://localhost/path',
+				  	json: true,
+				  	method: undefined,
+				  	headers: undefined,
+				  	body: undefined });
 				async.forEachOf(count_args, function(arg, i, callback) {
 					if (typeof arg != 'object') {
 						assert.equal(spies.db.count.getCall(0).args[i], count_args[i]);
@@ -754,9 +905,9 @@ describe('Testing Server', function() {
 				assert.equal(spies.res.status.callCount, 0);
 				assert.equal(spies.res.send.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
-				assert.equal(spies.url.parse.callCount, 2);
 				assert.equal(spies.res.setHeader.callCount, 1);
 				assert.equal(spies.db.count.callCount, 1);
+				assert.equal(spies.requester.request.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
 				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
@@ -765,10 +916,11 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.getCall(2).args[0], 'X-Actor-ID');
 				assert.equal(spies.req.get.getCall(3).args[0], 'X-API-KEY');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
-				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.equal(spies.url.parse.getCall(1).args[0], 'http://localhost/path');
-				assert.equal(spies.res.setHeader.getCall(0).args[0], 0);
-				assert.deepEqual(spies.res.setHeader.getCall(0).args[1], {header: 'header1'});
+				assert.deepEqual(spies.requester.request.getCall(0).args[0], { url: 'http://localhost/path',
+				  	json: true,
+				  	method: undefined,
+				  	headers: undefined,
+				  	body: undefined });
 				async.forEachOf(count_args, function(arg, i, callback) {
 					if (typeof arg != 'object') {
 						assert.equal(spies.db.count.getCall(0).args[i], count_args[i]);
@@ -811,9 +963,6 @@ describe('Testing Server', function() {
 				send: function() {},
 				setHeader: function(header, value) {}
 			}
-			implementations.proxy = {
-				getClientIp: function(request, headers) {}
-			}
 			mocker(implementations, function(proxy_server, spies) {
 				assert.equal(spies.logger.info.callCount, 2);
 				assert.equal(spies.logger.log.callCount, 1);
@@ -823,7 +972,6 @@ describe('Testing Server', function() {
 				assert.equal(spies.db.checkInfo.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
 				assert.equal(spies.url.parse.callCount, 2);
-				assert.equal(spies.proxy.getClientIp.callCount, 1);
 				assert.equal(spies.contextBroker.getOperation.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.info.getCall(1).args[0], 'Loading module for Orion Context Broker...');
@@ -840,8 +988,6 @@ describe('Testing Server', function() {
 				assert.equal(spies.db.checkInfo.getCall(0).args[2], '/path');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.deepEqual(spies.proxy.getClientIp.getCall(0).args[0], implementations.req);
-				assert.equal(spies.proxy.getClientIp.getCall(0).args[1], 'header');
 				assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], 'http://localhost/path');
 				assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
 				done();
@@ -883,8 +1029,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.callCount, 4);
 				assert.equal(spies.db.checkInfo.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
-				assert.equal(spies.url.parse.callCount, 2);
-				assert.equal(spies.proxy.getClientIp.callCount, 1);
+				assert.equal(spies.url.parse.callCount, 1);
 				assert.equal(spies.contextBroker.getOperation.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.info.getCall(1).args[0], 'Loading module for Orion Context Broker...');
@@ -900,20 +1045,88 @@ describe('Testing Server', function() {
 				assert.equal(spies.db.checkInfo.getCall(0).args[2], '/path');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.deepEqual(spies.proxy.getClientIp.getCall(0).args[0], implementations.req);
-				assert.equal(spies.proxy.getClientIp.getCall(0).args[1], 'header');
 				assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], 'http://localhost/path');
 				assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
 				done();
 			});
 		});
 
-		it('[ContextBroker request] correct', function(done) {
-			implementations.proxy.sendData = function(protocol, options, body, response, callback) {
-				return callback(200, {resp: 'resp'}, ['header1']);
-			}
+		it('[ContextBroker request] error seding the request to the CB', function(done) {
 			implementations.acc_modules.count = function(response, callback) {
 				return callback('Error', null);
+			}
+			implementations.contextBroker = {
+				getOperation: function(url, request, callback) {
+					return callback(null, null);
+				},
+				requestHandler:  function(request, response, service, unit, operation, callback) {
+					return callback(null);
+				}
+			}
+			implementations.req = {
+				get: function(header) {
+					if (header === 'X-Actor-ID') {
+						return '0001';
+					} else {
+						return 'api_key';
+					}
+				},
+				path: '/path',
+				headers: 'header'
+			}
+			implementations.requester = {
+				request: function(options, callback) {
+					return callback('Error', {}, {});
+				}
+			}
+			implementations.res = {
+				status: function(status) {
+						return this;
+				},
+				send: function() {},
+				setHeader: function(header, value) {}
+			}
+			mocker(implementations, function(proxy_server, spies) {
+				assert.equal(spies.logger.info.callCount, 2);
+				assert.equal(spies.logger.log.callCount, 1);
+				assert.equal(spies.logger.warn.callCount, 1);
+				assert.equal(spies.req.get.callCount, 4);
+				assert.equal(spies.db.checkInfo.callCount, 1);
+				assert.equal(spies.db.getService.callCount, 1);
+				assert.equal(spies.url.parse.callCount, 1);
+				assert.equal(spies.res.status.callCount, 1);
+				assert.equal(spies.res.send.callCount, 1);
+				assert.equal(spies.contextBroker.getOperation.callCount, 1);
+				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
+				assert.equal(spies.logger.info.getCall(1).args[0], 'Loading module for Orion Context Broker...');
+				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
+				assert.equal(spies.logger.log.getCall(0).args[1], '[%s] New request');
+				assert.equal(spies.logger.warn.getCall(0).args[0], 'An error ocurred requesting Context-Broker');
+				assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
+				assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
+				assert.equal(spies.req.get.getCall(2).args[0], 'X-Actor-ID');
+				assert.equal(spies.req.get.getCall(3).args[0], 'X-API-KEY');
+				assert.equal(spies.db.checkInfo.getCall(0).args[0], '0001');
+				assert.equal(spies.db.checkInfo.getCall(0).args[1], 'api_key');
+				assert.equal(spies.db.checkInfo.getCall(0).args[2], '/path');
+				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
+				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
+				assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], 'http://localhost/path');
+				assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
+				assert.equal(spies.res.status.getCall(0).args[0], 500);
+				assert.equal(spies.res.send.getCall(0).args[0], 'Error');
+				done();
+			});
+		});
+
+		it('[ContextBroker request] correct', function(done) {
+			implementations.acc_modules.count = function(response, callback) {
+				return callback('Error', null);
+			}
+			implementations.requester = {
+				request: function(options, callback) {
+					return callback(null, { headers: [ {header: 'header1'}]}, {});
+				}
 			}
 			implementations.contextBroker = {
 				getOperation: function(url, request, callback) {
@@ -948,8 +1161,7 @@ describe('Testing Server', function() {
 				assert.equal(spies.req.get.callCount, 4);
 				assert.equal(spies.db.checkInfo.callCount, 1);
 				assert.equal(spies.db.getService.callCount, 1);
-				assert.equal(spies.url.parse.callCount, 2);
-				assert.equal(spies.proxy.getClientIp.callCount, 1);
+				assert.equal(spies.url.parse.callCount, 1);
 				assert.equal(spies.contextBroker.getOperation.callCount, 1);
 				assert.equal(spies.logger.info.getCall(0).args[0], 'Loading accounting modules...');
 				assert.equal(spies.logger.info.getCall(1).args[0], 'Loading module for Orion Context Broker...');
@@ -966,8 +1178,6 @@ describe('Testing Server', function() {
 				assert.equal(spies.db.checkInfo.getCall(0).args[2], '/path');
 				assert.equal(spies.db.getService.getCall(0).args[0], '/path');
 				assert.equal(spies.url.parse.getCall(0).args[0], 'http://localhost/path');
-				assert.deepEqual(spies.proxy.getClientIp.getCall(0).args[0], implementations.req);
-				assert.equal(spies.proxy.getClientIp.getCall(0).args[1], 'header');
 				assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], 'http://localhost/path');
 				assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
 				done();

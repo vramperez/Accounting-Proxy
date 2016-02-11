@@ -86,7 +86,7 @@ var mocker = function(database) {
 }
 
 console.log('[LOG]: starting an endpoint for testing...');
-test_endpoint.run();
+test_endpoint.run(config_tests.integration.accounting_CB_port);
 
 describe('Testing the accounting API', function() { 
 
@@ -116,7 +116,7 @@ describe('Testing the accounting API', function() {
 				it('correct entity creation', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost:9020/v1/updateContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -225,7 +225,7 @@ describe('Testing the accounting API', function() {
 				it('error entity creation', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost:9020/v1/updateContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -289,7 +289,7 @@ describe('Testing the accounting API', function() {
 				it('correct query context operation', function(done) {
 					var services = [{
 						path: '/v1/queryContext',
-						url: 'http://localhost:9020/v1/queryContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/queryContext'
 					}];
 					var resources = [{
 						offering: {
@@ -385,7 +385,7 @@ describe('Testing the accounting API', function() {
 				it('error query context operation (entity invalid entity)', function(done) {
 					var services = [{
 						path: '/v1/queryContext',
-						url: 'http://localhost:9020/v1/queryContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/queryContext'
 					}];
 					var resources = [{
 						offering: {
@@ -449,7 +449,7 @@ describe('Testing the accounting API', function() {
 				it('update context elements', function(done) {
 					var services = [{
 						path: '/v1/updateContext',
-						url: 'http://localhost:9020/v1/updateContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/updateContext'
 					}];
 					var resources = [{
 						offering: {
@@ -558,7 +558,7 @@ describe('Testing the accounting API', function() {
 				it('correct context unsubscription', function(done) {
 					var services = [{
 						path: '/v1/unsubscribeContext',
-						url: 'http://localhost:9020/v1/unsubscribeContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/unsubscribeContext'
 					}];
 					var resources = [{
 						offering: {
@@ -628,7 +628,7 @@ describe('Testing the accounting API', function() {
 				it('correct context subscription', function(done) {
 					var services = [{
 						path: '/v1/subscribeContext',
-						url: 'http://localhost:9020/v1/subscribeContext'
+						url: 'http://localhost:' + config_tests.integration.accounting_CB_port + '/v1/subscribeContext'
 					}];
 					var resources = [{
 						offering: {

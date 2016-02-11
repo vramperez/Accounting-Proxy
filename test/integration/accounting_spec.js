@@ -24,7 +24,7 @@ var logger_mock = { // Avoid display server information while running the tests
 }
 
 console.log('[LOG]: starting an endpoint for testing...');
-test_endpoint.run();
+test_endpoint.run(config_tests.integration.accounting_port);
 
 var api_mock = {
 	run: function(){}
@@ -117,7 +117,7 @@ describe('Testing the accounting API', function() {
 				it('correct (200) response from the service, call accounting', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost:9020/rest/example1'
+						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/example1'
 					}];
 					var resources = [{
 						offering: {
@@ -173,7 +173,7 @@ describe('Testing the accounting API', function() {
 				it('correct (200) response from the service, megabyte accounting', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost:9020/rest/example2'
+						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/example2'
 					}];
 					var resources = [{
 						offering: {
@@ -229,7 +229,7 @@ describe('Testing the accounting API', function() {
 				it('error (400) response from the service', function(done) {
 					var services = [{
 						path: '/public',
-						url: 'http://localhost:9020/rest/wrong'
+						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/wrong'
 					}];
 					var resources = [{
 						offering: {

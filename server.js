@@ -7,32 +7,9 @@ var express = require('express'),
     url = require('url'),
     bodyParser = require('body-parser'),
     async = require('async'),
-    winston = require('winston'),
-    request = require('request'),
-    mkdirp = require('mkdirp');
+    request = require('request');
 
 "use strict";
-
-var logger = new winston.Logger( {
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: './log/all-log',
-            colorize: false
-        }),
-        new winston.transports.Console({
-            level: 'info',
-            colorize: true
-        })
-    ],
-    exitOnError: false
-});
-
-mkdirp('./log', function(err) {
-    if (err) {
-        logger.info('Error creating "./log" path');
-    }
-});
 
 var db = require(config.database);
 db.init(); // Initialize the database
@@ -43,35 +20,36 @@ exports.init = function() {
     app.listen(app.get('port'));
 }
 
+var loadAccModules = function(callback) {
+    async.each(config.modules.accounting, function(module, task_callback) {
+        try {
+            acc_modules[module] = require('./acc_modules/' + module).count;
+        } catch (e) {
+            
+        }
+        task_callback();
+    }, callback);
+    for (var u in config.modules.accounting) {
+        try {
+            acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u]).count;
+        } catch (e) {
+            logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
+        }
+    }
+} 
+
+/**
+ * Call the notifier to send the accounting information to the WStore.
+ */
 var notify = function(callback) {
-    db.getApiKeys(function(err, api_keys) {
+    db.getNotificationInfo(function(err, notificationInfo) {
         if (err) {
             return callback(err);
-        } else if (api_keys.length == 0){
-            logger.log('debug', "No data availiable");
+        } else if (notificationInfo !== null) {
             return callback(null);
         } else {
-            async.each(api_keys, function(api_key, callback) {
-                db.getResources(api_key, function(err, resources) {
-                    if (err) {
-                        return callback(err);
-                    } else  if (resources.length == 0) {
-                        logger.log('debug', "No data availiable");
-                        return callback(null);
-                    } else {
-                        async.each(resources, function(resource, callback) {
-                            db.getNotificationInfo(api_key, resource, function(err, info) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    notifier.notify(info);
-                                    return callback(null);
-                                }
-                            });
-                        });
-                    }
-                });
-            });
+            notifier.notify(notificationInfo);
+            return callback(null);
         }
     });
 }
@@ -89,15 +67,6 @@ var job = cron.scheduleJob('00 00 * * *', function() {
     });
 });
 
-logger.info("Loading accounting modules...");
-// Load accounting modules
-for (var u in config.modules.accounting) {
-    try {
-        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u]).count;
-    } catch (e) {
-        logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
-    }
-}
 
 // Start ContextBroker Server for subscription notifications if it is enabled in the config
 if (config.resources.contextBroker) {

@@ -11,9 +11,9 @@ config.accounting_proxy = {
         port: 9000,
 
         /**
-        * Por where the accounting proxied is listening the Store notifications
-        */
-        store_port: 9001
+         * Por where the accounting proxied is listening the Store notifications
+         */
+        admin_port: 9001
 
 };
 
@@ -41,21 +41,10 @@ config.modules = {
 // Configures the WStore address and port
 config.WStore = {
 
-    /** 
-    * WStore host
-    */
-    accounting_host: 'localhost',
-
-    /** 
-    * WStore path for accounting notifications
-    */
-    accounting_path: '/api/contracting/',
-
-    /** 
-    * WStore port
-    */
-    accounting_port: 9010
-
+    /**
+     * WStore url for accounting notification
+     */
+    url: 'http://localhost:9010/charging/orderingManagement/accounting/'
 };
 
 // Resource configuration
@@ -63,14 +52,14 @@ config.WStore = {
 // Configures the resources accounted by the proxy
 config.resources = {
 
-    /* *
-    * Enabled if the resource accounted is Orion Context Broker
-    */
+    /**
+     * Enabled if the resource accounted is Orion Context Broker
+     */
     contextBroker: false,
 
-    /* *
-    * Port where the accounting proxy server is listening to subscription notifications
-    */
+    /**
+     * Port where the accounting proxy server is listening to subscription notifications
+     */
     notification_port: 9002
 
 };

@@ -9,11 +9,8 @@ exports.validate = function(type, body, callback) {
 	var validation_schema;
 
 	switch(type) {
-		case 'resource':
-			validation_schema = schemas.resource;
-			break;
-		case 'offer':
-			validation_schema = schemas.offer;
+		case 'product':
+			validation_schema = schemas.product;
 			break;
 	}
 	Joi.validate(body, validation_schema, function(err, data) {

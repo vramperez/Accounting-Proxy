@@ -113,13 +113,11 @@ exports.getService = function(publicPath, callback) {
  * @param  {string} url         Url to check.
  */
 exports.checkUrl = function(url, callback) {
-    console.log(url)
     db.all('SELECT * \
             FROM services \
             WHERE url=$url', {
                 $url: url
             }, function(err, services) {
-                console.log(services)
                 if (err) {
                     return callback(err, false);
                 } else if (services.length === 0) {
@@ -176,10 +174,32 @@ exports.checkRequest = function(customer, apiKey, callback) {
                     return callback(err, false);
                 } else if (user.length === 0) {
                     return callback(null, false);
-                } else if (user[0] !== customer) {
+                } else if (user[0].customer !== customer) {
                     return callback(null, false);
                 } else {
                     return callback(null, true);
+                }
+    });
+}
+
+/**
+ * Return the url and unit associated with the apiKey passed as argument.
+ * 
+ * @param  {string}   apiKey   Product identifier.
+ */
+exports.getAccountingInfo = function(apiKey, callback) {
+    db.all('SELECT accounting.unit, services.url, accounting.publicPath \
+            FROM accounting , services \
+            WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey', 
+            {
+                $apiKey: apiKey
+            }, function(err, accountingInfo) {
+                if (err) {
+                    return callback(err, null);
+                } else if (accountingInfo.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, accountingInfo[0]);
                 }
     });
 }
@@ -189,8 +209,8 @@ exports.checkRequest = function(customer, apiKey, callback) {
  * 
  */
 exports.getNotificationInfo = function(callback) {
-    db.all('SELECT orderId, productId, customer, value, correlationNumber, recordType, unit \
-            FROM accounting
+    db.all('SELECT apiKey, orderId, productId, customer, value, correlationNumber, recordType, unit \
+            FROM accounting \
             WHERE value!=0', 
             function(err, notificationInfo) {
                 if (err) {
@@ -198,7 +218,7 @@ exports.getNotificationInfo = function(callback) {
                 } else if (notificationInfo.length === 0) {
                     return callback(null, null);
                 } else {
-                    return callback(null, notificationInfo[0]);
+                    return callback(null, notificationInfo);
                 }
     });
 }
@@ -275,14 +295,14 @@ exports.resetAccounting = function(apiKey, callback) {
 exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, callback) {
     db.serialize(function() {
         db.run('INSERT OR REPLACE INTO subscriptions \
-                VALUES ($subscriptionId, $apiKey, $notificationUrl',
+                VALUES ($subscriptionId, $apiKey, $notificationUrl)',
                 {
                     $subscriptionId: subscriptionId,
                     $apiKey: apiKey,
                     $notificationUrl: notificationUrl
                 }, function(err) {
                     if (err) {
-                        return callabck(err);
+                        return callback(err);
                     } else {
                         return callback(null);
                     }
@@ -296,9 +316,9 @@ exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, ca
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.getCBSubscription = function(subscriptionId, callback) {
-    db.all('SELECT apiKey, notificationUrl \
-            FROM subscriptions \
-            WHERE subscriptionId=$subscriptionId',
+    db.all('SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
+            FROM subscriptions , accounting\
+            WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId',
             {
                 $subscriptionId: subscriptionId
             }, function(err, subscriptionInfo) {

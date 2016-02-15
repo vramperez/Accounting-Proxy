@@ -10,7 +10,7 @@ var db = require(config.database);
  * @param  {string} apiKey              Identifies the product.
  * @param  {Object} notificationInfo    Information for notify the WStore.
  */
-exports.notify = function(apiKey, notificationInfo) {
+exports.notify = function(notificationInfo, callback) {
     var body = {
         customer: notificationInfo.customer,
         timestamp: (new Date()).toISOString(),
@@ -36,13 +36,13 @@ exports.notify = function(apiKey, notificationInfo) {
         if (err) {
             // Log notification failed
         } else if (200 <= resp.statusCode && resp.statusCode <= 299 ) {
-            db.resetAccounting(apiKey, function(err) {
+            db.resetAccounting(notificationInfo.apiKey, function(err) {
                 if (err) {
-                    // Log resetAccounting failed
+                    return callback('Error while reseting the accounting after notify the WStore');
                 }
             });
         } else {
-            // Log notification failed
+            return callback('Error notifying the WStore');
         }
     });
 };

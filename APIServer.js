@@ -33,7 +33,6 @@ var checkUrl = function(req, res) {
         res.status(400).json({error: 'Incorrect body, url undefined'});
     } else {
         db.checkUrl(body.url, function(err, correct) {
-            console.log(err)
             if (err) {
                 res.status(500).send();
             } else if (correct) {

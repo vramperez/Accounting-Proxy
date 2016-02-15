@@ -1,83 +1,72 @@
-var proxy = require('../HTTP_Client/HTTPClient'),
+var request = require('request'),
  	subsUrls = require('./subsUrls'),
  	config = require('../config'),
  	express = require('express'),
  	acc_proxy = require('../server'),
  	url = require('url'),
  	bodyParser = require('body-parser'),
- 	async = require('async'),
- 	winston = require('winston');
+ 	async = require('async');
 
 var app = express();
 var db = require('../' + config.database);
-var logger = new winston.Logger( {
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: '../log/all-log',
-            colorize: false
-        }),
-        new winston.transports.Console({
-            level: 'info',
-            colorize: true
-        })
-    ],
-    exitOnError: false
-});
 
-// Initialize the endpoint
+/**
+ * Start the endopoint to receive CB notifications. 
+ */
 exports.run = function() {
 	app.listen(app.get('port'));
 };
 
-// Receive and manage CB subscribe notifications
-var notificationHandler = function(req, response) {
+/**
+ * Handles the notification from the CB; make the accounting and notify the user.
+ * 
+ * @param  {Object} req Incoming request.
+ * @param  {Object} res Outgoing response.
+ */
+var notificationHandler = function(req, res) {
 	var body = req.body;
 	var subscriptionId = body.subscriptionId;
 
 	db.getCBSubscription(subscriptionId, function(err, subscription) {
-		if (err != null || subscription == null) {
-			logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
+		console.log(subscription)
+		if (err != null || subscription === null) {
+			//logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
 		} else {
 			// Make accounting
-			acc_proxy.count(subscription.API_KEY, subscription.publicPath, subscription.unit, body, function(err) {
+			acc_proxy.count(subscription.apiKey, subscription.unit, body, function(err) {
 				if (err) {
-					logger.error('An error ocurred while making the accounting');
+					//logger.error('An error ocurred while making the accounting');
 				} else {
 					var options = {
-						host: subscription.ref_host,
-						port: subscription.ref_port,
-						path: subscription.ref_path,
-						method: 'POST',
-						headers: {
-							'content-type': 'application/json'
-						}
+						url: subscription.notificationUrl,
+						method: req.method,
+						headers: req.headers,
+						json: true,
+						body: body
 					}
-
-			    	// Send the response to the client
-			    	proxy.sendData('http', options, JSON.stringify(body), response, function(status, resp, headers) { 
-			    		response.statusCode = status;
-			    		for (var i in headers) {
-			    			response.setHeader(i, headers[i]);
-			    		}
-			    		response.send(resp);
-			    		if (status !== 200) {
-			    			logger.error('An error ocurred while notifying the subscription to: http://' + 
-			    				subscription.ref_host + ':' + subscription.ref_port + subscription.ref_path + '. Status: ' + status + ' ' + resp.statusMessage);
-			    		}
-			    	});
+					
+					request(options, function(error, resp, body) {
+						if (error)  {
+							// Logger.
+						}
+					});
 			    }
 			});
 		}
 	});
 };
 
-// Return the operation (subscribe/unsubscribe) based on the path
-exports.getOperation = function(privatePath, request, callback) {
+/**
+ * Return the operation associated with the path passed as argument.
+ * 
+ * @param  {string}   privatePath Path for the request.
+ * @param  {Object}   req         Incoming request.
+ */
+exports.getOperation = function(privatePath, req, callback) {
 	var operation = null;
 
 	async.forEachOf(subsUrls, function(entry, i, task_callback) {
-		if (request.method === subsUrls[i][0] && privatePath.toLowerCase().match(subsUrls[i][1])) {
+		if (req.method === subsUrls[i][0] && privatePath.toLowerCase().match(subsUrls[i][1])) {
 			operation = subsUrls[i][2];
 			task_callback();
 		} else {
@@ -88,81 +77,92 @@ exports.getOperation = function(privatePath, request, callback) {
 	});
 };
 
-
-// Manage the subscribe/unsubscribe Context Broker requests
-exports.requestHandler = function(request, response, service, unit, operation, callback) {
+/**
+ * Manage the subscribe/unsubscribe Context Broker requests.
+ * 
+ * @param  {Object}   req       Incoming request.
+ * @param  {Object}   res       Outgoing response.
+ * @param  {string}   url  		Context-Broker url. 
+ * @param  {string}   unit      Accounting unit.
+ * @param  {string}   operation Context Broker operation (subscribe, unsubscribe).
+ */
+exports.requestHandler = function(req, res, url, unit, operation, callback) {
 	var options = {
-		host: url.parse(service.url).hostname,
-		port: url.parse(service.url).port,
-		path: url.parse(service.url).pathname,
-		method: request.method,
+		url: url,
+		method: req.method,
+		json: true,
 		headers: {
 			'content-type': 'application/json',
 			'accept': 'application/json'
-		}
+		},
+		body: req.body
 	}
 
 	if (operation === 'subscribe') {
-		var req_body = request.body;
+		var req_body = req.body;
 		var reference_url = req_body.reference;
-		req_body.reference = 'http://localhost:/' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
-		// Send the request to the CB and redirect the response to the subscriber
-		proxy.sendData('http', options, JSON.stringify(req_body), response, function(status, resp, headers) {
-			var resp_body = JSON.parse(resp);
-			var subscriptionId = resp_body.subscribeResponse.subscriptionId;
-			response.statusCode = status;
-			for (var i in headers) {
-				response.setHeader(i, headers[i]);
-			}
-			
-			if (status === 200) {
-				// Store the endpoint information of the subscriber to be notified
+		req_body.reference = 'http://localhost:' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
 
-				db.addCBSubscription(request.get('X-API-KEY'), request.path, subscriptionId, url.parse(reference_url).hostname, 
-					url.parse(reference_url).port, url.parse(reference_url).pathname, unit, function(err){
-						if (err) {
-							response.send(resp_body);
-							return callback(err);
-						} else {
-							response.send(resp_body);
-							return callback(null);
-						}
-				});
+		// Send the request to the CB and redirect the response to the subscriber
+		request(options, function(error, resp, body) {
+			if (error) {
+				// Logger
 			} else {
-				response.send(resp_body);
-				return callback(null);
+				var subscriptionId = body.subscribeResponse.subscriptionId;
+				res.status(resp.statusCode);
+				async.forEachOf(resp.headers, function(header, key, task_callback) {
+	                res.setHeader(key, header);
+	                task_callback();
+	            }, function() { 
+	            	res.send(body);
+	            	if (resp.statusCode === 200) {
+	            		// Store the endpoint information of the subscriber to be notified
+	            		db.addCBSubscription(req.get('X-API-KEY'), subscriptionId, reference_url, function(err) {
+	            			if (err) {
+	            				return callback(err);
+	            			} else {
+	            				return callback(null);
+	            			}
+	            		})
+	            	} else {
+	            		return callback(null);
+	            	}
+	            });
 			}
 		});
 
 	} else if(operation === 'unsubscribe') {
 		var subscriptionId = '';
-		if (request.method === 'POST') {
-			subscriptionId = request.body.subscriptionId;
-		} else if (request.method === 'DELETE') {
+		if (req.method === 'POST') {
+			subscriptionId = req.body.subscriptionId;
+		} else if (req.method === 'DELETE') {
 			var pattern = /\/(\w+)$/;
-			var match = pattern.exec(request.path);
+			var match = pattern.exec(req.path);
 			subscriptionId = match[0];
 			subscriptionId = subscriptionId.replace('/', '');
 		}
 
 		// Sends the request to the CB and redirect the response to the subscriber
-		proxy.sendData('http', options, JSON.stringify(request.body), response, function(status, resp, headers) {
-			response.statusCode = status;
-			var resp_body = JSON.parse(resp);
-			for (var idx in headers) {
-				response.setHeader(idx, headers[idx]);
-			}
-			response.send(resp_body);
-			if (status === 200) {
-				db.deleteCBSubscription(subscriptionId, function(err){
-					if (err) {
-						return callback(err);
-					} else {
-						return callback(null);
-					}
-				});
+		request(options, function(error, resp, body) {
+			if (error) {
+				// Logger
 			} else {
-				return callback(null);
+				res.status(resp.statusCode);
+				async.forEachOf(resp.headers, function(header, key, task_callback) {
+	                res.setHeader(key, header);
+	                task_callback();
+	            }, function() { 
+	            	res.send(body);
+	            	if (resp.statusCode === 200) {
+	            		db.deleteCBSubscription(subscriptionId, function(err) {
+	            			if (err) {
+	            				return callback(err);
+	            			} else {
+	            				return callback(null);
+	            			}
+	            		})
+	            	}
+	            });
 			}
 		});
 	}   

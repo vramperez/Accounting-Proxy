@@ -23,7 +23,7 @@ config.resource = {
         /**
         * API paths for administration
         */
-        admin_paths: ['/api/users', 'api/resources', '/api/users/keys']
+        admin_paths: ['/api/checkUrl', '/api/newBuy']
     },
 
     proxy: {

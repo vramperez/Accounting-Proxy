@@ -42,11 +42,11 @@ cli
     .description('Get service\'s information.')
     .action(function(publicPath) {
         if (/\/((\w+)\/?)*$/.test(publicPath)){
-            db.getService(publicPath, function(err, data) {
-                if(err || data === null) {
+            db.getService(publicPath, function(err, url) {
+                if(err || url === null) {
                     console.log('No service avaliable for path: ' + publicPath);
                 } else {
-                    console.log("url: " + data['url']);
+                    console.log("url: " + url);
                 }
             });
         } else {

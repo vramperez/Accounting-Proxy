@@ -34,6 +34,18 @@ exports.init = function() {
         contextBroker = require('./orion_context_broker/cb_handler');
         contextBroker.run();
     }
+    /* Create daemon to update WStore every day
+     * Cron format:
+     * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+     */
+    cron.scheduleJob('00 00 * * *', function() {
+        //logger.info('Sending accounting information...');
+        notify(function(err) {
+            if (err) {
+                //logger.error('Error while notifying the WStore');
+            }
+        });
+    });
     app.listen(app.get('port'));
     api.run();
 }
@@ -74,19 +86,6 @@ var notify = function(callback) {
         }
     });
 }
-
-/* Create daemon to update WStore every day
- * Cron format:
- * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
- */
-var job = cron.scheduleJob('00 00 * * *', function() {
-    logger.info('Sending accounting information...');
-    notify(function(err) {
-        if (err) {
-            logger.error('Error while notifying the WStore');
-        }
-    });
-});
 
 /**
  * Auxiliar function for making the accounting.
@@ -129,7 +128,6 @@ var CBrequestHandler = function(req, res, options, unit) {
         } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.requestHandler(req, res, options.url, unit, operation, function(err) {
                 if (err) {
-                    console.log(err)
                     //logger.error('Error processing CB request');
                 } 
             });
@@ -137,7 +135,7 @@ var CBrequestHandler = function(req, res, options, unit) {
             request(options, function(error, resp, body) {
                 if (error) {
                     res.status(500).send(error);
-                    logger.warn("An error ocurred requesting Context-Broker");
+                    //logger.warn("An error ocurred requesting Context-Broker");
                 } else {
                     async.forEachOf(resp.headers, function(header, key, task_callback) {
                         res.setHeader(key, header);
@@ -241,7 +239,7 @@ var handler = function(req, res) {
                     } else {
                         getEndpointPath(req.path, accountingInfo.publicPath, function(err, path) {
                             if (err) {
-                                res.status(400).json({ error: 'Invalid public path ' + req.path})
+                                res.status(400).json({ error: 'Invalid public path ' + req.path});
                             } else {
                                 var options = {
                                     url: accountingInfo.url + path,

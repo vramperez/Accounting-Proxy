@@ -102,7 +102,7 @@ exports.getService = function(publicPath, callback) {
                 } else if (service.length ===  0){
                     return callback(null, null);
                 } else {
-                    return callback(null, service[0]);
+                    return callback(null, service[0].url);
                 }
     });
 }
@@ -183,7 +183,7 @@ exports.checkRequest = function(customer, apiKey, callback) {
 }
 
 /**
- * Return the url and unit associated with the apiKey passed as argument.
+ * Return the url, unit and publicPath associated with the apiKey passed as argument.
  * 
  * @param  {string}   apiKey   Product identifier.
  */
@@ -230,29 +230,33 @@ exports.getNotificationInfo = function(callback) {
  * @param  {float} amount       Amount to account.
  */
 exports.makeAccounting = function(apiKey, amount, callback) {
-    db.beginTransaction(function(err, transaction) {
-        if (err) {
-            return callback(err);
-        } else {
-            transaction.run(
-                'UPDATE accounting \
-                SET value=value+$amount \
-                WHERE apiKey=$apiKey',
-                {
-                    $apiKey: apiKey,
-                    $amount: amount
-                }, function(err) {
-                    if (err) {
-                        transaction.rollback();
-                        return callback(err);
-                    } else {
-                        transaction.commit(function (error) {
-                            return callback(error);
-                        });
-                    }
-            });
-        }
-    });
+    if (amount < 0) {
+        return calback('[ERROR] The aomunt must be greater than 0');
+    } else {
+        db.beginTransaction(function(err, transaction) {
+            if (err) {
+                return callback(err);
+            } else {
+                transaction.run(
+                    'UPDATE accounting \
+                    SET value=value+$amount \
+                    WHERE apiKey=$apiKey',
+                    {
+                        $apiKey: apiKey,
+                        $amount: amount
+                    }, function(err) {
+                        if (err) {
+                            transaction.rollback();
+                            return callback(err);
+                        } else {
+                            transaction.commit(function (error) {
+                                return callback(error);
+                            });
+                        }
+                });
+            }
+        });
+    }
 }
 
 /**

@@ -19,14 +19,13 @@ exports.notify = function(notificationInfo, callback) {
         recordType: notificationInfo.recordType,
         unit: notificationInfo.unit
     }
-    
+
     var options = {
-        url: config.WStore.url + '/' + notificationInfo.orderId + '/' + notificationInfo.productId,
+        url: config.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId,
         json: true,
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': body.length
+            'Content-Type': 'application/json'
             // Acces Token or something in the headers for the WStore pep-proxy
         },
         body: body

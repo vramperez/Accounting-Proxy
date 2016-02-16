@@ -30,7 +30,7 @@ var checkUrl = function(req, res) {
     if (! req.is('application/json')) {
         res.status(415).json({error: 'Content-Type must be "application/json"'});
     } else if (body.url === undefined) {
-        res.status(400).json({error: 'Incorrect body, url undefined'});
+        res.status(400).json({error: 'Invalid body, url undefined'});
     } else {
         db.checkUrl(body.url, function(err, correct) {
             if (err) {
@@ -73,7 +73,7 @@ var newBuy = function(req, res) {
                         recordType: body.productSpecification.recordType
                     }, function(err) {
                         if (err) {
-                            res.status(500).send();
+                            res.status(400).send();
                         } else {
                             res.status(201).send();
                         }

@@ -28,7 +28,6 @@ var notificationHandler = function(req, res) {
 	var subscriptionId = body.subscriptionId;
 
 	db.getCBSubscription(subscriptionId, function(err, subscription) {
-		console.log(subscription)
 		if (err != null || subscription === null) {
 			//logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
 		} else {
@@ -160,7 +159,7 @@ exports.requestHandler = function(req, res, url, unit, operation, callback) {
 	            			} else {
 	            				return callback(null);
 	            			}
-	            		})
+	            		});
 	            	}
 	            });
 			}

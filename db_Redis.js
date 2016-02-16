@@ -95,6 +95,7 @@ exports.newBuy = function(buyInformation, callback) {
 	var multi = db.multi();
 
 	multi.sadd(['apiKeys', buyInformation.apiKey]);
+	multi.sadd([buyInformation.customer, buyInformation.apiKey]);
 	multi.hmset(buyInformation.apiKey, {
 		publicPath: buyInformation.publicPath,
 		orderId: buyInformation.orderId,
@@ -110,6 +111,46 @@ exports.newBuy = function(buyInformation, callback) {
 			return callback(err);
 		} else {
 			return callback(null);
+		}
+	});
+}
+
+/**
+ * Return the api-keys, productId and orderId associated with the user passed as argument.
+ * 
+ * @param  {string}   user     Customer identifier.
+ */
+exports.getApiKeys = function(user, callback) {
+	var toReturn = [];
+
+	db.smembers(user, function(err, apiKeys) {
+		if (err) {
+			return callback(err, null);
+		} else if (apiKeys === null) {
+			return callback(null, null);
+		} else {
+			async.each(apiKeys, function(apiKey, task_callback) {
+				db.hgetall(apiKey, function(err, accountingInfo) {
+					if (err) {
+						return task_callback(err);
+					} else {
+						toReturn.push({
+							apiKey: apiKey,
+							productId: accountingInfo.productId,
+							orderId: accountingInfo.orderId
+						});
+						task_callback(null);
+					}
+				});
+			}, function(err) {
+				if (err) {
+					return callback(err, null);
+				} else if (toReturn.length !== 0){
+					return callback(null, toReturn);
+				} else {
+					return callback(null, null);
+				}
+			});
 		}
 	});
 }
@@ -174,7 +215,7 @@ exports.getNotificationInfo = function(callback) {
 				db.hgetall(apiKey, function(err, accountingInfo) {
 					if (err) {
 						task_callback(err);
-					} else if (accountingInfo.value === 0) {
+					} else if (parseFloat(accountingInfo.value) === 0) {
 						task_callback(null);
 					} else {
 						notificationInfo.push({
@@ -218,7 +259,7 @@ exports.makeAccounting = function(apiKey, amount, callback) {
 				return callback(err);
 			} else {
 				multi.hmset(apiKey, {
-					value: (parseFloat(num) + amount).toString()
+					value: parseFloat(num) + amount
 				});
 				multi.exec(function(err) {
 					if (err) {

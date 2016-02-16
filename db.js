@@ -158,6 +158,28 @@ exports.newBuy = function(buyInformation, callback) {
 }
 
 /**
+ * Return the api-keys, productId and orderId associated with the user passed as argument.
+ * 
+ * @param  {string}   user     Customer identifier.
+ */
+exports.getApiKeys = function(user, callback) {
+    db.all('SELECT apiKey, productId, orderId \
+            FROM accounting \
+            WHERE customer=$user',
+            {
+                $user: user
+            }, function(err, apiKeys) {
+                if (err) {
+                    return callback(err, null);
+                } else if (apiKeys.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, apiKeys);
+                }
+    });
+}
+
+/**
  * Check if the user is associated with the apiKey (return true) or not (return false).
  * 
  * @param  {string} customer    User identifier.

@@ -5,7 +5,8 @@ var request = require('request'),
  	acc_proxy = require('../server'),
  	url = require('url'),
  	bodyParser = require('body-parser'),
- 	async = require('async');
+ 	async = require('async')
+ 	logger = require('../accounting-proxy').logger;
 
 var app = express();
 var db = require('../' + config.database);
@@ -29,12 +30,12 @@ var notificationHandler = function(req, res) {
 
 	db.getCBSubscription(subscriptionId, function(err, subscription) {
 		if (err != null || subscription === null) {
-			//logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
+			logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
 		} else {
 			// Make accounting
 			acc_proxy.count(subscription.apiKey, subscription.unit, body, function(err) {
 				if (err) {
-					//logger.error('An error ocurred while making the accounting');
+					logger.error('An error ocurred while making the accounting');
 				} else {
 					var options = {
 						url: subscription.notificationUrl,
@@ -46,7 +47,7 @@ var notificationHandler = function(req, res) {
 					
 					request(options, function(error, resp, body) {
 						if (error)  {
-							// Logger.
+							logger.error('An error ocurred notifying the user, url: ' + options.url);
 						}
 					});
 			    }
@@ -105,7 +106,7 @@ exports.requestHandler = function(req, res, url, unit, operation, callback) {
 		// Send the request to the CB and redirect the response to the subscriber
 		request(options, function(error, resp, body) {
 			if (error) {
-				// Logger
+				logger.error('Error sending the subscription to the CB');
 			} else {
 				var subscriptionId = body.subscribeResponse.subscriptionId;
 				res.status(resp.statusCode);
@@ -144,7 +145,7 @@ exports.requestHandler = function(req, res, url, unit, operation, callback) {
 		// Sends the request to the CB and redirect the response to the subscriber
 		request(options, function(error, resp, body) {
 			if (error) {
-				// Logger
+				logger.error('Error sending the unsubscription to the CB');
 			} else {
 				res.status(resp.statusCode);
 				async.forEachOf(resp.headers, function(header, key, task_callback) {
@@ -165,7 +166,7 @@ exports.requestHandler = function(req, res, url, unit, operation, callback) {
 			}
 		});
 	}   
-};
+}
 
 app.use(bodyParser.json());
 app.set('port', config.resources.notification_port);

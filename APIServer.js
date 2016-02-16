@@ -25,13 +25,16 @@ exports.run = function() {
  */
 var checkUrl = function(req, res) {
     req.setEncoding('utf-8');
-    var body = req.body
+    var body = req.body;
 
     if (! req.is('application/json')) {
         res.status(415).json({error: 'Content-Type must be "application/json"'});
     } else if (body.url === undefined) {
         res.status(400).json({error: 'Invalid body, url undefined'});
     } else {
+        if (body.token !== undefined) { //Save the token to notify the WStore
+            WStoreToken = body.token;
+        }
         db.checkUrl(body.url, function(err, correct) {
             if (err) {
                 res.status(500).send();
@@ -75,10 +78,34 @@ var newBuy = function(req, res) {
                         if (err) {
                             res.status(400).send();
                         } else {
-                            res.status(201).send();
+                            res.status(201).json({'API-KEY': apiKey});
                         }
                     });
                 });
+            }
+        });
+    }
+}
+
+/**
+ * Return the apiKey, productId and orderId for each product bought by the user.
+ * 
+ * @param  {Object} req Incoming request.
+ * @param  {Object} res Outgoing response.
+ */
+var getApiKeys = function(req, res) {
+    var user = req.get('X-Actor-ID');
+
+    if (user === undefined) {
+        res.status(400).json({error: 'Undefined "X-Actor-ID" header'});
+    } else {
+        db.getApiKeys(user, function(err, apiKeysInfo) {
+            if (err) {
+                res.status(500).send();
+            } else if (apiKeysInfo === null) {
+                res.status(400).send();
+            } else {
+                res.status(200).json(apiKeysInfo);
             }
         });
     }
@@ -102,7 +129,8 @@ var generateApiKey = function(productId, orderId, customer, callback) {
 app.set('port', config.accounting_proxy.admin_port);
 app.use(bodyParser.json());
 
-app.post('/api/checkUrl', checkUrl);
-app.post('/api/newBuy', newBuy);
+app.post('/api/resources', checkUrl);
+app.post('/api/users', newBuy);
+app.get('/api/users/keys', getApiKeys);
 
 module.exports.app = app;

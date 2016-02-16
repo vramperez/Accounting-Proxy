@@ -13,24 +13,26 @@ var express = require('express'),
 var db = require(config.database); 
 var app = express();
 var acc_modules = {};
+var logger;
 
 /**
  * Start and configure the server.
  */
 exports.init = function() {
+    logger = require('./accounting-proxy').logger
     db.init();
     loadAccModules(function(err) {
         if (err) {
-            // Logger err.
+            logger.error(err);
         }
     });
     notify(function(err) {
         if (err) {
-            // Logger err.
+            logger.error('Error while notifying the WStore: ' + err);
         }
     });
     if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
-        // logger.info("Loading module for Orion Context Broker...");
+        logger.info("Loading module for Orion Context Broker...");
         contextBroker = require('./orion_context_broker/cb_handler');
         contextBroker.run();
     }
@@ -39,10 +41,10 @@ exports.init = function() {
      * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
      */
     cron.scheduleJob('00 00 * * *', function() {
-        //logger.info('Sending accounting information...');
+        logger.info('Sending accounting information...');
         notify(function(err) {
             if (err) {
-                //logger.error('Error while notifying the WStore');
+                logger.error('Error while notifying the WStore: ' + err);
             }
         });
     });
@@ -54,11 +56,12 @@ exports.init = function() {
  * Load the necessary accounting modules.
  */
 var loadAccModules = function(callback) {
+    logger.info("Loading accounting modules...");
     async.each(config.modules.accounting, function(module, task_callback) {
         try {
             acc_modules[module] = require('./acc_modules/' + module).count;
         } catch (e) {
-            task_callback(e);
+            task_callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' +  module, module);
         }
         task_callback();
     }, callback);
@@ -75,6 +78,7 @@ var notify = function(callback) {
             return callback(null);
         } else {
             async.each(notificationInfo, function(info, task_callback) {
+                console.log(info)
                 notifier.notify(info, function(err) {
                     if (err) {
                         task_callback(err);
@@ -124,18 +128,18 @@ var CBrequestHandler = function(req, res, options, unit) {
 
     contextBroker.getOperation(url.parse(options.url).pathname, req, function(err, operation) {
         if (err) {
-            //logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
+            logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
         } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.requestHandler(req, res, options.url, unit, operation, function(err) {
                 if (err) {
-                    //logger.error('Error processing CB request');
+                    logger.error('Error processing CB request');
                 } 
             });
         } else {
             request(options, function(error, resp, body) {
                 if (error) {
                     res.status(500).send(error);
-                    //logger.warn("An error ocurred requesting Context-Broker");
+                    logger.warn("An error ocurred requesting Context-Broker");
                 } else {
                     async.forEachOf(resp.headers, function(header, key, task_callback) {
                         res.setHeader(key, header);
@@ -143,7 +147,7 @@ var CBrequestHandler = function(req, res, options, unit) {
                     }, function() {
                          exports.count(apiKey, unit, body, function(err){
                             if(err) {
-                                //logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                                logger.warn("[%s] An error ocurred while making the accounting", apiKey);
                             }
                             res.send(body);
                         });
@@ -170,7 +174,7 @@ var requestHandler = function(req, res, options, unit) {
     request(options, function(error, resp, body) {
         if (error) {
             res.status(500).send(error);
-            //logger.warn("An error ocurred requesting the endpoint");
+            logger.warn("An error ocurred requesting the endpoint");
         } else {
             async.forEachOf(resp.headers, function(header, key, task_callback) {
                 res.setHeader(key, header);
@@ -178,7 +182,7 @@ var requestHandler = function(req, res, options, unit) {
             }, function() {
                  exports.count(apiKey, unit, body, function(err){
                     if(err) {
-                        //logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                        logger.warn("[%s] An error ocurred while making the accounting", apiKey);
                     }
                     res.send(body);
                 });
@@ -217,11 +221,11 @@ var handler = function(req, res) {
     var apiKey = req.get('X-API-KEY');
 
     if(user === undefined) {
-        //logger.log('debug', "[%s] Undefined username", API_KEY);
+        logger.log('debug', "[%s] Undefined username", apiKey);
         res.status(400).json({ error: 'Undefined "X-Actor-ID" header'});
 
     } else if (apiKey === undefined) {
-        //logger.log('debug', "[%s] Undefined API_KEY", API_KEY);
+        logger.log('debug', "[%s] Undefined API_KEY", apiKey);
         res.status(400).json({ error: 'Undefined "X-API-KEY" header'});
 
     } else {

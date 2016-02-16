@@ -1,5 +1,6 @@
 var http = require('http'),
     config = require('./config'),
+    proxy = require('./APIServer.js'),
     request = require('request');
 
 var db = require(config.database);
@@ -26,14 +27,14 @@ exports.notify = function(notificationInfo, callback) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
-            // Acces Token or something in the headers for the WStore pep-proxy
+            //'X-Auth-Token': token 
         },
         body: body
     }
 
     request(options, function(err, resp, body) {
         if (err) {
-            // Log notification failed
+            return callback('Error notifying the WStore');
         } else if (200 <= resp.statusCode && resp.statusCode <= 299 ) {
             db.resetAccounting(notificationInfo.apiKey, function(err) {
                 if (err) {

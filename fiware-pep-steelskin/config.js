@@ -23,7 +23,7 @@ config.resource = {
         /**
         * API paths for administration
         */
-        admin_paths: ['/api/checkUrl', '/api/newBuy']
+        admin_paths: ['/api/resources', '/api/users', '/api/users/keys']
     },
 
     proxy: {
@@ -76,7 +76,7 @@ config.access = {
  */
 config.authentication = {
     checkHeaders: true,
-    module: 'keystone',
+    module: 'idm',
     user: 'pepproxy',
     password: 'pepproxy',
     domainName: 'admin_domain',
@@ -87,7 +87,7 @@ config.authentication = {
         roles: 60
     },
     options: {
-        protocol: 'http',
+        protocol: 'https',
         host: 'localhost',
         port: 5000,
         path: '/v3/role_assignments',

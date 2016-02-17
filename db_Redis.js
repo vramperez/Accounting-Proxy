@@ -29,7 +29,48 @@ exports.newService = function(publicPath, url, callback) {
 }
 
 /**
- * Delete the service.
+ * Return apiKeys associated with the public path passed as argument.
+ * 
+ * @param  {string}   publicPath Service public path.
+ */
+var associatedApiKeys = function(publicPath, callback) {
+	db.smembers(publicPath, function(err, apiKeys) {
+		if (err) {
+			return callback(err, null);
+		} else {
+			return callback(null, apiKeys);
+		}
+	});
+}
+
+/**
+ * Return subscriptions identifiers associated with the api-keys passed as argument.
+ * 
+ * @param  {Array}   apiKeys  Api-keys array.
+ */
+var associatedSubscriptions = function(apiKeys, callback) {
+	async.each(apiKeys, function(apiKey, task_callback) {
+		db.smembers(apiKey + 'subs', function(err, subscriptions) {
+			if (err) {
+				task_callback(err);
+			} else if (subscriptions === null) { 
+				task_callback(null);
+			} else {
+				apiKeys.push.apply(apiKeys, subscriptions);
+				task_callback(null);
+			}
+		});
+	}, function(err) {
+		if (err) {
+			return callback(err);
+		} else {
+			return callback(null, apiKeys);
+		}
+	});
+}
+
+/**
+ * Delete the service and delete on cascade all the information associated with this service.
  * 
  * @param  {string} publicPath      Public path for the users.
  */
@@ -37,11 +78,35 @@ exports.deleteService = function(publicPath, callback) {
 	var multi = db.multi();
 
 	multi.hdel('services', publicPath);
-	multi.exec(function(err) {
+	multi.del(publicPath);
+	async.waterfall([
+		async.apply(associatedApiKeys, publicPath),
+		associatedSubscriptions,
+	], function(err, keys) {
 		if (err) {
 			return callback(err);
 		} else {
-			return callback(null);
+			async.each(keys, function(key, task_callback) {
+				db.hget(key, 'customer', function(err, customer) {
+					if (err) {
+						task_callback(err);
+					} else {
+						multi.srem(customer, key);
+						multi.del(key);
+						multi.del(key + 'subs');
+						multi.srem('apiKeys', key);
+						task_callback(null);
+					}
+				});
+			}, function() {
+				multi.exec(function(err) {
+					if (err) {
+						return callback(err);
+					} else {
+						return callback(null);
+					}
+				});
+			});
 		}
 	});
 }
@@ -81,7 +146,7 @@ exports.checkUrl = function(url, callback) {
 				}
 			}, function() {
 				return callback(null, false);
-			})
+			});
 		}
 	});
 }
@@ -95,6 +160,7 @@ exports.newBuy = function(buyInformation, callback) {
 	var multi = db.multi();
 
 	multi.sadd(['apiKeys', buyInformation.apiKey]);
+	multi.sadd([buyInformation.publicPath, buyInformation.apiKey]);
 	multi.sadd([buyInformation.customer, buyInformation.apiKey]);
 	multi.hmset(buyInformation.apiKey, {
 		publicPath: buyInformation.publicPath,
@@ -308,10 +374,14 @@ exports.resetAccounting = function(apiKey, callback) {
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  */
 exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, callback) {
-	db.hmset(subscriptionId, {
+	var multi = db.multi();
+
+	multi.sadd([apiKey + 'subs', subscriptionId]);
+	multi.hmset(subscriptionId, {
 		apiKey: apiKey,
 		notificationUrl: notificationUrl
-	}, function(err) {
+	});
+	multi.exec(function(err) {
 		if (err) {
 			return callback(err);
 		} else {
@@ -353,7 +423,17 @@ exports.getCBSubscription = function(subscriptionId, callback) {
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.deleteCBSubscription = function(subscriptionId, callback) {
-	db.del(subscriptionId, function(err) {
+	var multi = db.multi();
+
+	db.hget(subscriptionId, 'apiKey', function(err, apiKey) {
+		if (err) {
+			return callback(err);
+		} else {
+			multi.srem(apiKey + 'subs', subscriptionId);
+		}
+	});
+	multi.del(subscriptionId);
+	multi.exec(function(err) {
 		if (err) {
 			return callback(err);
 		} else {

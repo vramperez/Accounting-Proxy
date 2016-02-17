@@ -78,7 +78,6 @@ var notify = function(callback) {
             return callback(null);
         } else {
             async.each(notificationInfo, function(info, task_callback) {
-                console.log(info)
                 notifier.notify(info, function(err) {
                     if (err) {
                         task_callback(err);

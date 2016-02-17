@@ -33,7 +33,7 @@ exports.init = function() {
                     recordType          TEXT, \
                     correlationNumber   TEXT, \
                     PRIMARY KEY (apiKey), \
-                    FOREIGN KEY (publicPath) REFERENCES services (publicPath) \
+                    FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE\
         )');
 
         db.run('CREATE TABLE IF NOT EXISTS subscriptions ( \
@@ -41,7 +41,7 @@ exports.init = function() {
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
                     PRIMARY KEY (subscriptionId), \
-                    FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) \
+                    FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
         )');
     });
 };

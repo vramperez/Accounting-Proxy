@@ -66,7 +66,6 @@ exports.addToken = function(token, callback) {
                         $token: token
                     }, function(err) {
                         if (err) {  
-                            console.log(err)
                             return callback(err);
                         } else {
                             return callback(null);
@@ -87,7 +86,6 @@ exports.getToken = function(callback) {
             if (err) {
                 return callback(err, null);
             } else {
-                console.log(token)
                 return callback(null, token[0].token);
             }
     });
@@ -146,7 +144,7 @@ exports.getService = function(publicPath, callback) {
             }, function(err, service) {
                 if (err) {
                     return callback(err, null);
-                } else if (service.length ===  0){
+                } else if (service.length ===  0) {
                     return callback(null, null);
                 } else {
                     return callback(null, service[0].url);
@@ -300,7 +298,7 @@ exports.getNotificationInfo = function(callback) {
  */
 exports.makeAccounting = function(apiKey, amount, callback) {
     if (amount < 0) {
-        return calback('[ERROR] The aomunt must be greater than 0');
+        return callback('[ERROR] The aomunt must be greater than 0');
     } else {
         db.beginTransaction(function(err, transaction) {
             if (err) {

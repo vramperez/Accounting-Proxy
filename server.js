@@ -19,7 +19,7 @@ var logger;
  * Start and configure the server.
  */
 exports.init = function() {
-    logger = require('./accounting-proxy').logger
+    logger = require('./accounting-proxy').logger;
     db.init();
     loadAccModules(function(err) {
         if (err) {

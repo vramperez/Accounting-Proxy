@@ -16,6 +16,10 @@ exports.init = function() {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
 
+        db.run('CREATE TABLE IF NOT EXISTS token ( \
+                token               TEXT \
+        )');
+
         db.run('CREATE TABLE IF NOT EXISTS services ( \
                     publicPath      TEXT, \
                     url             TEXT, \
@@ -45,6 +49,49 @@ exports.init = function() {
         )');
     });
 };
+
+/**
+ * Save the token to notify the WStore.
+ */
+exports.addToken = function(token, callback) {
+    db.serialize(function() {
+        db.run('DELETE FROM token', 
+        function(err) {
+            if (err) {
+                return callback(err);
+            } else {
+                db.run('INSERT OR REPLACE INTO token \
+                    VALUES ($token)',
+                    {
+                        $token: token
+                    }, function(err) {
+                        if (err) {  
+                            console.log(err)
+                            return callback(err);
+                        } else {
+                            return callback(null);
+                        }
+                    });
+            }
+        });
+    });
+}
+
+/**
+ * Return the token to notify the WStore.
+ */
+exports.getToken = function(callback) {
+    db.all('SELECT * \
+            FROM token', 
+        function(err, token) {
+            if (err) {
+                return callback(err, null);
+            } else {
+                console.log(token)
+                return callback(null, token[0].token);
+            }
+    });
+}
 
 /**
  * Map the publicPath with the endpoint url.

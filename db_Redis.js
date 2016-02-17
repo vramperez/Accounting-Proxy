@@ -1,5 +1,5 @@
 var redis = require('redis'),
-	async = require('async');
+    async = require('async');
 
 var db = redis.createClient();
 
@@ -8,6 +8,35 @@ var db = redis.createClient();
 */
 exports.init = function() {};
 
+/**
+ * Save the token to notify the WStore.
+ */
+exports.addToken = function(token, callback) {
+    var multi = db.multi();
+
+    multi.del('token');
+    multi.sadd(['token', token]);
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
+}
+
+/**
+ * Return the token to notify the WStore.
+ */
+exports.getToken = function(callback) {
+    db.smembers('token', function(err, token) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, token[0]);
+        }
+    });
+}
 
 /**
  * Map the publicPath with the endpoint url.
@@ -16,16 +45,16 @@ exports.init = function() {};
  * @param  {string} url             Endpoint url.
  */
 exports.newService = function(publicPath, url, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	multi.hmset('services', publicPath, url);
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
+    multi.hmset('services', publicPath, url);
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }
 
 /**
@@ -34,13 +63,13 @@ exports.newService = function(publicPath, url, callback) {
  * @param  {string}   publicPath Service public path.
  */
 var associatedApiKeys = function(publicPath, callback) {
-	db.smembers(publicPath, function(err, apiKeys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			return callback(null, apiKeys);
-		}
-	});
+    db.smembers(publicPath, function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, apiKeys);
+        }
+    });
 }
 
 /**
@@ -49,24 +78,24 @@ var associatedApiKeys = function(publicPath, callback) {
  * @param  {Array}   apiKeys  Api-keys array.
  */
 var associatedSubscriptions = function(apiKeys, callback) {
-	async.each(apiKeys, function(apiKey, task_callback) {
-		db.smembers(apiKey + 'subs', function(err, subscriptions) {
-			if (err) {
-				task_callback(err);
-			} else if (subscriptions === null) { 
-				task_callback(null);
-			} else {
-				apiKeys.push.apply(apiKeys, subscriptions);
-				task_callback(null);
-			}
-		});
-	}, function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null, apiKeys);
-		}
-	});
+    async.each(apiKeys, function(apiKey, task_callback) {
+        db.smembers(apiKey + 'subs', function(err, subscriptions) {
+            if (err) {
+                task_callback(err);
+            } else if (subscriptions === null) { 
+                task_callback(null);
+            } else {
+                apiKeys.push.apply(apiKeys, subscriptions);
+                task_callback(null);
+            }
+        });
+    }, function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null, apiKeys);
+        }
+    });
 }
 
 /**
@@ -75,40 +104,40 @@ var associatedSubscriptions = function(apiKeys, callback) {
  * @param  {string} publicPath      Public path for the users.
  */
 exports.deleteService = function(publicPath, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	multi.hdel('services', publicPath);
-	multi.del(publicPath);
-	async.waterfall([
-		async.apply(associatedApiKeys, publicPath),
-		associatedSubscriptions,
-	], function(err, keys) {
-		if (err) {
-			return callback(err);
-		} else {
-			async.each(keys, function(key, task_callback) {
-				db.hget(key, 'customer', function(err, customer) {
-					if (err) {
-						task_callback(err);
-					} else {
-						multi.srem(customer, key);
-						multi.del(key);
-						multi.del(key + 'subs');
-						multi.srem('apiKeys', key);
-						task_callback(null);
-					}
-				});
-			}, function() {
-				multi.exec(function(err) {
-					if (err) {
-						return callback(err);
-					} else {
-						return callback(null);
-					}
-				});
-			});
-		}
-	});
+    multi.hdel('services', publicPath);
+    multi.del(publicPath);
+    async.waterfall([
+        async.apply(associatedApiKeys, publicPath),
+        associatedSubscriptions,
+    ], function(err, keys) {
+        if (err) {
+            return callback(err);
+        } else {
+            async.each(keys, function(key, task_callback) {
+                db.hget(key, 'customer', function(err, customer) {
+                    if (err) {
+                        task_callback(err);
+                    } else {
+                        multi.srem(customer, key);
+                        multi.del(key);
+                        multi.del(key + 'subs');
+                        multi.srem('apiKeys', key);
+                        task_callback(null);
+                    }
+                });
+            }, function() {
+                multi.exec(function(err) {
+                    if (err) {
+                        return callback(err);
+                    } else {
+                        return callback(null);
+                    }
+                });
+            });
+        }
+    });
 }
 
 /**
@@ -117,15 +146,15 @@ exports.deleteService = function(publicPath, callback) {
  * @param  {string} publicPath      Public path for the users.
  */
 exports.getService = function(publicPath, callback) {
-	db.hget('services', publicPath, function(err, url) {
-		if (err) {
-			return callback(err, null);
-		} else if (url === null){
-			return callback(null, null);
-		} else {
-			return callback(null, url);
-		}
-	});
+    db.hget('services', publicPath, function(err, url) {
+        if (err) {
+            return callback(err, null);
+        } else if (url === null){
+            return callback(null, null);
+        } else {
+            return callback(null, url);
+        }
+    });
 }
 
 /**
@@ -134,21 +163,21 @@ exports.getService = function(publicPath, callback) {
  * @param  {string} url         Url to check.
  */
 exports.checkUrl = function(url, callback) {
-	db.hgetall('services', function(err, services) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(services, function(value, task_callback) {
-				if (value === url) {
-					return callback(null, true);
-				} else {
-					task_callback(null);
-				}
-			}, function() {
-				return callback(null, false);
-			});
-		}
-	});
+    db.hgetall('services', function(err, services) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            async.each(services, function(value, task_callback) {
+                if (value === url) {
+                    return callback(null, true);
+                } else {
+                    task_callback(null);
+                }
+            }, function() {
+                return callback(null, false);
+            });
+        }
+    });
 }
 
 /**
@@ -157,28 +186,28 @@ exports.checkUrl = function(url, callback) {
  * @param  {object} buyInformation      Information received from the WStore.  
  */
 exports.newBuy = function(buyInformation, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	multi.sadd(['apiKeys', buyInformation.apiKey]);
-	multi.sadd([buyInformation.publicPath, buyInformation.apiKey]);
-	multi.sadd([buyInformation.customer, buyInformation.apiKey]);
-	multi.hmset(buyInformation.apiKey, {
-		publicPath: buyInformation.publicPath,
-		orderId: buyInformation.orderId,
-		productId: buyInformation.productId,
-		customer: buyInformation.customer,
-		unit: buyInformation.unit,
-		value: 0,
-		recordType: buyInformation.recordType,
-		correlationNumber: 0
-	});
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
+    multi.sadd(['apiKeys', buyInformation.apiKey]);
+    multi.sadd([buyInformation.publicPath, buyInformation.apiKey]);
+    multi.sadd([buyInformation.customer, buyInformation.apiKey]);
+    multi.hmset(buyInformation.apiKey, {
+        publicPath: buyInformation.publicPath,
+        orderId: buyInformation.orderId,
+        productId: buyInformation.productId,
+        customer: buyInformation.customer,
+        unit: buyInformation.unit,
+        value: 0,
+        recordType: buyInformation.recordType,
+        correlationNumber: 0
+    });
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }
 
 /**
@@ -187,38 +216,38 @@ exports.newBuy = function(buyInformation, callback) {
  * @param  {string}   user     Customer identifier.
  */
 exports.getApiKeys = function(user, callback) {
-	var toReturn = [];
+    var toReturn = [];
 
-	db.smembers(user, function(err, apiKeys) {
-		if (err) {
-			return callback(err, null);
-		} else if (apiKeys === null) {
-			return callback(null, null);
-		} else {
-			async.each(apiKeys, function(apiKey, task_callback) {
-				db.hgetall(apiKey, function(err, accountingInfo) {
-					if (err) {
-						return task_callback(err);
-					} else {
-						toReturn.push({
-							apiKey: apiKey,
-							productId: accountingInfo.productId,
-							orderId: accountingInfo.orderId
-						});
-						task_callback(null);
-					}
-				});
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else if (toReturn.length !== 0){
-					return callback(null, toReturn);
-				} else {
-					return callback(null, null);
-				}
-			});
-		}
-	});
+    db.smembers(user, function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else if (apiKeys === null) {
+            return callback(null, null);
+        } else {
+            async.each(apiKeys, function(apiKey, task_callback) {
+                db.hgetall(apiKey, function(err, accountingInfo) {
+                    if (err) {
+                        return task_callback(err);
+                    } else {
+                        toReturn.push({
+                            apiKey: apiKey,
+                            productId: accountingInfo.productId,
+                            orderId: accountingInfo.orderId
+                        });
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback(err, null);
+                } else if (toReturn.length !== 0){
+                    return callback(null, toReturn);
+                } else {
+                    return callback(null, null);
+                }
+            });
+        }
+    });
 }
 
 /**
@@ -228,15 +257,15 @@ exports.getApiKeys = function(user, callback) {
  * @param  {string} apiKey      Identifies the product.
  */
 exports.checkRequest = function(customer, apiKey, callback) {
-	db.hget(apiKey, 'customer', function(err, user) {
-		if (err) {
-			return callback(err, null);
-		} else if (user === customer){
-			return callback(null, true);
-		} else {
-			return callback(null, false);
-		}
-	});
+    db.hget(apiKey, 'customer', function(err, user) {
+        if (err) {
+            return callback(err, null);
+        } else if (user === customer){
+            return callback(null, true);
+        } else {
+            return callback(null, false);
+        }
+    });
 }
 
 /**
@@ -245,25 +274,25 @@ exports.checkRequest = function(customer, apiKey, callback) {
  * @param  {string}   apiKey   Product identifier.
  */
 exports.getAccountingInfo = function(apiKey, callback) {
-	db.hgetall(apiKey, function(err, accountingInfo) {
-		if (err) {
-			return callback(err, null);
-		} else if (apiKey === null) {
-			return callback(null, null);
-		} else {
-			db.hget('services', accountingInfo.publicPath, function(err, url) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, {
-						unit: accountingInfo.unit,
-						url: url,
-						publicPath: accountingInfo.publicPath
-					});
-				}
-			});
-		}
-	});
+    db.hgetall(apiKey, function(err, accountingInfo) {
+        if (err) {
+            return callback(err, null);
+        } else if (apiKey === null) {
+            return callback(null, null);
+        } else {
+            db.hget('services', accountingInfo.publicPath, function(err, url) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, {
+                        unit: accountingInfo.unit,
+                        url: url,
+                        publicPath: accountingInfo.publicPath
+                    });
+                }
+            });
+        }
+    });
 }
 
 /**
@@ -271,41 +300,41 @@ exports.getAccountingInfo = function(apiKey, callback) {
  * 
  */
 exports.getNotificationInfo = function(callback) {
-	var notificationInfo = [];
+    var notificationInfo = [];
 
-	db.smembers('apiKeys', function(err, apiKeys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(apiKeys, function(apiKey, task_callback) {
-				db.hgetall(apiKey, function(err, accountingInfo) {
-					if (err) {
-						task_callback(err);
-					} else if (parseFloat(accountingInfo.value) === 0) {
-						task_callback(null);
-					} else {
-						notificationInfo.push({
-							apiKey: apiKey,
-							orderId: accountingInfo.orderId,
-							productId: accountingInfo.productId,
-							customer: accountingInfo.customer,
-							value: accountingInfo.value,
-							correlationNumber: accountingInfo.correlationNumber,
-							recordType: accountingInfo.recordType,
-							unit: accountingInfo.unit
-						});
-						task_callback(null);
-					}
-				});
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, notificationInfo);
-				}
-			});
-		}
-	});
+    db.smembers('apiKeys', function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            async.each(apiKeys, function(apiKey, task_callback) {
+                db.hgetall(apiKey, function(err, accountingInfo) {
+                    if (err) {
+                        task_callback(err);
+                    } else if (parseFloat(accountingInfo.value) === 0) {
+                        task_callback(null);
+                    } else {
+                        notificationInfo.push({
+                            apiKey: apiKey,
+                            orderId: accountingInfo.orderId,
+                            productId: accountingInfo.productId,
+                            customer: accountingInfo.customer,
+                            value: accountingInfo.value,
+                            correlationNumber: accountingInfo.correlationNumber,
+                            recordType: accountingInfo.recordType,
+                            unit: accountingInfo.unit
+                        });
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, notificationInfo);
+                }
+            });
+        }
+    });
 }
 
 /**
@@ -315,28 +344,28 @@ exports.getNotificationInfo = function(callback) {
  * @param  {float} amount       Amount to account.
  */
 exports.makeAccounting = function(apiKey, amount, callback) { 
-	var multi = db.multi();
+    var multi = db.multi();
 
-	if (amount < 0) {
-		return calback('[ERROR] The aomunt must be greater than 0');
-	} else {
-		db.hget(apiKey, 'value', function(err, num) {
-			if (err) {
-				return callback(err);
-			} else {
-				multi.hmset(apiKey, {
-					value: parseFloat(num) + amount
-				});
-				multi.exec(function(err) {
-					if (err) {
-						return callback(err);
-					} else {
-						return callback(null);
-					}
-				});
-			}
-		});
-	}
+    if (amount < 0) {
+        return calback('[ERROR] The aomunt must be greater than 0');
+    } else {
+        db.hget(apiKey, 'value', function(err, num) {
+            if (err) {
+                return callback(err);
+            } else {
+                multi.hmset(apiKey, {
+                    value: parseFloat(num) + amount
+                });
+                multi.exec(function(err) {
+                    if (err) {
+                        return callback(err);
+                    } else {
+                        return callback(null);
+                    }
+                });
+            }
+        });
+    }
 }
 
 /**
@@ -345,25 +374,25 @@ exports.makeAccounting = function(apiKey, amount, callback) {
  * @param  {string} apiKey      Idenfies the product.
  */
 exports.resetAccounting = function(apiKey, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	db.hget(apiKey, 'correlationNumber', function(err, correlationNumber) {
-		if (err) {
-			return callback(err);
-		} else {
-			multi.hmset(apiKey, {
-				correlationNumber: parseInt(correlationNumber) + 1,
-				value: '0'
-			});
-			multi.exec(function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-			});
-		}
-	});
+    db.hget(apiKey, 'correlationNumber', function(err, correlationNumber) {
+        if (err) {
+            return callback(err);
+        } else {
+            multi.hmset(apiKey, {
+                correlationNumber: parseInt(correlationNumber) + 1,
+                value: '0'
+            });
+            multi.exec(function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+            });
+        }
+    });
 }
 
 /**
@@ -374,20 +403,20 @@ exports.resetAccounting = function(apiKey, callback) {
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  */
 exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	multi.sadd([apiKey + 'subs', subscriptionId]);
-	multi.hmset(subscriptionId, {
-		apiKey: apiKey,
-		notificationUrl: notificationUrl
-	});
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
+    multi.sadd([apiKey + 'subs', subscriptionId]);
+    multi.hmset(subscriptionId, {
+        apiKey: apiKey,
+        notificationUrl: notificationUrl
+    });
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }
 
 /**
@@ -396,25 +425,25 @@ exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, ca
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.getCBSubscription = function(subscriptionId, callback) {
-	db.hgetall(subscriptionId, function(err, subscriptionInfo) {
-		if (err) {
-			return callback(err, null);
-		} else if (subscriptionInfo === null) {
-			return callback(null, null);
-		} else {
-			db.hget(subscriptionInfo.apiKey, 'unit', function(err, unit) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, {
-						apiKey: subscriptionInfo.apiKey,
-						notificationUrl: subscriptionInfo.notificationUrl,
-						unit: unit
-					});
-				}
-			});
-		}
-	});
+    db.hgetall(subscriptionId, function(err, subscriptionInfo) {
+        if (err) {
+            return callback(err, null);
+        } else if (subscriptionInfo === null) {
+            return callback(null, null);
+        } else {
+            db.hget(subscriptionInfo.apiKey, 'unit', function(err, unit) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, {
+                        apiKey: subscriptionInfo.apiKey,
+                        notificationUrl: subscriptionInfo.notificationUrl,
+                        unit: unit
+                    });
+                }
+            });
+        }
+    });
 }
 
 /**
@@ -423,21 +452,21 @@ exports.getCBSubscription = function(subscriptionId, callback) {
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.deleteCBSubscription = function(subscriptionId, callback) {
-	var multi = db.multi();
+    var multi = db.multi();
 
-	db.hget(subscriptionId, 'apiKey', function(err, apiKey) {
-		if (err) {
-			return callback(err);
-		} else {
-			multi.srem(apiKey + 'subs', subscriptionId);
-		}
-	});
-	multi.del(subscriptionId);
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
+    db.hget(subscriptionId, 'apiKey', function(err, apiKey) {
+        if (err) {
+            return callback(err);
+        } else {
+            multi.srem(apiKey + 'subs', subscriptionId);
+        }
+    });
+    multi.del(subscriptionId);
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }

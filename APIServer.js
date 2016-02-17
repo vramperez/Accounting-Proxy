@@ -9,12 +9,14 @@ var express = require('express'),
 "use strict";
 
 var app = express();
+var logger;
 
 /**
  * Intialize the server.
  */
 exports.run = function() {
     app.listen(app.get('port'));
+    logger = require('./accounting-proxy').logger;
 }
 
 /**
@@ -32,18 +34,22 @@ var checkUrl = function(req, res) {
     } else if (body.url === undefined) {
         res.status(400).json({error: 'Invalid body, url undefined'});
     } else {
-        if (body.token !== undefined) { //Save the token to notify the WStore
-            WStoreToken = body.token;
+        if (req.get('X-API-KEY') !== undefined) { //Save the token to notify the WStore
+            db.addToken(req.get('X-API-KEY'), function(err) {
+                if (err) {
+                    logger.error('Error saving the token in database');
+                }
+                db.checkUrl(body.url, function(err, correct) {
+                    if (err) {
+                        res.status(500).send();
+                    } else if (correct) {
+                        res.status(200).send();
+                    } else {
+                        res.status(400).json({error: 'Incorrect url ' + body.url});
+                    }
+                });
+            });
         }
-        db.checkUrl(body.url, function(err, correct) {
-            if (err) {
-                res.status(500).send();
-            } else if (correct) {
-                res.status(200).send();
-            } else {
-                res.status(400).json({error: 'Incorrect url ' + body.url});
-            }
-        });
     }
 }
 

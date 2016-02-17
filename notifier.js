@@ -21,28 +21,34 @@ exports.notify = function(notificationInfo, callback) {
         unit: notificationInfo.unit
     }
 
-    var options = {
-        url: config.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId,
-        json: true,
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-            //'X-Auth-Token': token 
-        },
-        body: body
-    }
-
-    request(options, function(err, resp, body) {
+    db.getToken(function(err, token) {
         if (err) {
-            return callback('Error notifying the WStore');
-        } else if (200 <= resp.statusCode && resp.statusCode <= 299 ) {
-            db.resetAccounting(notificationInfo.apiKey, function(err) {
+            return callback('Error obtaining the token');
+        } else {
+            var options = {
+                url: config.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId,
+                json: true,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-KEY': token
+                },
+                body: body
+            }
+
+            request(options, function(err, resp, body) {
                 if (err) {
-                    return callback('Error while reseting the accounting after notify the WStore');
+                    return callback('Error notifying the WStore');
+                } else if (200 <= resp.statusCode && resp.statusCode <= 299 ) {
+                    db.resetAccounting(notificationInfo.apiKey, function(err) {
+                        if (err) {
+                            return callback('Error while reseting the accounting after notify the WStore');
+                        }
+                    });
+                } else {
+                    return callback('Error notifying the WStore');
                 }
             });
-        } else {
-            return callback('Error notifying the WStore');
         }
     });
 };

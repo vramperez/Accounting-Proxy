@@ -111,6 +111,16 @@ var getApiKeys = function(req, res) {
 }
 
 /**
+ * Return the accounting units soported.
+ * 
+ * @param  {Object} req Incoming request.
+ * @param  {Object} res Outgoing response.
+ */
+var getUnits = function(req, res) {
+    res.status(200).json({units: config.modules.accounting});
+}
+
+/**
  * Generates an api-key based on the productId, orderId and customer passed as argument.
  * 
  * @param  {string} productId   product identifier.
@@ -144,6 +154,7 @@ app.use(bodyParser.json());
 
 app.post('/api/resources', checkIsJSON, checkUrl);
 app.post('/api/users', checkIsJSON, newBuy);
-app.get('/api/users/keys', checkIsJSON, getApiKeys);
+app.get('/api/users/keys', getApiKeys);
+app.get('/api/units', getUnits);
 
 module.exports.app = app;

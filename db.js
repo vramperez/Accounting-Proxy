@@ -17,7 +17,7 @@ exports.init = function() {
         db.run('PRAGMA foreign_keys = 1;');
 
         db.run('CREATE TABLE IF NOT EXISTS token ( \
-                token               TEXT \
+                    token               TEXT \
         )');
 
         db.run('CREATE TABLE IF NOT EXISTS services ( \
@@ -54,25 +54,22 @@ exports.init = function() {
  * Save the token to notify the WStore.
  */
 exports.addToken = function(token, callback) {
-    db.serialize(function() {
-        db.run('DELETE FROM token', 
-        function(err) {
-            if (err) {
-                return callback(err);
-            } else {
-                db.run('INSERT OR REPLACE INTO token \
-                    VALUES ($token)',
-                    {
-                        $token: token
-                    }, function(err) {
-                        if (err) {  
-                            return callback(err);
-                        } else {
-                            return callback(null);
-                        }
-                    });
-            }
-        });
+    db.run('DELETE FROM token', function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            db.run('INSERT OR REPLACE INTO token \
+                VALUES ($token)',
+                {
+                    $token: token
+                }, function(err) {
+                    if (err) {  
+                        return callback(err);
+                    } else {
+                        return callback(null);
+                    }
+                });
+        }
     });
 }
 
@@ -80,13 +77,14 @@ exports.addToken = function(token, callback) {
  * Return the token to notify the WStore.
  */
 exports.getToken = function(callback) {
-    db.all('SELECT * \
+    db.get('SELECT * \
             FROM token', 
         function(err, token) {
+            console.log(token)
             if (err) {
                 return callback(err, null);
             } else {
-                return callback(null, token[0].token);
+                return callback(null, token.token);
             }
     });
 }
@@ -121,7 +119,7 @@ exports.deleteService = function(publicPath, callback) {
     db.run('DELETE FROM services \
             WHERE publicPath=$path',
         {
-         $path: publicPath
+            $path: publicPath
         }, function(err) {
         if (err) {
             return callback(err);

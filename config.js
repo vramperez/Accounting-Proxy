@@ -11,7 +11,7 @@ config.accounting_proxy = {
         port: 9000,
 
         /**
-         * Por where the accounting proxied is listening the Store notifications
+         * Port where the accounting proxy is listening the Store notifications
          */
         admin_port: 9001
 
@@ -55,7 +55,7 @@ config.resources = {
     /**
      * Enabled if the resource accounted is Orion Context Broker
      */
-    contextBroker: false,
+    contextBroker: true,
 
     /**
      * Port where the accounting proxy server is listening to subscription notifications

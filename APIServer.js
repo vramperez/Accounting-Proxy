@@ -29,9 +29,7 @@ var checkUrl = function(req, res) {
     req.setEncoding('utf-8');
     var body = req.body;
 
-    if (! req.is('application/json')) {
-        res.status(415).json({error: 'Content-Type must be "application/json"'});
-    } else if (body.url === undefined) {
+    if (body.url === undefined) {
         res.status(400).json({error: 'Invalid body, url undefined'});
     } else {
         if (req.get('X-API-KEY') !== undefined) { //Save the token to notify the WStore
@@ -60,37 +58,32 @@ var checkUrl = function(req, res) {
  * @param  {Object} res     Outgoing request.
  */
 var newBuy = function(req, res) {
+    req.setEncoding('utf-8');
+    var body = req.body;
 
-    if (! req.is('application/json')) {
-        res.status(415).json({error: 'Content-Type must be "application/json"'});
-    } else {
-        req.setEncoding('utf-8');
-        var body = req.body;
-
-        validation.validate('product', body, function(err) { // Check if the json is correct
-            if (err) {
-                res.status(400).json({error: 'Invalid json'}); // More specific error? (wich field is undefined)
-            } else {
-                generateApiKey(body.productId, body.orderId, body.customer, function(apiKey) {
-                    db.newBuy({
-                        apiKey: apiKey,
-                        publicPath: url.parse(body.productSpecification.url).pathname,
-                        orderId: body.orderId,
-                        productId: body.productId,
-                        customer: body.customer,
-                        unit: body.productSpecification.unit,
-                        recordType: body.productSpecification.recordType
-                    }, function(err) {
-                        if (err) {
-                            res.status(400).send();
-                        } else {
-                            res.status(201).json({'API-KEY': apiKey});
-                        }
-                    });
+    validation.validate('product', body, function(err) { // Check if the json is correct
+        if (err) {
+            res.status(400).json({error: 'Invalid json'}); // More specific error? (wich field is undefined)
+        } else {
+            generateApiKey(body.productId, body.orderId, body.customer, function(apiKey) {
+                db.newBuy({
+                    apiKey: apiKey,
+                    publicPath: url.parse(body.productSpecification.url).pathname,
+                    orderId: body.orderId,
+                    productId: body.productId,
+                    customer: body.customer,
+                    unit: body.productSpecification.unit,
+                    recordType: body.productSpecification.recordType
+                }, function(err) {
+                    if (err) {
+                        res.status(400).send();
+                    } else {
+                        res.status(201).json({'API-KEY': apiKey});
+                    }
                 });
-            }
-        });
-    }
+            });
+        }
+    });
 }
 
 /**
@@ -132,11 +125,25 @@ var generateApiKey = function(productId, orderId, customer, callback) {
     return callback(apiKey);
 }
 
+/**
+ * Check if the content-type of the request is "application/json".
+ * @param  {Object}   req  Incoming request.
+ * @param  {Object}   res  Outgoing response.
+ * @param  {Function} next Next function to call.
+ */
+var checkIsJSON = function(req, res, next) {
+    if (!req.is('application/json')) {
+        res.status(415).json({error: 'Content-Type must be "application/json"'});
+    } else {
+        next();
+    }
+}
+
 app.set('port', config.accounting_proxy.admin_port);
 app.use(bodyParser.json());
 
-app.post('/api/resources', checkUrl);
-app.post('/api/users', newBuy);
-app.get('/api/users/keys', getApiKeys);
+app.post('/api/resources', checkIsJSON, checkUrl);
+app.post('/api/users', checkIsJSON, newBuy);
+app.get('/api/users/keys', checkIsJSON, getApiKeys);
 
 module.exports.app = app;

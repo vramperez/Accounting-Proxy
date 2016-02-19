@@ -19,8 +19,8 @@ cli
     .command('addService [publicPath] [URL]')
     .description('Add new service to proxy database.')
     .action(function(publicPath, url) {
-        if (/\/((\w+)\/?)*$/.test(publicPath) &&
-            /^(ftp|http|https):\/\/[^ "]+$/.test(url)) {
+        if (/\/((\w+)\/?)*$/.test(publicPath)) {
+            if(/^(http|https):\/\/[^ "]+$/.test(url)) {
                 db.newService(publicPath, url, function(err) {
                     if (err) {
                         console.log(err);
@@ -28,9 +28,12 @@ cli
                         console.log('[LOG] Service successfully added.');
                     }
                 });
+            } else {
+                console.log('[ERROR] Invalid url. Format: "http|https://host:port/path"');
+            }
         }
         else {
-            console.log("[ERROR] Invalid parameters.");
+            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
         }
     });
 
@@ -50,7 +53,7 @@ cli
                 }
             });
         } else {
-            console.log("[ERROR] Invalid parameters.");
+            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
         } 
     });
 
@@ -71,7 +74,7 @@ cli
                 }
             });
         } else {
-            console.log("[ERROR] Invalid parameters.");
+            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
         }
     });
 

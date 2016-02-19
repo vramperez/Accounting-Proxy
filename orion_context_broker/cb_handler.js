@@ -64,7 +64,6 @@ var notificationHandler = function(req, res) {
  */
 exports.getOperation = function(privatePath, req, callback) {
 	var operation = null;
-
 	async.forEachOf(subsUrls, function(entry, i, task_callback) {
 		if (req.method === subsUrls[i][0] && privatePath.toLowerCase().match(subsUrls[i][1])) {
 			operation = subsUrls[i][2];
@@ -86,7 +85,7 @@ exports.getOperation = function(privatePath, req, callback) {
  * @param  {string}   unit      Accounting unit.
  * @param  {string}   operation Context Broker operation (subscribe, unsubscribe).
  */
-exports.requestHandler = function(req, res, url, unit, operation, callback) {
+exports.subscriptionHandler = function(req, res, url, unit, operation, callback) {
 	var options = {
 		url: url,
 		method: req.method,

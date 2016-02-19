@@ -165,7 +165,7 @@ exports.getService = function(publicPath, callback) {
 exports.checkUrl = function(url, callback) {
     db.hgetall('services', function(err, services) {
         if (err) {
-            return callback(err, null);
+            return callback(err, false);
         } else {
             async.each(services, function(value, task_callback) {
                 if (value === url) {
@@ -240,10 +240,8 @@ exports.getApiKeys = function(user, callback) {
             }, function(err) {
                 if (err) {
                     return callback(err, null);
-                } else if (toReturn.length !== 0){
-                    return callback(null, toReturn);
                 } else {
-                    return callback(null, null);
+                    return callback(null, toReturn);
                 }
             });
         }
@@ -259,7 +257,7 @@ exports.getApiKeys = function(user, callback) {
 exports.checkRequest = function(customer, apiKey, callback) {
     db.hget(apiKey, 'customer', function(err, user) {
         if (err) {
-            return callback(err, null);
+            return callback(err, false);
         } else if (user === customer){
             return callback(null, true);
         } else {
@@ -277,7 +275,7 @@ exports.getAccountingInfo = function(apiKey, callback) {
     db.hgetall(apiKey, function(err, accountingInfo) {
         if (err) {
             return callback(err, null);
-        } else if (apiKey === null) {
+        } else if (accountingInfo === null) {
             return callback(null, null);
         } else {
             db.hget('services', accountingInfo.publicPath, function(err, url) {
@@ -347,7 +345,7 @@ exports.makeAccounting = function(apiKey, amount, callback) {
     var multi = db.multi();
 
     if (amount < 0) {
-        return calback('[ERROR] The aomunt must be greater than 0');
+        return callback('[ERROR] The aomunt must be greater than 0');
     } else {
         db.hget(apiKey, 'value', function(err, num) {
             if (err) {
@@ -459,14 +457,14 @@ exports.deleteCBSubscription = function(subscriptionId, callback) {
             return callback(err);
         } else {
             multi.srem(apiKey + 'subs', subscriptionId);
-        }
-    });
-    multi.del(subscriptionId);
-    multi.exec(function(err) {
-        if (err) {
-            return callback(err);
-        } else {
-            return callback(null);
+            multi.del(subscriptionId);
+            multi.exec(function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+            });
         }
     });
 }

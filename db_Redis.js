@@ -127,14 +127,18 @@ exports.deleteService = function(publicPath, callback) {
                         task_callback(null);
                     }
                 });
-            }, function() {
-                multi.exec(function(err) {
-                    if (err) {
-                        return callback(err);
-                    } else {
-                        return callback(null);
-                    }
-                });
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    multi.exec(function(err) {
+                        if (err) {
+                            return callback(err);
+                        } else {
+                            return callback(null);
+                        }
+                    });
+                }
             });
         }
     });

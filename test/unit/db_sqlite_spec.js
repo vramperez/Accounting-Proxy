@@ -17,6 +17,7 @@ var mocker = function(implementations, callback) {
         },
         run: implementations.run,
         all: implementations.all,
+        get: implementations.get,
         beginTransaction: implementations.beginTransaction
     }
 
@@ -52,7 +53,7 @@ describe('Testing SQLITE database', function() {
             'PRAGMA encoding = "UTF-8";',
             'PRAGMA foreign_keys = 1;',
             'CREATE TABLE IF NOT EXISTS token ( \
-                token               TEXT         )',
+                    token               TEXT         )',
             'CREATE TABLE IF NOT EXISTS services ( \
                     publicPath      TEXT, \
                     url             TEXT, \
@@ -95,7 +96,7 @@ describe('Testing SQLITE database', function() {
     });
 
     describe('Function "addToken"', function() {
-        var sentences = ['DELETE FROM token', 'INSERT OR REPLACE INTO token                     VALUES ($token)'];
+        var sentences = ['DELETE FROM token', 'INSERT OR REPLACE INTO token                 VALUES ($token)'];
         var params = {'$token': 'token'};
 
         it('error deleting the previous token', function(done) {
@@ -164,15 +165,15 @@ describe('Testing SQLITE database', function() {
 
         it('error getting the token', function(done) {
             var implementations = {
-                all: function(sentence, callback) {
+                get: function(sentence, callback) {
                     return callback('Error');
                 }
             }
             mocker(implementations, function(db, spies) {
                 db.getToken(function(err, token) {
                     assert.equal(err, 'Error');
-                    assert.equal(spies.all.callCount, 1);
-                    assert.equal(spies.all.getCall(0).args[0], sentence);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
                     done();
                 })
             });
@@ -180,16 +181,16 @@ describe('Testing SQLITE database', function() {
 
         it('correct', function(done) {
             var implementations = {
-                all: function(sentence, callback) {
-                    return callback(null, [{token: 'token'}]);
+                get: function(sentence, callback) {
+                    return callback(null, {token: 'token'});
                 }
             }
             mocker(implementations, function(db, spies) {
                 db.getToken(function(err, token) {
                     assert.equal(err, null);
                     assert.equal(token, 'token');
-                    assert.equal(spies.all.callCount, 1);
-                    assert.equal(spies.all.getCall(0).args[0], sentence);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
                     done();
                 });
             });

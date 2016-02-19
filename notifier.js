@@ -1,6 +1,5 @@
 var http = require('http'),
     config = require('./config'),
-    proxy = require('./APIServer.js'),
     request = require('request');
 
 var db = require(config.database);
@@ -43,6 +42,8 @@ exports.notify = function(notificationInfo, callback) {
                     db.resetAccounting(notificationInfo.apiKey, function(err) {
                         if (err) {
                             return callback('Error while reseting the accounting after notify the WStore');
+                        } else {
+                            return callback(null);
                         }
                     });
                 } else {

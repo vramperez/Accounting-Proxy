@@ -9,14 +9,12 @@ var express = require('express'),
 "use strict";
 
 var app = express();
-var logger;
-
+var logger = require('./accounting-proxy').logger;
 /**
  * Intialize the server.
  */
 exports.run = function() {
     app.listen(app.get('port'));
-    logger = require('./accounting-proxy').logger;
 }
 
 /**
@@ -37,17 +35,17 @@ var checkUrl = function(req, res) {
                 if (err) {
                     logger.error('Error saving the token in database');
                 }
-                db.checkUrl(body.url, function(err, correct) {
-                    if (err) {
-                        res.status(500).send();
-                    } else if (correct) {
-                        res.status(200).send();
-                    } else {
-                        res.status(400).json({error: 'Incorrect url ' + body.url});
-                    }
-                });
             });
         }
+        db.checkUrl(body.url, function(err, correct) {
+            if (err) {
+                res.status(500).send();
+            } else if (correct) {
+                res.status(200).send();
+            } else {
+                res.status(400).json({error: 'Incorrect url ' + body.url});
+            }
+        });
     }
 }
 
@@ -60,7 +58,7 @@ var checkUrl = function(req, res) {
 var newBuy = function(req, res) {
     req.setEncoding('utf-8');
     var body = req.body;
-
+    
     validation.validate('product', body, function(err) { // Check if the json is correct
         if (err) {
             res.status(400).json({error: 'Invalid json'}); // More specific error? (wich field is undefined)

@@ -72,7 +72,7 @@ exports.getOperation = function(privatePath, req, callback) {
 			task_callback();
 		}
 	}, function() {
-		return callback(null, operation);
+		return callback(operation);
 	});
 };
 
@@ -93,19 +93,19 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
 		headers: {
 			'content-type': 'application/json',
 			'accept': 'application/json'
-		},
-		body: req.body
+		}
 	}
-
+	
 	if (operation === 'subscribe') {
 		var req_body = req.body;
 		var reference_url = req_body.reference;
 		req_body.reference = 'http://localhost:' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
+		options.body = req_body;
 
 		// Send the request to the CB and redirect the response to the subscriber
 		request(options, function(error, resp, body) {
 			if (error) {
-				logger.error('Error sending the subscription to the CB');
+				return callback('Error sending the subscription to the CB');
 			} else {
 				var subscriptionId = body.subscribeResponse.subscriptionId;
 				res.status(resp.statusCode);
@@ -140,11 +140,12 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
 			subscriptionId = match[0];
 			subscriptionId = subscriptionId.replace('/', '');
 		}
+		options.body = req.body;
 
 		// Sends the request to the CB and redirect the response to the subscriber
 		request(options, function(error, resp, body) {
 			if (error) {
-				logger.error('Error sending the unsubscription to the CB');
+				return callback('Error sending the unsubscription to the CB');
 			} else {
 				res.status(resp.statusCode);
 				async.forEachOf(resp.headers, function(header, key, task_callback) {

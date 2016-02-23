@@ -24,4 +24,9 @@ mkdirp('./log', function(err) {
 
 module.exports.logger = logger;
 
-require('./server').init();
+require('./server').init(function(err) {
+    if (err) {
+        logger.error(err);
+        process.exit();
+    }
+});

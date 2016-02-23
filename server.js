@@ -13,25 +13,20 @@ var express = require('express'),
 var db = require(config.database); 
 var app = express();
 var acc_modules = {};
-var logger;
+var logger = require('./accounting-proxy').logger;
+var contextBroker = require('./orion_context_broker/cb_handler');
 
 /**
  * Start and configure the server.
  */
-exports.init = function() {
-    logger = require('./accounting-proxy').logger;
+exports.init = function(callback) {
     db.init();
-    async.series([
-        loadAccModules,
-        notify
-    ], function(err) {
+    notify(function(err) {
         if (err) {
-            logger.error(err);
-            process.exit();
+            return callback(err);
         } else {
             if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
-                logger.info("Loading module for Orion Context Broker...");
-                contextBroker = require('./orion_context_broker/cb_handler');
+                logger.info('Loading module for Orion Context Broker...');
                 contextBroker.run();
             }
             /* Create daemon to update WStore every day
@@ -48,24 +43,10 @@ exports.init = function() {
             });
             app.listen(app.get('port'));
             api.run();
+            return callback(null);
         }
     });
 }
-
-/**
- * Load the necessary accounting modules.
- */
-var loadAccModules = function(callback) {
-    logger.info("Loading accounting modules...");
-    async.each(config.modules.accounting, function(module, task_callback) {
-        try {
-            acc_modules[module] = require('./acc_modules/' + module).count;
-        } catch (e) {
-            task_callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' +  module, module);
-        }
-        task_callback();
-    }, callback);
-} 
 
 /**
  * Call the notifier to send the accounting information to the WStore.
@@ -78,6 +59,7 @@ var notify = function(callback) {
             return callback(null);
         } else {
             async.each(notificationInfo, function(info, task_callback) {
+                logger.info('Notifying the WStore...');
                 notifier.notify(info, function(err) {
                     if (err) {
                         task_callback(err);
@@ -98,6 +80,14 @@ var notify = function(callback) {
  * @param  {Object}   body     Endpoint response body.
  */
 exports.count = function(apiKey, unit, body, callback) {
+    if (acc_modules[unit] === undefined) {
+        try {
+            acc_modules[unit] = require('./acc_modules/' + unit).count;
+            console
+        } catch (e) {
+            return callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' +  unit, unit);
+        }
+    }
     acc_modules[unit](body, function(err, amount) {
         if (err) {
             return callback(err);
@@ -125,13 +115,11 @@ var CBrequestHandler = function(req, res, options, unit) {
     var user = req.get('X-Actor-ID');
     var apiKey = req.get('X-API-KEY');
 
-    contextBroker.getOperation(url.parse(options.url).pathname, req, function(err, operation) {
-        if (err) {
-            logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
-        } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
+    contextBroker.getOperation(url.parse(options.url).pathname, req, function(operation) {
+        if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.subscriptionHandler(req, res, options.url, unit, operation, function(err) {
                 if (err) {
-                    logger.error('Error processing CB request');
+                    logger.error(err);
                 } 
             });
         } else {
@@ -151,14 +139,14 @@ var requestHandler = function(options, res, apiKey, unit) {
     request(options, function(error, resp, body) {
         if (error) {
             res.status(504).send();
-            logger.warn("An error ocurred requesting the endpoint: " + options.url);
+            logger.warn('An error ocurred requesting the endpoint: ' + options.url);
         } else {
             for (var header in resp.headers) {
                 res.setHeader(header, resp.headers[header]);
             }
             exports.count(apiKey, unit, body, function(err){
                 if(err) {
-                    logger.warn("[%s] An error ocurred while making the accounting", apiKey);
+                    logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                     res.status(500).send();
                 } else {
                     res.send(body);
@@ -198,25 +186,25 @@ var handler = function(req, res) {
     var apiKey = req.get('X-API-KEY');
 
     if(user === undefined) {
-        logger.log('debug', "[%s] Undefined username", apiKey);
+        logger.log('debug', 'Undefined username');
         res.status(401).json({ error: 'Undefined "X-Actor-ID" header'});
 
     } else if (apiKey === undefined) {
-        logger.log('debug', "[%s] Undefined API_KEY", apiKey);
+        logger.log('debug', 'Undefined API_KEY');
         res.status(401).json({ error: 'Undefined "X-API-KEY" header'});
 
     } else {
         db.checkRequest(user, apiKey, function(err, correct) {
             if (err) {
-                res.status(500).end();
+                res.status(500).send();
             } else if (! correct) { // Invalid apiKey or user
                 res.status(401).json({ error: 'Invalid API_KEY or user'});
             } else {
                 db.getAccountingInfo(apiKey, function(err, accountingInfo) {
                     if (err) {
-                        res.status(500).end();
+                        res.status(500).send();
                     } else if (accountingInfo === null) {
-                        res.status(500).end();
+                        res.status(500).send();
                     } else {
                         getEndpointPath(req.path, accountingInfo.publicPath, function(err, path) {
                             if (err) {

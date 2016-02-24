@@ -80,7 +80,6 @@ exports.getToken = function(callback) {
     db.get('SELECT * \
             FROM token', 
         function(err, token) {
-            console.log(token)
             if (err) {
                 return callback(err, null);
             } else {

@@ -244,6 +244,8 @@ exports.getApiKeys = function(user, callback) {
             }, function(err) {
                 if (err) {
                     return callback(err, null);
+                } else if (toReturn.length === 0) {
+                    return callback(null, null);
                 } else {
                     return callback(null, toReturn);
                 }

@@ -7,19 +7,19 @@ var mocker = function(implementations, callback) {
     var mocks, spies, cb_handler;
 
     // Create mocks and spies
+    var logger = {
+        error: function(msg) {}
+    }
     mocks = {
-        mock_logger: {
-            logger: {
-                error: function(msg) {}
-            }
-        },
         app: {
             use: function(middleware) {},
             set: function(key, value) {},
             post: function(path, handler) {}
         },
         config: {
-            database: './db',
+            database: {
+                type: './db' 
+            },
             resources: {
                 notification_port: 9002
             }
@@ -39,7 +39,7 @@ var mocker = function(implementations, callback) {
     }
     spies = {
         logger: {
-            error: sinon.spy(mocks.mock_logger.logger, 'error')
+            error: sinon.spy(logger, 'error')
         },
         app: {},
         config: {},
@@ -74,6 +74,7 @@ var mocker = function(implementations, callback) {
         });
     }, function() {
         // Mocking dependencies
+        mocks.server.logger = logger;
         cb_handler = proxyquire('../../orion_context_broker/cb_handler', {
             express: function() {
                 return mocks.app;
@@ -81,7 +82,6 @@ var mocker = function(implementations, callback) {
             '../config': mocks.config,
             '.././db': mocks.db,
             'async': mocks.async,
-            '../accounting-proxy': mocks.mock_logger,
             request: mocks.requester.request,
             'url': mocks.url,
             '../server': mocks.server,
@@ -108,7 +108,9 @@ describe('Testing ContextBroker Handler', function() {
                     post: function(path, handler) {}
                 },
                 config: {
-                    database: './db',
+                    database: {
+                        type: './db'
+                    },
                     resources: {
                         notification_port: port
                     }

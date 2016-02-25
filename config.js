@@ -19,12 +19,22 @@ config.accounting_proxy = {
 
 // Accounting database configuration
 //--------------------------------------------------
-// Select the database. Possible optrions are: 
-//  * './db_Redis': redis database
-//  * './db': sqlite database
-config.database = './db';
+config.database = {
+    
+    /**
+     * Select the database. Possible optrions are: 
+     *     './db_Redis': redis database.
+     *     './db': sqlite database.
+     */
+    type: "./db",
 
-config.database_name = 'accountingDB.sqlite';
+    /**
+     * Database name. If the database type selected is './db_Redis', 
+     *  then name must be a number (0 by default, and 15 is reserved to test by default).
+     */
+    name: 'accountingDB.sqlite',
+
+}
 
 // Accouning Modules configuration
 //--------------------------------------------------

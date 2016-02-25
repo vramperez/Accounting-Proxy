@@ -2,7 +2,7 @@ var http = require('http'),
     config = require('./config'),
     request = require('request');
 
-var db = require(config.database);
+var db = require(config.database.type);
 
 /**
  * Send the accounting information to the WStore.

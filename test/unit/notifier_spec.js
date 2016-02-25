@@ -18,7 +18,9 @@ var mocker = function(implementations, callback) {
         request: function() {}
     }
     var config_mock = {
-        database: './db',
+        database: {
+            type: './db'
+        },
         WStore: implementations.WStore
     }
     // Create spies

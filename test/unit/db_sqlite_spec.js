@@ -83,13 +83,15 @@ describe('Testing SQLITE database', function() {
                 run: function(create) {}
             }
             mocker(implementations, function(db, spies) {
-                db.init();
-                assert.equal(spies.run.callCount, 6);
-                async.forEachOf(spies.run.args, function(call, i, task_callback) {
-                    assert.equal(call[0], sentences[i]);
-                    task_callback();
-                }, function() {
-                    done();
+                db.init(function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.run.callCount, 6);
+                    async.forEachOf(spies.run.args, function(call, i, task_callback) {
+                        assert.equal(call[0], sentences[i]);
+                        task_callback();
+                    }, function() {
+                        done();
+                    });
                 });
             });
         });

@@ -5,13 +5,13 @@ var sqlite = require('sqlite3').verbose(), // Debug enable
 "use strict"
 
 var db = new TransactionDatabase (
-        new sqlite.Database(config.database_name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE)
+        new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE)
 );
 
 /*
 * Initialize the database and creates the necessary tables.
 */
-exports.init = function() {
+exports.init = function(callback) {
     db.serialize(function() {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
@@ -47,6 +47,7 @@ exports.init = function() {
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
         )');
+        return callback(null);
     });
 };
 

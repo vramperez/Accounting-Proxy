@@ -1,20 +1,5 @@
-var winston = require('winston'),
-    mkdirp = require('mkdirp');
-
-var logger = new winston.Logger( {
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: './log/all-log',
-            colorize: false
-        }),
-        new winston.transports.Console({
-            level: 'info',
-            colorize: true
-        })
-    ],
-    exitOnError: false
-});
+var mkdirp = require('mkdirp'),
+    server = require('./server');
 
 mkdirp('./log', function(err) {
     if (err) {
@@ -22,11 +7,11 @@ mkdirp('./log', function(err) {
     }
 });
 
-module.exports.logger = logger;
-
-require('./server').init(function(err) {
+server.init(function(err) {
     if (err) {
         logger.error(err);
         process.exit();
     }
 });
+
+module.exports.logger = logger;

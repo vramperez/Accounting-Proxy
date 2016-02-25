@@ -1,15 +1,15 @@
 var request = require('request'),
-     subsUrls = require('./subsUrls'),
-     config = require('../config'),
-     express = require('express'),
-     acc_proxy = require('../server'),
-     url = require('url'),
-     bodyParser = require('body-parser'),
-     async = require('async')
-     logger = require('../accounting-proxy').logger;
+    subsUrls = require('./subsUrls'),
+    config = require('../config'),
+    express = require('express'),
+    acc_proxy = require('../server'),
+    url = require('url'),
+    bodyParser = require('body-parser'),
+    async = require('async')
+    logger = acc_proxy.logger;
 
 var app = express();
-var db = require('../' + config.database);
+var db = require('../' + config.database.type);
 
 /**
  * Start the endopoint to receive CB notifications. 

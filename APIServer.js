@@ -4,12 +4,13 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     validation = require('./validation'),
     url = require('url'),
-    db = require(config.database);
+    db = require(config.database.type);
 
 "use strict";
 
 var app = express();
-var logger = require('./accounting-proxy').logger;
+var logger = require('./server').logger;
+
 /**
  * Intialize the server.
  */

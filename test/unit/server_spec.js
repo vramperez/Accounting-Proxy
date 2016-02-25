@@ -9,6 +9,12 @@ var proxyquire = require('proxyquire').noCallThru(),
 var mocker = function(implementations, callback) {
     var mocks, spies, proxy_server;
 
+    var log_mock = {
+        log: function(level, msg) {},
+        info: function(msg) {},
+        warn: function(msg) {},
+        error: function(msg) {}
+    }
     mocks = {
         app: {
             set: function(prop, value) {},
@@ -31,12 +37,13 @@ var mocker = function(implementations, callback) {
             request: {}
         },
         db: {},
-        mock_logger: {
-            logger: {
-                log: function(level, msg) {},
-                warn: function(msg) {},
-                error: function(msg) {},
-                info: function(msg) {}
+        logger: {
+            Logger: function(transports) {
+                return log_mock;
+            },
+            transports: {
+                File: function(params) {},
+                Console: function(params) {}
             }
         },
         contextBroker: {},
@@ -59,10 +66,10 @@ var mocker = function(implementations, callback) {
         requester: {},
         db: {},
         logger: {
-            log: sinon.spy(mocks.mock_logger.logger, 'log'),
-            warn: sinon.spy(mocks.mock_logger.logger, 'warn'),
-            error: sinon.spy(mocks.mock_logger.logger, 'error'),
-            info: sinon.spy(mocks.mock_logger.logger, 'info')
+            log: sinon.spy(log_mock, 'log'),
+            warn: sinon.spy(log_mock, 'warn'),
+            info: sinon.spy(log_mock, 'info'),
+            error: sinon.spy(log_mock, 'error')
         },
         contextBroker: {},
         acc_modules: {}
@@ -80,7 +87,9 @@ var mocker = function(implementations, callback) {
                 port: 9000
             }
         }
-        mocks.config.database = './db';
+        mocks.config.database = {
+            type: './db'
+        }
     async.each(Object.keys(implementations), function(obj, task_callback1) {
         async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
             mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
@@ -108,7 +117,7 @@ var mocker = function(implementations, callback) {
             './db': mocks.db,
             'async': mocks.async,
             './APIServer': mocks.api,
-            './accounting-proxy': mocks.mock_logger,
+            'winston': mocks.logger,
             './notifier': mocks.notifier,
             'node-schedule': mocks.cron,
             './acc_modules/megabyte': mocks.acc_modules,
@@ -123,13 +132,33 @@ describe('Testing Server', function() {
 
     describe('Function "initialize"', function() {
 
+        it('error initializing the database', function(done) {
+            var implementations = {
+                db: {
+                    init: function(callback) {
+                        return callback('Error');
+                    }
+                }
+            }
+            mocker(implementations, function(server, spies) {
+                server.init(function(err) {
+                    assert.equal(err, 'Error');
+                    assert.equal(spies.async.series.callCount, 1);
+                    assert.equal(spies.db.init.callCount, 1);
+                    done();
+                })
+            });
+        });
+
         it('error notifying the WStore: error getting information from db', function(done) {
             var implementations = {
                 db: {
                     getNotificationInfo: function(callback) {
                         return callback('Error');
                     },
-                    init: function() {}
+                    init: function(callback) {
+                        return callback(null);
+                    }
                 }
             }
             mocker(implementations, function(server, spies) {
@@ -151,7 +180,9 @@ describe('Testing Server', function() {
                     getNotificationInfo: function(callback) {
                         return callback(null, null);
                     },
-                    init: function() {}
+                    init: function(callback) {
+                        return callback(null);
+                    }
                 },
                 config: {
                     resources: {
@@ -201,7 +232,9 @@ describe('Testing Server', function() {
                     getNotificationInfo: function(callback) {
                         return callback(null, notificationInfo);
                     },
-                    init: function() {}
+                    init: function(callback) {
+                        return callback(null);
+                    }
                 },
                 config: {
                     resources: {
@@ -251,7 +284,9 @@ describe('Testing Server', function() {
                             return callback('Error', null);
                         }
                     },
-                    init: function() {}
+                    init: function(callback) {
+                        return callback(null);
+                    }
                 },
                 config: {
                     resources: {
@@ -318,7 +353,9 @@ describe('Testing Server', function() {
                     getNotificationInfo: function(callback) {
                         return callback(null, notificationInfo);
                     },
-                    init: function() {}
+                    init: function(callback) {
+                        return callback(null);
+                    }
                 },
                 config: {
                     resources: {

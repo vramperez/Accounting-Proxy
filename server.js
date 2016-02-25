@@ -6,22 +6,42 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     async = require('async'),
     url = require('url'),
+    winston = require('winston'),
     request = require('request');
 
 "use strict";
 
-var db = require(config.database); 
+var db = require(config.database.type); 
 var app = express();
 var acc_modules = {};
-var logger = require('./accounting-proxy').logger;
+var logger = new winston.Logger( {
+    transports: [
+        new winston.transports.File({
+            level: 'debug',
+            filename: './log/all-log',
+            colorize: false
+        }),
+        new winston.transports.Console({
+            level: 'info',
+            colorize: true
+        })
+    ],
+    exitOnError: false
+});
 var contextBroker = require('./orion_context_broker/cb_handler');
 
 /**
  * Start and configure the server.
  */
 exports.init = function(callback) {
-    db.init();
-    notify(function(err) {
+    async.series([
+        function(callback) {
+            db.init(callback);
+        },
+        function(callback) {
+            notify(callback);
+        }
+    ], function(err) {
         if (err) {
             return callback(err);
         } else {
@@ -234,3 +254,4 @@ app.set('port', config.accounting_proxy.port);
 app.use(bodyParser.json());
 app.use('/', handler);
 module.exports.app = app;
+module.exports.logger = logger;

@@ -1,4 +1,5 @@
 var redis = require('redis'),
+    config = require('./config'),
     async = require('async');
 
 var db = redis.createClient();
@@ -6,7 +7,15 @@ var db = redis.createClient();
 /*
 * Initialize the database and creates the necessary tables.
 */
-exports.init = function() {};
+exports.init = function(callback) { 
+    db.select(config.database.name, function(err) {
+        if (err) {
+            return callback('Error selecting datbase ' + config.database.name + ': ' + err);
+        } else {
+            return callback(null);
+        }
+    });
+};
 
 /**
  * Save the token to notify the WStore.
@@ -225,7 +234,7 @@ exports.getApiKeys = function(user, callback) {
     db.smembers(user, function(err, apiKeys) {
         if (err) {
             return callback(err, null);
-        } else if (apiKeys === null) {
+        } else if (apiKeys.length === 0) {
             return callback(null, null);
         } else {
             async.each(apiKeys, function(apiKey, task_callback) {
@@ -244,8 +253,6 @@ exports.getApiKeys = function(user, callback) {
             }, function(err) {
                 if (err) {
                     return callback(err, null);
-                } else if (toReturn.length === 0) {
-                    return callback(null, null);
                 } else {
                     return callback(null, toReturn);
                 }

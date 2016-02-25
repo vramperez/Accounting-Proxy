@@ -10,6 +10,11 @@ var proxyquire = require('proxyquire'),
  */
 var mocker = function(implementations, callback) {
 
+    var config_mock = {
+        database: {
+            name: 15
+        }
+    }
     var db_mock = {
         multi: function() {
             return this;
@@ -22,7 +27,8 @@ var mocker = function(implementations, callback) {
         hgetall: implementations.hgetall,
         hdel: implementations.hdel,
         del: implementations.del,
-        exec: implementations.exec
+        exec: implementations.exec,
+        select: implementations.select
     }
     var redis_stub = {
         createClient: function() {
@@ -46,6 +52,7 @@ var mocker = function(implementations, callback) {
     }, function() {
         var db = proxyquire('../../db_Redis', {
             'redis': redis_stub,
+            './config': config_mock,
             'async': async_stub
         });
         return callback(db, spies);
@@ -56,9 +63,35 @@ describe('Testing REDIS database', function() {
 
     describe('Function "init"', function() {
 
-        it('correct initialization', function() {
-            mocker({}, function(db, spies) {
-                db.init();
+        it('initialization', function(done) {
+            var implementations = {
+                select: function(db, callback) {
+                    return callback('Error');
+                }
+            }
+            mocker(implementations, function(db, spies) {
+                db.init(function(err) {
+                    assert.equal(err, 'Error selecting datbase 15: Error');
+                    assert.equal(spies.select.callCount, 1);
+                    assert.equal(spies.select.getCall(0).args[0], 15);
+                    done();
+                });
+            });
+        });
+
+        it('correct intialization', function(done) {
+            var implementations = {
+                select: function(db, callback) {
+                    return callback(null);
+                }
+            }
+            mocker(implementations, function(db, spies) {
+                db.init(function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.select.callCount, 1);
+                    assert.equal(spies.select.getCall(0).args[0], 15);
+                    done();
+                });
             });
         });
     });
@@ -638,7 +671,7 @@ describe('Testing REDIS database', function() {
         it('no api-keys available', function(done) {
             var implementations = {
                 smembers: function(hash, callback) {
-                    return callback(null, null);
+                    return callback(null, []);
                 }
             }
             mocker(implementations, function(db, spies) {

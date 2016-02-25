@@ -69,7 +69,9 @@ var mocker = function(implementations, callback) {
                 admin_port: 9001
             }
         }
-        mocks.config.database = './db';
+        mocks.config.database = {
+            type:'./db'
+        }
         api_server = proxyquire('../../APIServer', {
             express: function() {
                 return mocks.app;
@@ -77,7 +79,7 @@ var mocker = function(implementations, callback) {
             './config': mocks.config,
             './db': mocks.db,
             'url': mocks.url,
-            './accounting-proxy': mocks.mock_logger,
+            './server': mocks.mock_logger,
             './validation': mocks.validation
         });
         return callback(api_server, spies);

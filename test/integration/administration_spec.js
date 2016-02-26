@@ -1,8 +1,9 @@
 var request = require('supertest'),
     assert = require('assert'),
     proxyquire = require('proxyquire').noCallThru(),
-    databases = require('../config_tests').integration.databases,
+    test_config = require('../config_tests').integration,
     async = require('async'),
+    redis = require('redis'),
     api_server,
     db_mock;
     
@@ -12,26 +13,24 @@ var mock_config = {
     },
     accounting_proxy: {
         admin_port: 9001
-    }
+    },
+    database: {}
 };
 
 var prepare_tests = function(database) {
     switch (database) {
         case 'sql':
-            mock_config.database = './db';
-            mock_config.database_name = 'testDB_administration.sqlite1';
+            mock_config.database.type = './db';
+            mock_config.database.name = 'testDB_administration.sqlite1';
             db_mock = proxyquire('../../db', {
                 './config': mock_config
             });
             break;
         case 'redis':
-            var fakeredis = require('fakeredis');
-            var client = fakeredis.createClient(9090, 'localhost', {
-                fast: true // Disable simulated network latency
-            });
-            mock_config.database = './db_Redis';
+            mock_config.database.type = './db_Redis';
+            mock_config.database.name = test_config.database_redis;
             db_mock = proxyquire('../../db_Redis', {
-                'redis': { createClient: function() {return client} }
+                './config': mock_config
             });
             break;
     }
@@ -40,20 +39,27 @@ var prepare_tests = function(database) {
         './db': db_mock,
         './server': { logger: function() {}} // Not display logger messages while testing
     });
-    db_mock.init();
+    db_mock.init(function(err) {
+        if (err) {
+            console.log('Error initializing the database');
+            process.exit(1);
+        }
+    });
 }
 
-async.each(databases, function(database, task_callback) {
+async.each(test_config.databases, function(database, task_callback) {
+
     describe('Testing the administration API', function(done) {
 
-
-        beforeEach(function() { // Mock the database
+        before(function() { // Mock the database
             prepare_tests(database);
         });
 
-        after(function() {
+        /**
+         * Remove the database used for testing.
+         */
+        after(function(task_callback) {
             if (database === 'sql') {
-                // Remove the database for testing
                 fs.access('testDB_administration.sqlite1', fs.F_OK, function(err) {
                     if (!err) {
                         fs.unlinkSync('testDB_administration.sqlite1');
@@ -61,7 +67,16 @@ async.each(databases, function(database, task_callback) {
                 });
                 task_callback();
             } else {
-                task_callback();
+                var client = redis.createClient();
+                client.select(test_config.database_redis, function(err) {
+                    if (err) {
+                        console.log('Error deleting redis database: ' + test_config.database_redis);
+                        task_callback();
+                    } else {
+                        client.flushdb();
+                        task_callback();
+                    }
+                });
             }
         });
 
@@ -131,13 +146,6 @@ async.each(databases, function(database, task_callback) {
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
-                it('missing header "X-API-KEY" (400)', function() {
-                    request(api_server.app)
-                        .post('/api/resources')
-                        .set('content-type', 'application/json')
-                        .expect(400, {error: 'Invalid body, url undefined'}, done);
-                });
-
                 it('incorrect body (400)', function(done) {
                     var url = 'http://localhost:9000/path';
                     request(api_server.app)
@@ -155,20 +163,34 @@ async.each(databases, function(database, task_callback) {
                         .expect(400, {error: 'Incorrect url ' + url}, done);
                 });
 
-                it('correct url (200)', function(done) {
+                it('correct url and update the token (200)', function(done) {
                     var url = 'http://localhost:9000/path';
-                    db_mock.newService('/public2', url, function(err) {
+                    db_mock.addToken('token1', function(err) {
                         if (err) {
-                            console.log('Error adding new service');
+                            console.log('Error adding token');
                             process.exit(1);
                         } else {
-                            request(api_server.app)
-                                .post('/api/resources')
-                                .set('content-type', 'application/json')
-                                .send({url: url})
-                                .expect(200, done);
+                            db_mock.newService('/public2', url, function(err) {
+                                if (err) {
+                                    console.log('Error adding new service');
+                                    process.exit(1);
+                                } else {
+                                    request(api_server.app)
+                                        .post('/api/resources')
+                                        .set('content-type', 'application/json')
+                                        .set('X-API-KEY', 'token2')
+                                        .send({url: url})
+                                        .expect(200, function() {
+                                            db_mock.getToken(function(err, token) {
+                                                assert.equal(err, null);
+                                                assert.equal(token, 'token2');
+                                                done();
+                                            });
+                                    });
+                                }
+                            });
                         }
-                    })
+                    });
                 });
             });
 
@@ -209,7 +231,15 @@ async.each(databases, function(database, task_callback) {
                                 .post('/api/users')
                                 .set('content-type', 'application/json')
                                 .send(buy)
-                                .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, done);
+                                .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, function() {
+                                    db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function(err, res) {
+                                        assert.equal(err, null);
+                                        assert.deepEqual(res, { unit: 'megabyte',
+                                          url: 'http://example.com/path',
+                                          publicPath: '/path3' });
+                                        done();
+                                    });
+                            });
                         }
                     })
                 });

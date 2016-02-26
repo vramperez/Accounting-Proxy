@@ -33,7 +33,7 @@ exports.init = function(callback) {
                     productId           TEXT, \
                     customer            TEXT, \
                     unit                TEXT, \
-                    value               TEXT, \
+                    value               INT, \
                     recordType          TEXT, \
                     correlationNumber   TEXT, \
                     PRIMARY KEY (apiKey), \

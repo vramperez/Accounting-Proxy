@@ -65,7 +65,7 @@ describe('Testing SQLITE database', function() {
                     productId           TEXT, \
                     customer            TEXT, \
                     unit                TEXT, \
-                    value               TEXT, \
+                    value               INT, \
                     recordType          TEXT, \
                     correlationNumber   TEXT, \
                     PRIMARY KEY (apiKey), \

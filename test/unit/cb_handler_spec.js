@@ -358,7 +358,12 @@ describe('Testing ContextBroker Handler', function() {
                 method: 'POST',
                 body: body
             }
-            var res = {};
+            var res = {
+                status: function(statusCode) {
+                    return this;
+                },
+                send: function() {}
+            };
             var implementations = {
                 req: req,
                 requester: {
@@ -380,6 +385,9 @@ describe('Testing ContextBroker Handler', function() {
             }
             mocker(implementations, function(cb_handler, spies) {
                 cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.equal(spies.res.status.getCall(0).args[0], 504);
+                    assert.equal(spies.res.send.callCount, 1);
                     assert.equal(err, 'Error sending the subscription to the CB');
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -614,7 +622,12 @@ describe('Testing ContextBroker Handler', function() {
                 },
                 method: 'POST'
             }
-            var res = {}
+            var res = {
+                status: function(statusCode) {
+                    return this;
+                },
+                send: function() {}
+            }
             var implementations = {
                 requester: {
                     request: function(options, callback) {
@@ -636,9 +649,69 @@ describe('Testing ContextBroker Handler', function() {
             }
             mocker(implementations, function(cb_handler, spies) {
                 cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.equal(spies.res.status.getCall(0).args[0], 504);
+                    assert.equal(spies.res.send.callCount, 1);
                     assert.equal(err, 'Error sending the unsubscription to the CB');
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                    done();
+                });
+            });
+        });
+
+        it('[unsubscribe] error deleting the subscription from database', function(done) {
+            var subscriptionId = 'subscriptionId';
+            var req = {
+                body: {
+                    subscriptionId: subscriptionId
+                },
+                method: 'POST'
+            }
+            var resp = {
+                headers: { header1: 'header1'},
+                statusCode: 400
+            }
+            var res = {
+                status: function(statusCode) {
+                    return this;
+                },
+                setHeader: function(header, value) {},
+                send: function(body) {}
+            }
+            var implementations = {
+                requester: {
+                    request: function(options, callback) {
+                        return callback(null, resp, {});
+                    }
+                },
+                req: req,
+                res: res,
+            }
+            var options = {
+                url: 'http://contextBroker/path',
+                method: req.method,
+                json: true,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                },
+                body: req.body
+            }
+            mocker(implementations, function(cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.requester.request.callCount, 1);
+                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
+                    assert.equal(spies.async.forEachOf.callCount, 1);
+                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
+                    assert.equal(spies.res.setHeader.callCount, 1);
+                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
+                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+                    assert.equal(spies.res.send.callCount, 1);
+                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
                     done();
                 });
             });
@@ -708,7 +781,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] error deleting the subscription from database', function(done) {
+        it('[unsubscribe] correct unsubscription', function(done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {

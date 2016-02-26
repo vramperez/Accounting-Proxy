@@ -1257,7 +1257,7 @@ describe('Testing Server', function() {
             var apiKey = 'apiKey';
             var accountingInfo = {
                 publicPath: '/v1/updateContext',
-                url: 'http://example.com/v1/updateContext',
+                url: 'http://example.com',
                 unit: 'megabyte'
             }
             var implementations = {
@@ -1347,7 +1347,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.contextBroker.subscriptionHandler.callCount, 1);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[0], implementations.req);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[1], implementations.res);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[2], accountingInfo.url);
+                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[2], accountingInfo.url + accountingInfo.publicPath);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], 'megabyte');
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[4], 'unsubscribe');
                 assert.equal(spies.logger.error.callCount, 1);
@@ -1362,7 +1362,7 @@ describe('Testing Server', function() {
             var apiKey = 'apiKey';
             var accountingInfo = {
                 publicPath: '/v1/updateContext',
-                url: 'http://example.com/v1/updateContext',
+                url: 'http://example.com',
                 unit: 'megabyte'
             }
             var implementations = {
@@ -1456,9 +1456,9 @@ describe('Testing Server', function() {
                 assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
                 assert.equal(spies.requester.request.callCount, 1);
                 assert.deepEqual(spies.requester.request.getCall(0).args[0], { 
-                    url: 'http://example.com/v1/updateContext',
-                      method: 'GET',
-                      headers: { header1: 'value1' } 
+                        url: 'http://example.com/v1/updateContext',
+                        method: 'GET',
+                        headers: { header1: 'value1' } 
                   });
                   assert.equal(spies.res.setHeader.callCount, 1);
                   assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');

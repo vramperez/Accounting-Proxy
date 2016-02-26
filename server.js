@@ -134,7 +134,7 @@ exports.count = function(apiKey, unit, body, callback) {
 var CBrequestHandler = function(req, res, options, unit) {
     var user = req.get('X-Actor-ID');
     var apiKey = req.get('X-API-KEY');
-
+    
     contextBroker.getOperation(url.parse(options.url).pathname, req, function(operation) {
         if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.subscriptionHandler(req, res, options.url, unit, operation, function(err) {
@@ -184,7 +184,7 @@ var requestHandler = function(options, res, apiKey, unit) {
  */
 var getEndpointPath = function(reqPath, publicPath, callback) {
     if (reqPath === publicPath) { // Public path is the same
-        return callback(null, '');
+        return callback(null, publicPath);
     } else {
         var splitPath = reqPath.split('/');
         if ('/' + splitPath[1] === publicPath) {
@@ -235,6 +235,7 @@ var handler = function(req, res) {
                                     method: req.method,
                                     headers: req.headers
                                 }
+
                                 if (config.resources.contextBroker && 
                                     /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(url.parse(options.url).pathname)) { // Orion ContextBroker request
                                         CBrequestHandler(req, res, options, accountingInfo.unit);

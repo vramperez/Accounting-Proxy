@@ -105,6 +105,7 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
         // Send the request to the CB and redirect the response to the subscriber
         request(options, function(error, resp, body) {
             if (error) {
+                res.status(504).send();
                 return callback('Error sending the subscription to the CB');
             } else {
                 var subscriptionId = body.subscribeResponse.subscriptionId;
@@ -145,6 +146,7 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
         // Sends the request to the CB and redirect the response to the subscriber
         request(options, function(error, resp, body) {
             if (error) {
+                res.status(504).send();
                 return callback('Error sending the unsubscription to the CB');
             } else {
                 res.status(resp.statusCode);
@@ -152,15 +154,19 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
                     res.setHeader(key, header);
                     task_callback();
                 }, function() { 
-                    res.send(body);
                     if (resp.statusCode === 200) {
                         db.deleteCBSubscription(subscriptionId, function(err) {
                             if (err) {
+                                res.send(body);
                                 return callback(err);
                             } else {
+                                res.send(body);
                                 return callback(null);
                             }
                         });
+                    } else {
+                        res.send(body);
+                        return callback(null);
                     }
                 });
             }

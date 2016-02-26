@@ -103,7 +103,6 @@ exports.count = function(apiKey, unit, body, callback) {
     if (acc_modules[unit] === undefined) {
         try {
             acc_modules[unit] = require('./acc_modules/' + unit).count;
-            console
         } catch (e) {
             return callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' +  unit, unit);
         }

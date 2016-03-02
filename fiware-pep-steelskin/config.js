@@ -16,14 +16,9 @@ config.resource = {
         port: 9000,
 
         /**
-         * Port where the proxied server is listening to administration requests
-         */
-        admin_port: 9001,
-
-        /**
         * API paths for administration
         */
-        admin_paths: ['/api/resources', '/api/users', '/api/users/keys']
+        admin_paths: ['/api/resources', '/api/users', '/api/users/keys', '/api/units']
     },
 
     proxy: {

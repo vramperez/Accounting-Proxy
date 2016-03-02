@@ -7,7 +7,7 @@ var db = redis.createClient();
 /*
 * Initialize the database and creates the necessary tables.
 */
-exports.init = function(callback) { 
+exports.init = function(callback) {
     db.select(config.database.name, function(err) {
         if (err) {
             return callback('Error selecting datbase ' + config.database.name + ': ' + err);
@@ -171,17 +171,17 @@ exports.getService = function(publicPath, callback) {
 }
 
 /**
- * Check if the url passed as argument is associated with a service (return true) or not (return false).
+ * Check if the publicPath passed as argument is associated with a service (return true) or not (return false).
  * 
- * @param  {string} url         Url to check.
+ * @param  {string} publicPath         Path to check.
  */
-exports.checkUrl = function(url, callback) {
+exports.checkPath = function(publicPath, callback) {
     db.hgetall('services', function(err, services) {
         if (err) {
             return callback(err, false);
         } else {
-            async.each(services, function(value, task_callback) {
-                if (value === url) {
+            async.forEachOf(services, function(endpoint, path, task_callback) {
+                if (publicPath === path) {
                     return callback(null, true);
                 } else {
                     task_callback(null);
@@ -340,6 +340,8 @@ exports.getNotificationInfo = function(callback) {
             }, function(err) {
                 if (err) {
                     return callback(err, null);
+                } else if (notificationInfo.length === 0) {
+                    return callback(null, null);
                 } else {
                     return callback(null, notificationInfo);
                 }

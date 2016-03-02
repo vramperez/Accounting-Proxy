@@ -1,30 +1,20 @@
-var express = require('express'),
-    crypto = require('crypto'),
+var crypto = require('crypto'),
     config = require('./config'),
     bodyParser = require('body-parser'),
     validation = require('./validation'),
     url = require('url'),
-    db = require(config.database.type);
-
+    db = require(config.database.type),
+    logger = require('winston');
+    
 "use strict";
 
-var app = express();
-var logger = require('./server').logger;
-
 /**
- * Intialize the server.
- */
-exports.run = function() {
-    app.listen(app.get('port'));
-}
-
-/**
- * Check if the url in the request body is a registered url.
+ * Check if the url in the request body is a registered url (registered public path).
  * 
  * @param  {Object} req     Incoming request.
  * @param  {Object} res     Outgoing response.
  */
-var checkUrl = function(req, res) {
+exports.checkUrl = function(req, res) {
     req.setEncoding('utf-8');
     var body = req.body;
 
@@ -38,7 +28,7 @@ var checkUrl = function(req, res) {
                 }
             });
         }
-        db.checkUrl(body.url, function(err, correct) {
+        db.checkPath(url.parse(body.url).pathname, function(err, correct) {
             if (err) {
                 res.status(500).send();
             } else if (correct) {
@@ -56,7 +46,7 @@ var checkUrl = function(req, res) {
  * @param  {Object} req     Incoming request. 
  * @param  {Object} res     Outgoing request.
  */
-var newBuy = function(req, res) {
+exports.newBuy = function(req, res) {
     req.setEncoding('utf-8');
     var body = req.body;
     
@@ -91,7 +81,7 @@ var newBuy = function(req, res) {
  * @param  {Object} req Incoming request.
  * @param  {Object} res Outgoing response.
  */
-var getApiKeys = function(req, res) {
+exports.getApiKeys = function(req, res) {
     var user = req.get('X-Actor-ID');
 
     if (user === undefined) {
@@ -115,7 +105,7 @@ var getApiKeys = function(req, res) {
  * @param  {Object} req Incoming request.
  * @param  {Object} res Outgoing response.
  */
-var getUnits = function(req, res) {
+exports.getUnits = function(req, res) {
     res.status(200).json({units: config.modules.accounting});
 }
 
@@ -140,20 +130,10 @@ var generateApiKey = function(productId, orderId, customer, callback) {
  * @param  {Object}   res  Outgoing response.
  * @param  {Function} next Next function to call.
  */
-var checkIsJSON = function(req, res, next) {
+exports.checkIsJSON = function(req, res, next) {
     if (!req.is('application/json')) {
         res.status(415).json({error: 'Content-Type must be "application/json"'});
     } else {
         next();
     }
 }
-
-app.set('port', config.accounting_proxy.admin_port);
-app.use(bodyParser.json());
-
-app.post('/api/resources', checkIsJSON, checkUrl);
-app.post('/api/users', checkIsJSON, newBuy);
-app.get('/api/users/keys', getApiKeys);
-app.get('/api/units', getUnits);
-
-module.exports.app = app;

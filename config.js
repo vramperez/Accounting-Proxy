@@ -8,13 +8,7 @@ config.accounting_proxy = {
         /**
          * Port where the accounting proxy server is listening.
          */
-        port: 9000,
-
-        /**
-         * Port where the accounting proxy is listening the Store notifications
-         */
-        admin_port: 9001
-
+        port: 9000
 };
 
 // Accounting database configuration
@@ -32,7 +26,7 @@ config.database = {
      * Database name. If the database type selected is './db_Redis', 
      *  then name must be a number (0 by default, and 15 is reserved to test by default).
      */
-    name: 'accountingDB.sqlite',
+    name: 'accountingDB.sqlite'
 
 }
 

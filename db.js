@@ -151,15 +151,15 @@ exports.getService = function(publicPath, callback) {
 }
 
 /**
- * Check if the url passed as argument is associated with a service (return true) or not (return false).
+ * Check if the publicPath passed as argument is associated with a service (return true) or not (return false).
  * 
- * @param  {string} url         Url to check.
+ * @param  {string} publicPath         Path to check.
  */
-exports.checkUrl = function(url, callback) {
+exports.checkPath = function(publicPath, callback) {
     db.all('SELECT * \
             FROM services \
-            WHERE url=$url', {
-                $url: url
+            WHERE publicPath=$publicPath', {
+                $publicPath: publicPath
             }, function(err, services) {
                 if (err) {
                     return callback(err, false);

@@ -6,29 +6,15 @@ var express = require('express'),
     bodyParser = require('body-parser'),
     async = require('async'),
     url = require('url'),
-    winston = require('winston'),
-    request = require('request');
+    request = require('request'),
+    contextBroker = require('./orion_context_broker/cb_handler'),
+    logger = require('winston');
 
 "use strict";
 
 var db = require(config.database.type); 
 var app = express();
 var acc_modules = {};
-var logger = new winston.Logger( {
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: './log/all-log',
-            colorize: false
-        }),
-        new winston.transports.Console({
-            level: 'info',
-            colorize: true
-        })
-    ],
-    exitOnError: false
-});
-var contextBroker = require('./orion_context_broker/cb_handler');
 
 /**
  * Start and configure the server.
@@ -62,7 +48,6 @@ exports.init = function(callback) {
                 });
             });
             app.listen(app.get('port'));
-            api.run();
             return callback(null);
         }
     });
@@ -78,8 +63,8 @@ var notify = function(callback) {
         } else if (notificationInfo === null) { // Not notify
             return callback(null);
         } else {
+            logger.info('Notifying the WStore...');
             async.each(notificationInfo, function(info, task_callback) {
-                logger.info('Notifying the WStore...');
                 notifier.notify(info, function(err) {
                     if (err) {
                         task_callback(err);
@@ -149,6 +134,7 @@ var CBrequestHandler = function(req, res, options, unit) {
 
 /**
  * Send the request to the endpoint, make the accounting and send the response to the user.
+ * 
  * @param  {Object} options Request options.
  * @param  {Object} res     Outgoing response to the user.
  * @param  {string} apiKey  Product identifier.
@@ -252,6 +238,13 @@ var handler = function(req, res) {
 
 app.set('port', config.accounting_proxy.port);
 app.use(bodyParser.json());
+
+app.post('/api/resources', api.checkIsJSON, api.checkUrl);
+app.post('/api/users', api.checkIsJSON, api.newBuy);
+app.get('/api/users/keys', api.getApiKeys);
+app.get('/api/units', api.getUnits);
+
 app.use('/', handler);
+
 module.exports.app = app;
 module.exports.logger = logger;

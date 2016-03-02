@@ -5,8 +5,8 @@ var request = require('request'),
     acc_proxy = require('../server'),
     url = require('url'),
     bodyParser = require('body-parser'),
-    async = require('async')
-    logger = acc_proxy.logger;
+    logger = require('winston'),
+    async = require('async');
 
 var app = express();
 var db = require('../' + config.database.type);

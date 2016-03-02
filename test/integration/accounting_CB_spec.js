@@ -24,8 +24,13 @@ var logger_mock = { // Avoid display server information while running the tests
 }
 
 var api_mock = {
-    run: function(){}
+    checkIsJSON: function() {},
+    checkUrl: function() {},
+    newBuy: function() {},
+    getApiKeys: function(){},
+    getUnits: function() {}
 }
+
 var notifier_mock = {
     notify: function(info) {}
 }
@@ -58,7 +63,16 @@ var mocker = function(database) {
             });
             cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                 '../config': mock_config,
+                './winston': log_mock,
                 '.././db': db_mock
+            });
+            server = proxyquire('../../server', {
+                './config': mock_config,
+                './db': db_mock,
+                './APIServer': api_mock,
+                './notifier': notifier_mock,
+                './orion_context_broker/cb_handler': cb_handler_mock,
+                'winston': log_mock
             });
             break;
         case 'redis':
@@ -71,26 +85,19 @@ var mocker = function(database) {
             });
             cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                 '../config': mock_config,
+                './winston': log_mock,
                 '.././db_Redis': db_mock
+            });
+            server = proxyquire('../../server', {
+                './config': mock_config,
+                './db_Redis': db_mock,
+                './APIServer': api_mock,
+                './notifier': notifier_mock,
+                './orion_context_broker/cb_handler': cb_handler_mock,
+                'winston': log_mock
             });
             break;
     }
-    server = proxyquire('../../server', {
-        './config': mock_config,
-        './db': db_mock,
-        './APIServer': api_mock,
-        './notifier': notifier_mock,
-        './orion_context_broker/cb_handler': cb_handler_mock,
-        'winston': {
-            Logger: function(transports) {
-                return log_mock;
-            },
-            transports: {
-                File: function(params) {},
-                Console: function(params) {}
-            }
-        }
-    });
     db_mock.init(function(err) {
         if (err) {
             console.log('Error initializing the database');

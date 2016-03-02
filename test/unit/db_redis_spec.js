@@ -38,13 +38,15 @@ var mocker = function(implementations, callback) {
     var async_stub = {
         each: async.each,
         waterfall: async.waterfall,
-        apply: async.apply
+        apply: async.apply,
+        forEachOf: async.forEachOf
     }
     // Create necessary spies
     var spies = {
         each: sinon.spy(async_stub, 'each'),
         apply: sinon.spy(async_stub, 'apply'),
-        waterfall: sinon.spy(async_stub, 'waterfall')
+        waterfall: sinon.spy(async_stub, 'waterfall'),
+        forEachOf: sinon.spy(async_stub, 'forEachOf')
     }
     async.forEachOf(implementations, function(implementation, method, task_callback) {
         spies[method.toString()] = sinon.spy(db_mock, method.toString());
@@ -485,7 +487,7 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "checkUrl"', function(done) {
+    describe('Function "checkPath"', function(done) {
 
         it('error getting the service', function(done) {
             var implementations = {
@@ -494,7 +496,7 @@ describe('Testing REDIS database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('http://example.com/url', function(err, check) {
+                db.checkPath('/url', function(err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -515,13 +517,13 @@ describe('Testing REDIS database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('http://example.com/no_exist', function(err, check) {
+                db.checkPath('/no_exist', function(err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], 'services');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], services);
+                    assert.equal(spies.forEachOf.callCount, 1);
+                    assert.equal(spies.forEachOf.getCall(0).args[0], services);
                     done();
                 });
             });
@@ -538,13 +540,13 @@ describe('Testing REDIS database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('http://example.com/url2', function(err, check) {
+                db.checkPath('/public2', function(err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], 'services');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], services);
+                    assert.equal(spies.forEachOf.callCount, 1);
+                    assert.equal(spies.forEachOf.getCall(0).args[0], services);
                     done();
                 });
             }); 
@@ -937,6 +939,25 @@ describe('Testing REDIS database', function() {
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
+                    done();
+                });
+            });
+        });
+
+        it('no notification info available', function(done) {
+            var implementations = {
+                smembers: function(hash, callback) {
+                    return callback(null, null);
+                }
+            }
+            mocker(implementations, function(db, spies) {
+                db.getNotificationInfo(function(err, notificationInfo) {
+                    assert.equal(err, null);
+                    assert.equal(notificationInfo, null);
+                    assert.equal(spies.smembers.callCount, 1);
+                    assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
+                    assert.equal(spies.each.callCount, 1);
+                    assert.equal(spies.each.getCall(0).args[0], null);
                     done();
                 });
             });

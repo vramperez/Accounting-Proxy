@@ -23,7 +23,11 @@ var mock_config = {
 };
 
 var api_mock = {
-	run: function(){}
+	checkIsJSON: function() {},
+	checkUrl: function() {},
+	newBuy: function() {},
+	getApiKeys: function(){},
+	getUnits: function() {}
 }
 
 var notifier_mock = {
@@ -45,6 +49,14 @@ var mocker = function(database) {
 			db_mock = proxyquire('../../db', {
 				'./config': mock_config
 			});
+			server = proxyquire('../../server', {
+				'./config': mock_config,
+				'./db': db_mock,
+				'./APIServer': api_mock,
+				'./notifier': notifier_mock,
+				'winston': log_mock, // Not display logger messages while testing
+				'./orion_context_broker/db_handler': {}
+			});
 			break;
 		case 'redis':
 			mock_config.database.type = './db_Redis';
@@ -52,24 +64,16 @@ var mocker = function(database) {
 			db_mock = proxyquire('../../db_Redis', {
 				'./config': mock_config
 			});
+			server = proxyquire('../../server', {
+				'./config': mock_config,
+				'./db_Redis': db_mock,
+				'./APIServer': api_mock,
+				'./notifier': notifier_mock,
+				'winston': log_mock, // Not display logger messages while testing
+				'./orion_context_broker/db_handler': {}
+			});
 			break;
 	}
-	server = proxyquire('../../server', {
-		'./config': mock_config,
-		'./db': db_mock,
-		'./APIServer': api_mock,
-		'./notifier': notifier_mock,
-		'winston': {
-			Logger: function(transports) {
-                return log_mock;
-            },
-            transports: {
-                File: function(params) {},
-                Console: function(params) {}
-            }
-		}, // Not display logger messages while testing
-		'./orion_context_broker/db_handler': {}
-	});
 	db_mock.init(function(err) {
 		if (err) {
 			console.log('Error initializing the database');

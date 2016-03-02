@@ -85,7 +85,8 @@ var mocker = function(implementations, callback) {
             request: mocks.requester.request,
             'url': mocks.url,
             '../server': mocks.server,
-            './subsUrls': mocks.subsUrls
+            './subsUrls': mocks.subsUrls,
+            'winston': logger
         });
         return callback(cb_handler, spies);
     });

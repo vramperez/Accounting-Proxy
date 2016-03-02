@@ -4,7 +4,7 @@ var request = require('supertest'),
     test_config = require('../config_tests').integration,
     async = require('async'),
     redis = require('redis'),
-    api_server,
+    server,
     db_mock;
     
 var mock_config = {
@@ -12,10 +12,17 @@ var mock_config = {
         accounting: ['call', 'megabyte']
     },
     accounting_proxy: {
-        admin_port: 9001
+        port: 9000
     },
     database: {}
 };
+
+var log_mock = {
+    log: function(level, msg) {},
+    info: function(msg) {},
+    warn: function(msg) {},
+    error: function(msg) {}
+}
 
 var prepare_tests = function(database) {
     switch (database) {
@@ -25,6 +32,18 @@ var prepare_tests = function(database) {
             db_mock = proxyquire('../../db', {
                 './config': mock_config
             });
+            api_server = proxyquire('../../APIServer', {
+                './config': mock_config,
+                './db': db_mock
+            });
+            server = proxyquire('../../server', {
+                './config': mock_config,
+                './db': db_mock,
+                './APIServer': api_server,
+                './notifier': {},
+                'winston': log_mock, // Not display logger messages while testing
+                './orion_context_broker/db_handler': {}
+            });
             break;
         case 'redis':
             mock_config.database.type = './db_Redis';
@@ -32,13 +51,20 @@ var prepare_tests = function(database) {
             db_mock = proxyquire('../../db_Redis', {
                 './config': mock_config
             });
+            api_server = proxyquire('../../APIServer', {
+                './config': mock_config,
+                './db_Redis': db_mock
+            });
+            server = proxyquire('../../server', {
+                './config': mock_config,
+                './db_Redis': db_mock,
+                './APIServer': api_server,
+                './notifier': {},
+                'winston': log_mock, // Not display logger messages while testing
+                './orion_context_broker/db_handler': {}
+            });
             break;
     }
-    api_server = proxyquire('../../APIServer', {
-        './config': mock_config,
-        './db': db_mock,
-        './server': { logger: function() {}} // Not display logger messages while testing
-    });
     db_mock.init(function(err) {
         if (err) {
             console.log('Error initializing the database');
@@ -85,7 +111,7 @@ async.each(test_config.databases, function(database, task_callback) {
             describe('[GET: /api/units] accounting units request', function() {
 
                 it('correct (200) return all the accounting units', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                         .get('/api/units')
                         .expect(200, {units: ['call', 'megabyte']}, done);
                 });
@@ -94,13 +120,13 @@ async.each(test_config.databases, function(database, task_callback) {
             describe('[GET: /api/users/keys] user api-keys request', function() {
 
                 it('no "X-Actor-ID header" (400)', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                         .get('/api/users/keys')
                         .expect(400, {error: 'Undefined "X-Actor-ID" header'}, done);
                 });
 
                 it('no valid user (400)', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                         .get('/api/users/keys')
                         .set('X-Actor-ID', 'wrong')
                         .expect(400, done);
@@ -126,10 +152,10 @@ async.each(test_config.databases, function(database, task_callback) {
                                     console.log('Error adding new service');
                                     process.exit(1);
                                 } else {
-                                    request(api_server.app)
-                                                .get('/api/users/keys')
-                                                .set('X-Actor-ID', buyInfo1.customer)
-                                                .expect(200, [{ apiKey: 'apiKey1', productId: 'productId', orderId: 'orderId1' }], done);
+                                    request(server.app)
+                                        .get('/api/users/keys')
+                                        .set('X-Actor-ID', buyInfo1.customer)
+                                        .expect(200, [{ apiKey: 'apiKey1', productId: 'productId', orderId: 'orderId1' }], done);
                                 }
                             });
                         }
@@ -140,7 +166,7 @@ async.each(test_config.databases, function(database, task_callback) {
             describe('[POST: /api/resources] checkUrl request', function() {
 
                 it('invalid content-type (415)', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                         .post('/api/resources')
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
@@ -148,7 +174,7 @@ async.each(test_config.databases, function(database, task_callback) {
 
                 it('incorrect body (400)', function(done) {
                     var url = 'http://localhost:9000/path';
-                    request(api_server.app)
+                    request(server.app)
                         .post('/api/resources')
                         .set('content-type', 'application/json')
                         .expect(400, {error: 'Invalid body, url undefined'}, done);
@@ -156,7 +182,7 @@ async.each(test_config.databases, function(database, task_callback) {
 
                 it('invalid url (400)', function(done) {
                     var url = 'http://localhost:9000/wrong_path';
-                    request(api_server.app)
+                    request(server.app)
                         .post('/api/resources')
                         .set('content-type', 'application/json')
                         .send({url: url})
@@ -175,7 +201,7 @@ async.each(test_config.databases, function(database, task_callback) {
                                     console.log('Error adding new service');
                                     process.exit(1);
                                 } else {
-                                    request(api_server.app)
+                                    request(server.app)
                                         .post('/api/resources')
                                         .set('content-type', 'application/json')
                                         .set('X-API-KEY', 'token2')
@@ -197,14 +223,14 @@ async.each(test_config.databases, function(database, task_callback) {
             describe('[POST: /api/users] new buy request', function() {
 
                 it('invalid content-type (415)', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                         .post('/api/users')
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('invalid json (400)', function(done) {
-                    request(api_server.app)
+                    request(server.app)
                             .post('/api/users')
                             .set('content-type', 'application/json')
                             .send({})
@@ -227,7 +253,7 @@ async.each(test_config.databases, function(database, task_callback) {
                             console.log('Error adding new service');
                             process.exit(1);
                         } else {
-                            request(api_server.app)
+                            request(server.app)
                                 .post('/api/users')
                                 .set('content-type', 'application/json')
                                 .send(buy)

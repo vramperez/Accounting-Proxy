@@ -342,11 +342,11 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "checkUrl"', function() {
+    describe('Function "checkPath"', function() {
         var sentence = 'SELECT * \
             FROM services \
-            WHERE url=$url';
-        var params = {'$url': 'url'}
+            WHERE publicPath=$publicPath';
+        var params = {'$publicPath': '/path'}
 
         it('error checking the url', function(done) {
             var implementations = {
@@ -355,7 +355,7 @@ describe('Testing SQLITE database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('url', function(err, check) {
+                db.checkPath('/path', function(err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check,  false);
                     assert.equal(spies.all.callCount, 1);
@@ -373,7 +373,7 @@ describe('Testing SQLITE database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('url', function(err, check) {
+                db.checkPath('/path', function(err, check) {
                     assert.equal(err, null);
                     assert.equal(check,  false);
                     assert.equal(spies.all.callCount, 1);
@@ -391,7 +391,7 @@ describe('Testing SQLITE database', function() {
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.checkUrl('url', function(err, check) {
+                db.checkPath('/path', function(err, check) {
                     assert.equal(err, null);
                     assert.equal(check,  true);
                     assert.equal(spies.all.callCount, 1);

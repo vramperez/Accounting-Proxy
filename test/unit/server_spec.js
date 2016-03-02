@@ -9,18 +9,13 @@ var proxyquire = require('proxyquire').noCallThru(),
 var mocker = function(implementations, callback) {
     var mocks, spies, proxy_server;
 
-    var log_mock = {
-        log: function(level, msg) {},
-        info: function(msg) {},
-        warn: function(msg) {},
-        error: function(msg) {}
-    }
     mocks = {
         app: {
             set: function(prop, value) {},
             listen: function(port) {},
             get: function(prop) {},
-            use: function(middleware) {}
+            use: function(middleware) {},
+            post: function(path, middleware, handler) {}
         },
         req: {},
         res: {},
@@ -38,13 +33,10 @@ var mocker = function(implementations, callback) {
         },
         db: {},
         logger: {
-            Logger: function(transports) {
-                return log_mock;
-            },
-            transports: {
-                File: function(params) {},
-                Console: function(params) {}
-            }
+            log: function(level, msg) {},
+            info: function(msg) {},
+            warn: function(msg) {},
+            error: function(msg) {}
         },
         contextBroker: {},
         acc_modules: {}
@@ -66,10 +58,10 @@ var mocker = function(implementations, callback) {
         requester: {},
         db: {},
         logger: {
-            log: sinon.spy(log_mock, 'log'),
-            warn: sinon.spy(log_mock, 'warn'),
-            info: sinon.spy(log_mock, 'info'),
-            error: sinon.spy(log_mock, 'error')
+            log: sinon.spy(mocks.logger, 'log'),
+            warn: sinon.spy(mocks.logger, 'warn'),
+            info: sinon.spy(mocks.logger, 'info'),
+            error: sinon.spy(mocks.logger, 'error')
         },
         contextBroker: {},
         acc_modules: {}
@@ -146,7 +138,7 @@ describe('Testing Server', function() {
                     assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
                     done();
-                })
+                });
             });
         });
 
@@ -194,9 +186,6 @@ describe('Testing Server', function() {
                 },
                 cron: {
                     scheduleJob: function(schedule, callback) {}
-                },
-                api: {
-                    run: function() {}
                 }
             }
             mocker(implementations, function(server, spies) {
@@ -208,10 +197,9 @@ describe('Testing Server', function() {
                     assert.equal(spies.contextBroker.run.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
-                    assert.equal(spies.app.get.callCount, 1);
-                    assert.equal(spies.app.get.getCall(0).args[0], 'port');
+                    assert.equal(spies.app.get.callCount, 3);
+                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
                     assert.equal(spies.app.listen.callCount, 1);
-                    assert.equal(spies.api.run.callCount, 1);
                     done();
                 });
             });
@@ -300,9 +288,6 @@ describe('Testing Server', function() {
                     scheduleJob: function(schedule, callback) {
                         return callback();
                     }
-                },
-                api: {
-                    run: function() {}
                 }
             }
             mocker(implementations, function(server, spies) {
@@ -317,10 +302,9 @@ describe('Testing Server', function() {
                     assert.equal(spies.contextBroker.run.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
-                    assert.equal(spies.app.get.callCount, 1);
-                    assert.equal(spies.app.get.getCall(0).args[0], 'port');
+                    assert.equal(spies.app.get.callCount, 3);
+                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
                     assert.equal(spies.app.listen.callCount, 1);
-                    assert.equal(spies.api.run.callCount, 1);
                     done();
                 });
             });
@@ -346,7 +330,9 @@ describe('Testing Server', function() {
             var implementations = {
                 app: {
                     listen: function(port) {},
-                    get: function(prop) {}
+                    get: function(prop) {},
+                    post: function(path, middleware, handler) {},
+                    use: function(middleware) {}
                 },
                 db: {
                     count: 0,
@@ -379,8 +365,8 @@ describe('Testing Server', function() {
                     }
                 }
             }
-            var info_args = [ 'Notifying the WStore...', 'Notifying the WStore...', 'Loading module for Orion Context Broker...',
-                            'Sending accounting information...', 'Notifying the WStore...', 'Notifying the WStore...'];
+            var info_args = [ 'Notifying the WStore...', 'Loading module for Orion Context Broker...', 'Sending accounting information...',
+                            'Notifying the WStore...'];
             mocker(implementations, function(server, spies) {
                 server.init(function(err) {
                     assert.equal(err, null);
@@ -393,10 +379,14 @@ describe('Testing Server', function() {
                     assert.equal(spies.contextBroker.run.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
-                    assert.equal(spies.app.get.callCount, 1);
-                    assert.equal(spies.app.get.getCall(0).args[0], 'port');
+                    assert.equal(spies.app.post.callCount, 2);
+                    assert.equal(spies.app.post.getCall(0).args[0], '/api/resources');
+                    assert.equal(spies.app.post.getCall(1).args[0], '/api/users');
+                    assert.equal(spies.app.get.callCount, 3);
+                    assert.equal(spies.app.get.getCall(0).args[0], '/api/users/keys');
+                    assert.equal(spies.app.get.getCall(1).args[0], '/api/units');
+                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
                     assert.equal(spies.app.listen.callCount, 1);
-                    assert.equal(spies.api.run.callCount, 1);
                     done();
                 });
             });

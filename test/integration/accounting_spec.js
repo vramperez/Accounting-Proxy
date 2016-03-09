@@ -1,45 +1,51 @@
 var request = require('supertest'),
 	assert = require('assert'),
-	proxyquire = require('proxyquire'),
+	proxyquire = require('proxyquire').noCallThru(),
 	redis_mock = require('fakeredis'),
 	test_endpoint = require('./test_endpoint'),
 	config_tests = require('../config_tests'),
 	async = require('async'),
-	databases = require('../config_tests').integration.databases,
+	test_config = require('../config_tests').integration,
 	fs = require('fs'),
-	prepare_test = require('./prepareDatabase');
+	prepare_test = require('./prepareDatabase'),
+	redis = require('redis');
 
 var server, db_mock;
-var mock_config = {};
 
-var logger_mock = { // Avoid display server information while running the tests
-	Logger: function(transports) {
-		return {
-			log: function(level, msg) {},
-			info: function(msg) {},
-			warn: function(msg) {},
-			error: function(msg) {}
-		} 
-	}
-}
-
-console.log('[LOG]: starting an endpoint for testing...');
-test_endpoint.run(config_tests.integration.accounting_port);
+var mock_config = {
+	accounting_proxy: {
+		port: 9000
+	},
+	resources: {
+		contextBroker: false
+	},
+	database: {}
+};
 
 var api_mock = {
-	run: function(){}
+	checkIsJSON: function() {},
+	checkUrl: function() {},
+	newBuy: function() {},
+	getApiKeys: function(){},
+	getUnits: function() {}
 }
+
 var notifier_mock = {
-	notify: function(info) {}
+	notify: function(info, callback) {}
+}
+
+var log_mock = {
+	log: function(level, msg) {},
+	info: function(msg) {},
+	warn: function(msg) {},
+	error: function(msg) {}
 }
 
 var mocker = function(database) {
 	switch (database) {
 		case 'sql':
-			mock_config = {
-				database: './db',
-				database_name: 'testDB_accounting.sqlite'
-			}
+			mock_config.database.type = './db';
+			mock_config.database.name = 'testDB_accounting.sqlite';
 			db_mock = proxyquire('../../db', {
 				'./config': mock_config
 			});
@@ -48,238 +54,288 @@ var mocker = function(database) {
 				'./db': db_mock,
 				'./APIServer': api_mock,
 				'./notifier': notifier_mock,
-				'winston': logger_mock
+				'winston': log_mock, // Not display logger messages while testing
+				'./orion_context_broker/db_handler': {}
 			});
-			db_mock.init();
 			break;
 		case 'redis':
-			mock_config = {
-				database: './db_Redis'
-			}
+			mock_config.database.type = './db_Redis';
+            mock_config.database.name = test_config.database_redis;
 			db_mock = proxyquire('../../db_Redis', {
-				'redis': require('fakeredis')
+				'./config': mock_config
 			});
 			server = proxyquire('../../server', {
 				'./config': mock_config,
 				'./db_Redis': db_mock,
 				'./APIServer': api_mock,
 				'./notifier': notifier_mock,
-				'winston': logger_mock
+				'winston': log_mock, // Not display logger messages while testing
+				'./orion_context_broker/db_handler': {}
 			});
 			break;
 	}
+	db_mock.init(function(err) {
+		if (err) {
+			console.log('Error initializing the database');
+            process.exit(1);
+		}
+	});
 }
 
+console.log('[LOG]: starting an endpoint for testing...');
+test_endpoint.run(config_tests.integration.accounting_port);
 
-describe('Testing the accounting API', function() {
+async.each(test_config.databases, function(database, task_callback) {
 
-	describe('generic REST use', function() {
+	describe('Testing the accounting API. Generic REST use', function() {
+		
 
-		async.each(databases, function(database, task_callback) {
+		before(function() {
+			mocker(database);
+		});
 
-			describe('with database ' + database, function() {
+		/**
+		 * Remove the database used for testing.
+		 */
+		after(function(task_callback) {
+		 	if (database === 'sql') {
+		 		fs.access('./testDB_accounting.sqlite', fs.F_OK, function(err) {
+		 			if (!err) {
+		 				fs.unlinkSync('./testDB_accounting.sqlite');
+		 			}
+		 		});
+		 		task_callback();
+		 	} else {
+		 		var client = redis.createClient();
+		 		client.select(test_config.database_redis, function(err) {
+		 			if (err) {
+		 				console.log('Error deleting redis database');
+		 				task_callback();
+		 			} else {
+		 				client.flushdb();
+		 				task_callback();
+		 			}
+		 		});
+		 	} 
+		});
 
-				beforeEach(function() {
-					mocker(database);
+		describe('with database ' + database, function() {
+
+			it('undefined header "X-Actor-ID" (401)', function(done) {
+				request(server.app)
+				.get('/private')
+				.expect(401, { error: 'Undefined "X-Actor-ID" header'}, done);
+			});
+
+			it('undefined header "X-API-KEY" (401)', function(done) {
+				request(server.app)
+				.get('/private')
+				.set('X-Actor-ID', '0001')
+				.expect(401, { error: 'Undefined "X-API-KEY" header'}, done);
+			});
+
+			it('invalid apiKey (401)', function(done) {
+				var services = [{ publicPath: '/public1', url: 'http://localhost:9000/private1'}];
+				var buys = [{
+					apiKey: 'apiKey1',
+					publiPath: '/public1',
+					orderId: 'orderId1',
+					productId: 'productId1',
+					customer: '0001',
+					unit: 'call',
+					recordType: 'callusage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get('/private')
+						.set('X-Actor-ID', '0001')
+						.set('X-API-KEY', 'wrong')
+						.expect(401, { error: 'Invalid API_KEY or user'}, done);
+					}
 				});
+			});
 
-				after(function() {
-					// Remove the database for testing
-					fs.access('./testDB_accounting.sqlite', fs.F_OK, function(err) {
-						if (!err) {
-							fs.unlinkSync('./testDB_accounting.sqlite');
-						}
-					});
-					task_callback();
+			it('invalid user (401)', function(done) {
+				var services = [{ publicPath: '/public2', url: 'http://localhost:9000/private2'}]
+				var buys = [{
+					apiKey: 'apiKey2',
+					publiPath: '/public2',
+					orderId: 'orderId2',
+					productId: 'productId2',
+					customer: '0002',
+					unit: 'call',
+					recordType: 'callusage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get('/private')
+						.set('X-Actor-ID', 'wrong')
+						.set('X-API-KEY', 'apiKey1')
+						.expect(401, { error: 'Invalid API_KEY or user'}, done);
+					}
 				});
+			});
 
-				it('error (400) undefined "X-Actor-ID" header', function(done) {
-					request(server.app)
-						.post('/public')
-						.expect(400, { error: 'Undefined "X-Actor-ID" header' }, done);
+			it('invalid path (400)', function(done) {
+				var services = [ { publicPath: '/public3', url: 'http://localhost:9000/private3' } ];
+				var buys = [{
+					apiKey: 'apiKey3',
+					publicPath: '/public3',
+					orderId: 'orderId3',
+					productId: 'productId3',
+					customer: '0003',
+					unit: 'call',
+					recordType: 'callusage'
+				}];
+				var path = '/wrong';
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get(path)
+						.set('X-Actor-ID', '0003')
+						.set('X-API-KEY', 'apiKey3')
+						.expect(400, { error: 'Invalid public path ' + path}, done);
+					}
 				});
+			});
 
-				it('error (400) undefined "X-API-KEY" header', function(done) {
-					request(server.app)
-						.post('/public')
-						.set('X-Actor-ID', 'actor_id')
-						.expect(400, { error: 'Undefined "X-API-KEY" header' }, done);
+			it('error sending request to the endpoint (504)', function(done) {
+				var services = [{ publicPath: '/public4', url: 'wrong_url' } ];
+				var buys = [{
+					apiKey: 'apiKey4',
+					publicPath: '/public4',
+					orderId: 'orderId4',
+					productId: 'productId4',
+					customer: '0004',
+					unit: 'call',
+					recordType: 'callusage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get(services[0].publicPath)
+						.set('X-Actor-ID', '0004')
+						.set('X-API-KEY', 'apiKey4')
+						.expect(504, done);
+					}
 				});
+			});
 
-				it('error (401) invalid API_KEY, user or path', function(done) {
-					request(server.app)
-						.post('/public')
-						.set('X-Actor-ID', 'wrong_actorID')
-						.set('X-API-KEY', 'wrong_api_key')
-						.expect(401, { error: 'Invalid API_KEY, user or path' }, done);
-				});
-
-				it('correct (200) response from the service, call accounting', function(done) {
-					var services = [{
-						path: '/public',
-						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/example1'
-					}];
-					var resources = [{
-						offering: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0'
-						},
-						publicPath: '/public',
-						record_type: 'rec_type',
-						unit: 'call',
-						component_label: 'callusage'
-					}];
-					var info = [{
-						api_key: 'api_key1',
-						info: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0',
-							reference: '000000000000002',
-							actorID: '0001',
-							accounting: {
-								'/public': {
-									num: 0,
-									correlation_number: '0002'
-								}
-							}
-						}
-					}];
-					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
-						if (err) {
-							console.log('Error preparing the database');
-							process.exit(1);
-						} else {
-							request(server.app)
-								.get('/public')
-								.set('X-Actor-ID', '0001')
-								.set('X-API-KEY', 'api_key1')
-								.expect(200, function() {
-									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
-										if (err) {
-											console.log('Error checking the accounting');
-											process.exit(1);
-										} else {
-											assert.equal(info['num'], 1);
-											done();
-										}
-									})
+			it('correct (200) response and accounting (call unit)', function(done) {
+				var services = [{ publicPath: '/public5', url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/call' } ];
+				var buys = [{
+					apiKey: 'apiKey5',
+					publicPath: '/public5',
+					orderId: 'orderId5',
+					productId: 'productId5',
+					customer: '0005',
+					unit: 'call',
+					recordType: 'callusage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get(services[0].publicPath)
+						.set('X-Actor-ID', '0005')
+						.set('X-API-KEY', 'apiKey5')
+						.expect(200, function() {
+							db_mock.getNotificationInfo(function(err, accInfo) {
+								assert.equal(err, null);
+								assert.deepEqual(accInfo[0], {
+									apiKey: 'apiKey5',
+									correlationNumber: '0',
+									customer: '0005',
+									orderId: 'orderId5',
+									productId: 'productId5',
+									recordType: 'callusage',
+									unit: 'call',
+									value: '1'
 								});
-						}
-					});
+								done();
+							});
+						});
+					}
 				});
+			});
 
-				it('correct (200) response from the service, megabyte accounting', function(done) {
-					var services = [{
-						path: '/public',
-						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/example2'
-					}];
-					var resources = [{
-						offering: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0'
-						},
-						publicPath: '/public',
-						record_type: 'rec_type',
-						unit: 'megabyte',
-						component_label: 'megabyteCounting'
-					}];
-					var info = [{
-						api_key: 'api_key1',
-						info: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0',
-							reference: '000000000000002',
-							actorID: '0001',
-							accounting: {
-								'/public': {
-									num: 0,
-									correlation_number: '0002'
-								}
-							}
-						}
-					}];
-					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
-						if (err) {
-							console.log('Error preparing the database');
-							process.exit(1);
-						} else {
-							request(server.app)
-								.get('/public')
-								.set('X-Actor-ID', '0001')
-								.set('X-API-KEY', 'api_key1')
-								.expect(200, function() {
-									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
-										if (err) {
-											console.log('Error checking the accounting');
-											process.exit(1);
-										} else {
-											assert.equal(info['num'], 0.00000858306884765625);
-											done();
-										}
-									})
+			it('correct (200) response and accounting (megabyte unit)', function(done) {
+				var services = [{ publicPath: '/public6', url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/megabyte' } ];
+				var buys = [{
+					apiKey: 'apiKey6',
+					publicPath: '/public6',
+					orderId: 'orderId6',
+					productId: 'productId6',
+					customer: '0006',
+					unit: 'megabyte',
+					recordType: 'datausage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get(services[0].publicPath)
+						.set('X-Actor-ID', '0006')
+						.set('X-API-KEY', 'apiKey6')
+						.expect(200, function() {
+							db_mock.getNotificationInfo(function(err, accInfo) {
+								async.each(accInfo, function(acc, task_callback) {
+									if (acc.apiKey === buys.apiKey) {
+										assert.equal(err, null);
+										assert.deepEqual(acc, {});
+										task_callback();
+									} else {
+										task_callback();
+									}
+								}, function() {
+									done();
 								});
-						}
-					});
+							});
+						});
+					}
 				});
+			});
 
-				it('error (400) response from the service', function(done) {
-					var services = [{
-						path: '/public',
-						url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/wrong'
-					}];
-					var resources = [{
-						offering: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0'
-						},
-						publicPath: '/public',
-						record_type: 'rec_type',
-						unit: 'megabyte',
-						component_label: 'callusage'
-					}];
-					var info = [{
-						api_key: 'api_key1',
-						info: {
-							organization: 'test_org',
-							name: 'test_name',
-							version: '1.0',
-							reference: '000000000000002',
-							actorID: '0001',
-							accounting: {
-								'/public': {
-									num: 0,
-									correlation_number: '0002'
-								}
-							}
-						}
-					}];
-					prepare_test.addToDatabase(db_mock, services, resources, info, [], function(err) {
-						if (err) {
-							console.log('Error preparing the database');
-							process.exit(1);
-						} else {
-							request(server.app)
-								.get('/public')
-								.set('X-Actor-ID', '0001')
-								.set('X-API-KEY', 'api_key1')
-								.expect(400, function() {
-									db_mock.getNotificationInfo('api_key1', '/public', function(err, info) {
-										if (err) {
-											console.log('Error checking the accounting');
-											process.exit(1);
-										} else {
-											assert.equal(info['num'], 0.00000858306884765625);
-											done();
-										}
-									});
-								});
-						}
-					});
+			it('error (500) making the accounting (invalid unit)', function(done) {
+				var services = [{ publicPath: '/public7', url: 'http://localhost:' + config_tests.integration.accounting_port + '/rest/call' } ];
+				var buys = [{
+					apiKey: 'apiKey7',
+					publicPath: '/public7',
+					orderId: 'orderId7',
+					productId: 'productId7',
+					customer: '0007',
+					unit: 'wrong',
+					recordType: 'datausage'
+				}];
+				prepare_test.addToDatabase(db_mock, services, buys, [], function(err) {
+					if (err) {
+						console.log('Error preparing the database');
+						process.exit(1);
+					} else {
+						request(server.app)
+						.get(services[0].publicPath)
+						.set('X-Actor-ID', '0007')
+						.set('X-API-KEY', 'apiKey7')
+						.expect(500, done);
+					}
 				});
 			});
 		});

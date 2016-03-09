@@ -16,14 +16,9 @@ config.resource = {
         port: 9000,
 
         /**
-         * Port where the proxied server is listening to administration requests
-         */
-        admin_port: 9001,
-
-        /**
         * API paths for administration
         */
-        admin_paths: ['/api/users', 'api/resources', '/api/users/keys']
+        admin_paths: ['/api/resources', '/api/users', '/api/users/keys', '/api/units']
     },
 
     proxy: {
@@ -76,7 +71,7 @@ config.access = {
  */
 config.authentication = {
     checkHeaders: true,
-    module: 'keystone',
+    module: 'idm',
     user: 'pepproxy',
     password: 'pepproxy',
     domainName: 'admin_domain',
@@ -87,7 +82,7 @@ config.authentication = {
         roles: 60
     },
     options: {
-        protocol: 'http',
+        protocol: 'https',
         host: 'localhost',
         port: 5000,
         path: '/v3/role_assignments',

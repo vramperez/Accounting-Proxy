@@ -38,31 +38,39 @@ npm install
 All the Accounting Proxy configuration is stored in the `config.js` file in the root of the project folder.
 
 In order to have the accounting proxy running there are some information to fill:
-
 * `config.accounting_proxy`: the information of the accounting proxy itself.
- - `port`: port where the accounting proxy server is listening to client requests.
- - `store_port`:  port where the accounting proxy is listening to WStore notifications.
+ - `port`: port where the accounting proxy server is listening.
 ```
 {
-		port: 9000,
-    	store_port: 9001
+		port: 9000
 }
 ```
-* `config.database`: the database used by the proxy. Possible options:
-	- './db' : an SQL database (sqlite).
-	- './db_Redis' : a Redis database.
-* `config.database_name`: the database name for the SQL database ('accountingDB.sqlite' by default).
-* `config.modules`:  an array of accounting modules for accounting in different ways.
+
+* `config.database`: database configuration used by the proxy. Possible options:
+ - `type`: database type. Two possible options: `./db` (slite database) or `./db_Redis` (redis database).
+ - `name`: database name. If the database type select is redis, then this field select the database (0 to 14; 15 is reserved for testing).
 ```
 {
-    accounting: [ 'call', 'megabyte']
+		type: './db',
+    	name: 'accountingDB.sqlite'
 }
 ```
+
+* `config.modules`:  an array of supported accounting modules for accounting in different ways. Possible options are:
+	- `call`: accounting incremented in one unit each time the user send a request.
+	- `megabyte`: count the response amount of data  (in megabytes) and add to the actual accounting.
+```
+{
+		accounting: [ 'call', 'megabyte']
+}
+```
+Other accounting modules can be implemented and added here (see  [Accounting module](#accountingmodule) ).
+
 
 * `config.WStore`: the information of the WStore server.
 	- `accounting_host`: WStore host.
 	- `accounting_path`: WStore path for accounting notifications.
-	- `accounting_port`: Wstore port.
+	- `accounting_port`: WStore port.
 ```
 {
         accounting_host: 'localhost',
@@ -100,14 +108,12 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 * Finally, configure the PEP-Proxy `config.js` file copied in the previous step:
 	- `config.resource.original.host`: the Accounting Proxy host.
 	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
-	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
 	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
 ```
 {
         host: 'localhost',
         port: 9000,
-        admin_port: 9001,
-        admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
+        admin_paths: ['/api/users', '/api/resources', '/api/users/keys', '/api/units']
 }
 ```
 
@@ -124,15 +130,13 @@ In order to configure the Accounting Proxy working with other components follow 
 * Finally, configure the PEP-Proxy `config.js` file copied in the previous step:
 	- `config.resource.original.host`: the Accounting Proxy host.
 	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
-	- `admin_port` : the Accounting Proxy port where administration accounting proxy is listening (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.store_port`, 9001 by default).
 	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
 
 ```
 {
 	host: 'localhost',
     port: 9000,
-    admin_port: 9001,
-    admin_paths: ['/api/users', '/api/resources', '/api/users/keys']
+    admin_paths: ['/api/users', '/api/resources', '/api/users/keys', '/api/units']
 }
 ```
 
@@ -153,66 +157,36 @@ In order to manage servicies, use 'cli' tool. There are four commands available:
 * `./cli addService <publicPath> <url>`: binds the public path with the url specified.
 * `./cli getService <publicPath>`: returns the url associated with the public path.
 * `./cli deleteService <publicPath>`: delete the service associated with the public path.
-* `./cli getInfo <userID>`: returns information associated with the userID.
 
-To display brief information: `./cli -h`
+To display brief information: `./cli -h` or `./cli --help`.
 
 ## <a name="proxyapi"/> Proxy API
 
-Proxy's api is in port **9001** and root path **/api/..**.
+Proxy's api is in port **9000** by default and root path **/api/..**.
 
 ### POST ../users
 
-Use by the store to notify a offer purchase. Format example:
+Use by the store to notify a new buy:
 ```json
 {
-    "offering": {
-        "organization": "...",
-        "name": "...",
-        "version": "..."
-    },
-    "provider": "...",
-    "name": "...",
-    "version": "...",
-    "content_type":"...",
-    "url": "http://...",
-    "record_type": "...",
-    "unit": "...",
-    "component_label": "..."
+ "orderId": "...",
+ "productId": "...",
+ "customer": "...",
+ "productSpecification": {
+	"url": "...",
+	"unit": "...",
+	"recordType": "..."
+ }
 }
 ```
 * `unit`: accounting unit (`megabyte`, `call`, ...).
 
 ### POST ../resources
 
-Use by the store to notify a new resource include in an offer. Format example:
+Use by the store to check an URL:
 ```json
 {
-  "offering": {
-    "organization": "...",
-    "name": "...",
-    "version": "..."
-  },
-  "reference": "...",
-  "customer": "...",
-  "customer_name": "...",
-  "resources": 
- [
-    {
-      "provider": "...",
-      "name": "...",
-      "version": "...",
-      "content_type":"...",
-      "url": "http://..."
-    },
-    {
-      "provider": "...",
-      "name": "...",
-      "version": "...",
-      "content_type":"...",
-      "url": "http://..."
-    }
-  ]
+ "url": "..."
 }
 ```
 
@@ -222,16 +196,21 @@ Retrieve the user's API_KEYs in a json:
 
 ```json
 [
-    {
-        " offering": {
-            "organization": "...",
-            "name": "...",
-            "version": "..."
-        },
-        "API_KEY": "..."
-    },
-    ...
+	{
+    	"apiKey": "...",
+        "productId": "...",
+        "orderId": "..."
+    }
 ]
+```
+
+### GET /api/units
+
+Retrieve the supported accounting units by the accounting proxy in a JSON:
+```json
+{
+	"units": ["..."]
+}
 ```
 
 ## <a name="development"/> Development
@@ -240,7 +219,7 @@ Retrieve the user's API_KEYs in a json:
 
 Accounting modules should be implemented following the next code:
 
-```
+```javascript
 /** Accounting module for unit: XXXXXX */
 
 exports.count = function(response, callback) {
@@ -265,4 +244,4 @@ npm test
 Test reporter generates a directory `./coverage` with all the coverage information (coverage reporter is generated by Istanbul).
 
 ---
-Last updated: _11/02/2016
+Last updated: _02/03/2016

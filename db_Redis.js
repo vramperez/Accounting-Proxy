@@ -1,456 +1,485 @@
 var redis = require('redis'),
-	async = require('async'),
-	winston = require('winston'),
-	db;
+    config = require('./config'),
+    async = require('async');
 
-db = redis.createClient();
-var logger = new winston.Logger({
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: './log/all-log',
-            colorize: false
-        })
-    ],
-    exitOnError: false
-});
+var db = redis.createClient();
 
+/*
+* Initialize the database and creates the necessary tables.
+*/
+exports.init = function(callback) {
+    db.select(config.database.name, function(err) {
+        if (err) {
+            return callback('Error selecting datbase ' + config.database.name + ': ' + err);
+        } else {
+            return callback(null);
+        }
+    });
+};
 
-db.on('error', function(err) {
-	logger.warn("%s". err);
-});
+/**
+ * Save the token to notify the WStore.
+ */
+exports.addToken = function(token, callback) {
+    var multi = db.multi();
 
-exports.init = function() {};
-
-exports.checkInfo = function(user, api_key, publicPath, callback) {
-	var unit;
-
-	db.smembers(user, function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(api_keys, function(entry, task_callback) {
-				if (api_key === entry) {
-					db.hgetall(api_key, function(err, api_key_info) {
-						if (err) {
-							task_callback(err);
-						} else {
-							checkInfoAux(api_key_info, publicPath, function(err, res) {
-								if (err) {
-									task_callback(err);
-								} else {
-									unit = res;
-									task_callback();
-								}
-							});
-						}
-					});
-				} else {
-					task_callback();
-				}
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else if (unit == null) {
-					return callback(null, null);
-				} else {
-					return callback(null, unit);
-				}
-			});
-		}
-	});
+    multi.del('token');
+    multi.sadd(['token', token]);
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }
 
-checkInfoAux = function(api_key, publicPath, callback) {
-	var unit;
+/**
+ * Return the token to notify the WStore.
+ */
+exports.getToken = function(callback) {
+    db.smembers('token', function(err, token) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, token[0]);
+        }
+    });
+}
 
-	db.smembers('resources', function(err, resources) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(resources, function(resource, task_callback) {
-				db.hgetall(resource, function(err, res) {
-					if (err) {
-						task_callback(err);
-					} else {
-						db.hgetall(res.publicPath, function(err, serv) {
-							if (err) {
-								task_callback(err);
-							} else {
-								if (res !== null && 
-									api_key.organization === res.org && 
-									api_key.name === res.name && 
-									api_key.version === res.version &&
-									publicPath === res.publicPath) {
-										unit = res.unit;
-										task_callback();
-								} else {
-									task_callback();
-								}
-							}
-						});
-					}
-				});
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else if (unit == undefined) {
-					return callback(null, null);
-				} else {
-					return callback(null, unit);
-				}
-			});
-		} 
-	});
-};
+/**
+ * Map the publicPath with the endpoint url.
+ * 
+ * @param  {string} publicPath      Path for the users.
+ * @param  {string} url             Endpoint url.
+ */
+exports.newService = function(publicPath, url, callback) {
+    var multi = db.multi();
 
-// CLI: deleteService [path]
-exports.deleteService = function(path, callback) {
-	var multi = db.multi();
+    multi.hmset('services', publicPath, url);
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
+}
 
-	multi.del(path);
-	multi.srem('public', path);
+/**
+ * Return apiKeys associated with the public path passed as argument.
+ * 
+ * @param  {string}   publicPath Service public path.
+ */
+var associatedApiKeys = function(publicPath, callback) {
+    db.smembers(publicPath, function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, apiKeys);
+        }
+    });
+}
 
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
-};
+/**
+ * Return subscriptions identifiers associated with the api-keys passed as argument.
+ * 
+ * @param  {Array}   apiKeys  Api-keys array.
+ */
+var associatedSubscriptions = function(apiKeys, callback) {
+    async.each(apiKeys, function(apiKey, task_callback) {
+        db.smembers(apiKey + 'subs', function(err, subscriptions) {
+            if (err) {
+                task_callback(err);
+            } else if (subscriptions === null) { 
+                task_callback(null);
+            } else {
+                apiKeys.push.apply(apiKeys, subscriptions);
+                task_callback(null);
+            }
+        });
+    }, function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null, apiKeys);
+        }
+    });
+}
 
-// CLI: getService [publicPath]
+/**
+ * Delete the service and delete on cascade all the information associated with this service.
+ * 
+ * @param  {string} publicPath      Public path for the users.
+ */
+exports.deleteService = function(publicPath, callback) {
+    var multi = db.multi();
+
+    multi.hdel('services', publicPath);
+    multi.del(publicPath);
+    async.waterfall([
+        async.apply(associatedApiKeys, publicPath),
+        associatedSubscriptions,
+    ], function(err, keys) {
+        if (err) {
+            return callback(err);
+        } else {
+            async.each(keys, function(key, task_callback) {
+                db.hget(key, 'customer', function(err, customer) {
+                    if (err) {
+                        task_callback(err);
+                    } else {
+                        multi.srem(customer, key);
+                        multi.del(key);
+                        multi.del(key + 'subs');
+                        multi.srem('apiKeys', key);
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    multi.exec(function(err) {
+                        if (err) {
+                            return callback(err);
+                        } else {
+                            return callback(null);
+                        }
+                    });
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Return the service, the public path and the endpoint url associated with the path-
+ * 
+ * @param  {string} publicPath      Public path for the users.
+ */
 exports.getService = function(publicPath, callback) {
-	db.hgetall(publicPath, function(err, obj) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			return callback(null, obj);
-		}
-	});
-};
-
-// CLI: addService [publicPath] [url]
-exports.newService = function(publicPath, url, callback){
-	var multi = db.multi();
-
-	multi.sadd(['public', publicPath]);
-	multi.hmset(publicPath, { 'url': url});
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
-};
-
-// CLI: getInfo [user]
-exports.getInfo = function(user, callback) {
-	var toReturn = [];
-
-	db.smembers(user, function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(api_keys, function(api_key, task_callback) {
-				db.hgetall(api_key, function(err, api_key_info) {
-					if (err) {
-						task_callback(err);
-					} else {
-						toReturn.push({
-								API_KEY: api_key,
-								organization: api_key_info['organization'],
-								name: api_key_info['name'],
-								version: api_key_info['version']
-						});
-						task_callback();
-					}
-				});
-			}, function(err) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, toReturn);
-				}
-			});
-		} 
-	});
-};
-
-exports.addResource = function(data, callback) {
-	var multi = db.multi();
-
-	multi.sadd(['resources', data.publicPath + data.offering.organization + data.offering.name + data.offering.version]);
-	multi.hmset(data.publicPath + data.offering.organization + data.offering.name + data.offering.version, {
-				'publicPath': data.publicPath,
-				'org': data.offering.organization,
-				'name': data.offering.name,
-				'version': data.offering.version,
-				'record_type': data.record_type,
-				'unit': data.unit,
-				'component_label': data.component_label
-	});
-
-	multi.exec(function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
-};
-
-exports.getUnit = function(path, organization, name, version, callback) {
-	db.hgetall(path + organization + name + version, function(err, resource) {
-		if (err) {
-			return callback(err, null);
-		} else if (resource == null) { // Service no created in db
-			return callback(null, null);
-		} else {
-			return callback(null, resource.unit);
-		}
-	});
+    db.hget('services', publicPath, function(err, url) {
+        if (err) {
+            return callback(err, null);
+        } else if (url === null){
+            return callback(null, null);
+        } else {
+            return callback(null, url);
+        }
+    });
 }
 
-exports.getApiKeys = function(callback){
-	db.smembers('API_KEYS', function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			return callback(null, api_keys);
-		}
-	});
+/**
+ * Check if the publicPath passed as argument is associated with a service (return true) or not (return false).
+ * 
+ * @param  {string} publicPath         Path to check.
+ */
+exports.checkPath = function(publicPath, callback) {
+    db.hgetall('services', function(err, services) {
+        if (err) {
+            return callback(err, false);
+        } else {
+            async.forEachOf(services, function(endpoint, path, task_callback) {
+                if (publicPath === path) {
+                    return callback(null, true);
+                } else {
+                    task_callback(null);
+                }
+            }, function() {
+                return callback(null, false);
+            });
+        }
+    });
 }
 
-exports.getResources = function(api_key, callback) {
-	db.smembers(api_key + '_paths', function(err, paths) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			return callback(null, paths);
-		}
-	});
+/**
+ * Add the new buy information to the database.
+ * 
+ * @param  {object} buyInformation      Information received from the WStore.  
+ */
+exports.newBuy = function(buyInformation, callback) {
+    var multi = db.multi();
+
+    multi.sadd(['apiKeys', buyInformation.apiKey]);
+    multi.sadd([buyInformation.publicPath, buyInformation.apiKey]);
+    multi.sadd([buyInformation.customer, buyInformation.apiKey]);
+    multi.hmset(buyInformation.apiKey, {
+        publicPath: buyInformation.publicPath,
+        orderId: buyInformation.orderId,
+        productId: buyInformation.productId,
+        customer: buyInformation.customer,
+        unit: buyInformation.unit,
+        value: 0,
+        recordType: buyInformation.recordType,
+        correlationNumber: 0
+    });
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
 }
 
-exports.getNotificationInfo = function(api_key, path, callback) {
-	db.hgetall(api_key, function(err, api_key_info) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			db.hgetall(api_key_info.actorID + api_key + path, function(err, resource) {
-				if (err) {
-					return callback(err, null);
-				} else {
-					return callback(null, {
-						"actorID": api_key_info.actorID, 
-	                    "API_KEY": api_key,
-	                    "publicPath": path,
-	                    "organization": api_key_info.organization,
-	                    "name": api_key_info.name,
-	                    "version": api_key_info.version,
-	                    "correlation_number": resource.correlation_number,
-	                    "num": resource.num,
-	                    "reference": api_key_info.reference
-					});
-				}
-			});
-		}
-	});
+/**
+ * Return the api-keys, productId and orderId associated with the user passed as argument.
+ * 
+ * @param  {string}   user     Customer identifier.
+ */
+exports.getApiKeys = function(user, callback) {
+    var toReturn = [];
+
+    db.smembers(user, function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else if (apiKeys.length === 0) {
+            return callback(null, null);
+        } else {
+            async.each(apiKeys, function(apiKey, task_callback) {
+                db.hgetall(apiKey, function(err, accountingInfo) {
+                    if (err) {
+                        return task_callback(err);
+                    } else {
+                        toReturn.push({
+                            apiKey: apiKey,
+                            productId: accountingInfo.productId,
+                            orderId: accountingInfo.orderId
+                        });
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, toReturn);
+                }
+            });
+        }
+    });
 }
 
-exports.checkBuy = function(api_key, path, callback) {
-	var bought = false;
-
-	db.smembers(api_key + '_paths', function(err, paths) {
-		if (err) {
-			return callback(err, null);
-		} else {
-			async.each(paths, function(entry, task_callback) {
-				if (entry === path) {
-					bought = bought || true;
-					task_callback();
-				} else {
-					task_callback();
-				}
-			}, function() {
-				return callback(null, bought);
-			})
-		}
-	});
+/**
+ * Check if the user is associated with the apiKey (return true) or not (return false).
+ * 
+ * @param  {string} customer    User identifier.
+ * @param  {string} apiKey      Identifies the product.
+ */
+exports.checkRequest = function(customer, apiKey, callback) {
+    db.hget(apiKey, 'customer', function(err, user) {
+        if (err) {
+            return callback(err, false);
+        } else if (user === customer){
+            return callback(null, true);
+        } else {
+            return callback(null, false);
+        }
+    });
 }
 
-exports.addInfo = function(api_key, data, callback) {
-	var multi = db.multi();
+/**
+ * Return the url, unit and publicPath associated with the apiKey passed as argument.
+ * 
+ * @param  {string}   apiKey   Product identifier.
+ */
+exports.getAccountingInfo = function(apiKey, callback) {
+    db.hgetall(apiKey, function(err, accountingInfo) {
+        if (err) {
+            return callback(err, null);
+        } else if (accountingInfo === null) {
+            return callback(null, null);
+        } else {
+            db.hget('services', accountingInfo.publicPath, function(err, url) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, {
+                        unit: accountingInfo.unit,
+                        url: url,
+                        publicPath: accountingInfo.publicPath
+                    });
+                }
+            });
+        }
+    });
+}
 
-	multi.sadd(['API_KEYS', api_key]);
-	multi.hmset(api_key, {
-				'organization': data.organization,
-				'name': data.name,
-				'version': data.version,
-				'actorID': data.actorID,
-				'reference': data.reference
-	});
-	multi.sadd([data.actorID, api_key]);
-	async.forEachOf(data.accounting, function(acc, p, task_callback) {
-		multi.sadd([api_key + '_paths', p]);
-		multi.hmset(data.actorID + api_key + p, {
-			'actorID': data.actorID,
-			'API_KEY': api_key,
-			'num': acc.num,
-			'publicPath': p,
-			'correlation_number': acc.correlation_number
-		});
-		task_callback();
-	}, function() {
-		multi.exec(function(err) {
-			if (err) {
-				return callback(err);
-			} else {
-				return callback(null);
-			}
-		});
-	});
-};
+/**
+ * Return the necessary information to notify the WStore (accounting value).
+ * 
+ */
+exports.getNotificationInfo = function(callback) {
+    var notificationInfo = [];
 
-exports.getApiKey = function(user, offer, callback) {
-	db.smembers(user, function(err, api_keys) {
-		if (err) {
-			return callback(err, null);
-		} else if (api_keys.length !== 0) {
-			var count = 0;
+    db.smembers('apiKeys', function(err, apiKeys) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            async.each(apiKeys, function(apiKey, task_callback) {
+                db.hgetall(apiKey, function(err, accountingInfo) {
+                    if (err) {
+                        task_callback(err);
+                    } else if (parseFloat(accountingInfo.value) === 0) {
+                        task_callback(null);
+                    } else {
+                        notificationInfo.push({
+                            apiKey: apiKey,
+                            orderId: accountingInfo.orderId,
+                            productId: accountingInfo.productId,
+                            customer: accountingInfo.customer,
+                            value: accountingInfo.value,
+                            correlationNumber: accountingInfo.correlationNumber,
+                            recordType: accountingInfo.recordType,
+                            unit: accountingInfo.unit
+                        });
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback(err, null);
+                } else if (notificationInfo.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, notificationInfo);
+                }
+            });
+        }
+    });
+}
 
-			async.filter(api_keys, function(api_key, task_callback) {
-				db.hgetall(api_key, function(err, offerAcc) {
-					if (err) {
-						return callback(err, null);
-					} else if (offerAcc['organization'] === offer['organization'] &&
-						offerAcc['name'] === offer['name'] &&
-						offerAcc['version'] == offer['version']) {
-							task_callback(true);
-					} else {
-						task_callback(false);
-					}
-				});
-			}, function(res) {
-				if (res.length != 0) {
-					return callback(null, res[0]);
-				} else {
-					return callback(null, null);
-				}
-				
-			});
-		} else {
-			return callback(null, null);
-		}
-	});
-};
+/**
+ * Add the amount passed as argument to the actual amount of the user
+ * 
+ * @param  {string} apiKey      Idenfies the product.
+ * @param  {float} amount       Amount to account.
+ */
+exports.makeAccounting = function(apiKey, amount, callback) { 
+    var multi = db.multi();
 
-exports.count = function(actorID, API_KEY, publicPath, amount, callback) {
-	if (amount < 0 ) {
-		return callback('[ERROR] The aomunt must be greater than 0');
-	} else {
-		db.exists(actorID + API_KEY + publicPath, function(err, reply){
-			if (err) {
-				return callback(err)
-			} else if (reply === 0) {
-				return callback('[ERROR] The specified resource doesn\'t exist')
-			} else {
-				db.hget(actorID + API_KEY + publicPath, 'num', function(err, num) {
-					if (err) {
-						return callback(err);
-					} else {
-						db.hmset(actorID + API_KEY + publicPath, {
-							'num' : (parseFloat(num) + amount).toString()
-						}, function(err) {
-							if (err) {
-								return callback(err);
-							} else {
-								return callback(null);
-							}
-						});
-					}
-	    		});
-			}
-		});
-	}
-};
+    if (amount < 0) {
+        return callback('[ERROR] The aomunt must be greater than 0');
+    } else {
+        db.hget(apiKey, 'value', function(err, num) {
+            if (err) {
+                return callback(err);
+            } else {
+                multi.hmset(apiKey, {
+                    value: parseFloat(num) + amount
+                });
+                multi.exec(function(err) {
+                    if (err) {
+                        return callback(err);
+                    } else {
+                        return callback(null);
+                    }
+                });
+            }
+        });
+    }
+}
 
-exports.resetCount = function(actorID, API_KEY, publicPath, callback) {
-	db.hget(actorID + API_KEY + publicPath, 'correlation_number', function(err, correlation_number) {
-		if (err) {
-			return callback(err);
-		} else if (correlation_number !== null) {
-			correlation_number = parseInt(correlation_number) + 1;
-			db.hmset(actorID + API_KEY + publicPath, {
-				'correlation_number' : correlation_number,
-				'num' : '0'
-			}, function(err) {
-				if (err) {
-					return callback(err);
-				} else {
-					return callback(null);
-				}
-			});
-		} else  {
-			return callback(null);
-		}
-	});
-};
+/**
+ * Reset the accounting for the product identifies by the apiKey and increment the correlation number.
+ * 
+ * @param  {string} apiKey      Idenfies the product.
+ */
+exports.resetAccounting = function(apiKey, callback) {
+    var multi = db.multi();
 
-exports.getAccountingInfo = function(publicPath, offer, callback) {
-	var toReturn = {};
+    db.hget(apiKey, 'correlationNumber', function(err, correlationNumber) {
+        if (err) {
+            return callback(err);
+        } else {
+            multi.hmset(apiKey, {
+                correlationNumber: parseInt(correlationNumber) + 1,
+                value: '0'
+            });
+            multi.exec(function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+            });
+        }
+    });
+}
 
-	db.hgetall(publicPath + offer.organization + offer.name + offer.version, function(err, resource) {
-		if (err) {
-			return callback(err, null);
-		} else if (resource !== null) {
-			toReturn = {
-				recordType: resource.recordType,
-				unit: resource.unit,
-				component: resource.component
-			}
-			return callback(null, toReturn);
-		} else {
-			return callback(null, null);
-		}
-	});
-};
+/**
+ * Add new Context Broker subscription (apiKey and notificationUrl associated).
+ * 
+ * @param {string} apiKey           Identifies the product.
+ * @param {string} subscriptionId   Identifies the subscription.
+ * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
+ */
+exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, callback) {
+    var multi = db.multi();
 
-exports.addCBSubscription = function( API_KEY, publicPath, subscriptionID, ref_host, ref_port, ref_path, unit, callback) {
-	db.hmset(subscriptionID, {
-		'API_KEY': API_KEY,
-		'publicPath': publicPath,
-		'ref_host': ref_host,
-		'ref_port': ref_port,
-		'ref_path': ref_path,
-		'unit': unit
-	}, function(err) {
-		if(err){
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
-};
+    multi.sadd([apiKey + 'subs', subscriptionId]);
+    multi.hmset(subscriptionId, {
+        apiKey: apiKey,
+        notificationUrl: notificationUrl
+    });
+    multi.exec(function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
+}
 
-exports.getCBSubscription = function(subscriptionID, callback) {
-	db.hgetall(subscriptionID, function(err, res) {
-		if (err) {
-			return callback(err, null)
-		} else {
-			return callback(null, res);
-		}
-	});
-};
+/**
+ * Return the apiKey and notification url associated with the subscriptionId.
+ * 
+ * @param  {string} subscriptionId      Identifies the subscription.
+ */
+exports.getCBSubscription = function(subscriptionId, callback) {
+    db.hgetall(subscriptionId, function(err, subscriptionInfo) {
+        if (err) {
+            return callback(err, null);
+        } else if (subscriptionInfo === null) {
+            return callback(null, null);
+        } else {
+            db.hget(subscriptionInfo.apiKey, 'unit', function(err, unit) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, {
+                        apiKey: subscriptionInfo.apiKey,
+                        notificationUrl: subscriptionInfo.notificationUrl,
+                        unit: unit
+                    });
+                }
+            });
+        }
+    });
+}
 
-exports.deleteCBSubscription = function(subscriptionID, callback) {
-	db.del(subscriptionID, function(err) {
-		if (err) {
-			return callback(err);
-		} else {
-			return callback(null);
-		}
-	});
-};
+/**
+ * Delete the subscription identified by the subscriptionId. 
+ * 
+ * @param  {string} subscriptionId      Identifies the subscription.
+ */
+exports.deleteCBSubscription = function(subscriptionId, callback) {
+    var multi = db.multi();
+
+    db.hget(subscriptionId, 'apiKey', function(err, apiKey) {
+        if (err) {
+            return callback(err);
+        } else {
+            multi.srem(apiKey + 'subs', subscriptionId);
+            multi.del(subscriptionId);
+            multi.exec(function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+            });
+        }
+    });
+}

@@ -1,232 +1,181 @@
 var proxyquire = require('proxyquire'),
-	assert = require('assert'),
-	sinon = require('sinon');
+    assert = require('assert'),
+    sinon = require('sinon');
 
+/**
+ * Return an object with the mocked dependencies and object with the neecessary spies specified in implementations. 
+ * 
+ * @param  {Object}   implementations     Dependencies to mock and spy.
+ */
 var mocker = function(implementations, callback) {
-	var proxy_notifier, mocks, spies;
+    var mock, spies = {};
 
-	// Create mocks and spies
-	var log_mock = {
-		log: function(level, msg) {},
-		warn: function(msg) {}
-	}
-	mocks = {
-		db: {},
-		config: {},
-		info: {},
-		http: {},
-		logger: {
-			Logger: function(transports) {
-				return log_mock;
-			}
-		}
-	}
-	spies = {
-		db: {},
-		config: {},
-		info: {},
-		http: {},
-		logger: {
-			log: sinon.spy(log_mock, 'log'),
-			warn: sinon.spy(log_mock, 'warn')
-		}
-	}
-	mocks.config = implementations.config;
-	if (implementations.db.resetCount != undefined) {
-		mocks.db.resetCount = implementations.db.resetCount;
-		spies.db.resetCount = sinon.spy(mocks.db, 'resetCount');
-	}	
-	if (implementations.db.getAccountingInfo != undefined) {
-		mocks.db.getAccountingInfo = implementations.db.getAccountingInfo;
-		spies.db.getAccountingInfo = sinon.spy(mocks.db, 'getAccountingInfo');
-	}
-	if (implementations.http != undefined && implementations.http.request != undefined) {
-		mocks.http.request = implementations.http.request;
-		spies.http.request = sinon.spy(mocks.http, 'request');
-	}
-	// Mock dependencies
-	proxy_notifier = proxyquire('../../notifier', {
-		'./config': mocks.config,
-		'./db': mocks.db,
-		'winston': mocks.logger,
-		'./HTTP_Client/info.json': mocks.info,
-		'http': mocks.http
-	});
-	return callback(proxy_notifier, spies);
+    var db_mock = {
+        getToken: implementations.getToken,
+        resetAccounting: implementations.resetAccounting
+    }
+    var request_mock = {
+        request: function() {}
+    }
+    var config_mock = {
+        database: {
+            type: './db'
+        },
+        WStore: implementations.WStore
+    }
+    // Create spies
+    if (implementations.getToken !== undefined) {
+        spies.getToken = sinon.spy(db_mock, 'getToken');
+    }
+    if (implementations.resetAccounting !== undefined) {
+        spies.resetAccounting = sinon.spy(db_mock, 'resetAccounting');
+    }
+    if (implementations.request !== undefined) {
+        request_mock.request = implementations.request;
+        spies.request = sinon.spy(request_mock, 'request');
+    }
+
+    mock = proxyquire('../../notifier', {
+        request: request_mock.request,
+        './config': config_mock,
+        './db': db_mock
+    });
+    return callback(mock, spies);
 }
+
 describe('Testing Notifier', function() {
+    var notificationInfo = {
+        customer: '0001',
+        value: '2',
+        correlationNumber: '3',
+        recordType: 'callUsage',
+        unit: 'call',
+        productId: 'productId',
+        orderId: 'orderId',
+        apiKey: 'apiKey'
+    }
 
-	describe('notify', function() {
-		var implementations = {
-			config: {
-				database: './db'
-			},
-			db: {}
-		}
-		var accounting_info = {
-			publicPath: '/path',
-			organization: 'organization',
-			name: 'name',
-			version: 1.0,
-			num: 1.23,
-			reference: 'reference'
-		}
+    describe('Function "notify"', function() {
 
-		it('no request needed', function(done) { // Logger test?
-			var accounting_info = {
-				num: 0
-			};
-			mocker(implementations, function(proxy_notifier, spies) {
-				proxy_notifier.notify(accounting_info);
-				assert.equal(spies.logger.log.callCount, 1);
-				assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
-				assert.equal(spies.logger.log.getCall(0).args[1], 'No request needed.');
-				done();
-			});
-		});
+        it('error getting the Token', function(done) {
+            var implementations = {
+                getToken: function(callback) {
+                    return callback('Error', null);
+                }
+            }
+            mocker(implementations, function(notifier, spies){
+                notifier.notify({}, function(err) {
+                    assert.equal(err, 'Error obtaining the token');
+                    assert.equal(spies.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
 
-		it('error getting accounting info from db', function(done) {
-			implementations.db.getAccountingInfo = function(path, info, callback) {
-				return callback('Error', null);
-			}
-			mocker(implementations, function(proxy_notifier, spies) {
-				proxy_notifier.notify(accounting_info);
-				assert.equal(spies.db.getAccountingInfo.callCount, 1);
-				assert.equal(spies.logger.warn.callCount, 1);
-				assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], '/path');
-				assert.deepEqual(spies.db.getAccountingInfo.getCall(0).args[1], {
-					organization: accounting_info.organization,
-					name: accounting_info.name,
-					version: accounting_info.version
-				});
-				assert.equal(spies.logger.warn.getCall(0).args[0], 'Error while notifying');
-				done();
-			});
-		});
+        it('error notifying the WStore', function(done) {
+            var implementations = {
+                getToken: function(callback) {
+                    return callback(null, 'token');
+                },
+                request: function(options, callback) {
+                    return callback('Error', null, null);
+                },
+                WStore: {
+                    url: 'http://host:port/path/'    
+                }
+            }
+            mocker(implementations, function(notifier, spies){
+                notifier.notify(notificationInfo, function(err) {
+                    assert.equal(err, 'Error notifying the WStore');
+                    assert.equal(spies.getToken.callCount, 1);
+                    assert.equal(spies.request.callCount, 1);
+                    assert.equal(spies.request.getCall(0).args[0].url , implementations.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId);
+                    assert.equal(spies.request.getCall(0).args[0].headers['X-API-KEY'] , 'token');
+                    done();
+                });
+            });
+        });
 
-		it('error, request failed', function(done) {
-			implementations.info = {
-				offering: {}
-			}
-			implementations.config.WStore = {
-				accounting_host: 'localhost',
-				accounting_port: 9010,
-				accounting_path: '/path'
-			}
-			implementations.http = {
-				request: function(options, callback) {
-					callback({
-						statusCode: 400
-					});
-					return {
-						write: function(body) {},
-						end: function() {}
-					}
-				}
-			}
-			implementations.db.getAccountingInfo = function(path, info, callback) {
-				return callback(null, {
-					unit: 'megabyte',
-					record_type: 'rec_type',
-					component_label: 'label'
-				});
-			}
-			mocker(implementations, function(proxy_notifier, spies) {
-				proxy_notifier.notify(accounting_info);
-				assert.equal(spies.db.getAccountingInfo.callCount, 1);
-				assert.equal(spies.logger.warn.callCount, 1);
-				assert.equal(spies.http.request.callCount, 1);
-				assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], '/path');
-				assert.deepEqual(spies.db.getAccountingInfo.getCall(0).args[1], {
-					organization: accounting_info.organization,
-					name: accounting_info.name,
-					version: accounting_info.version
-				});
-				assert.deepEqual(spies.http.request.getCall(0).args[0], {
-					host: implementations.config.WStore.accounting_host,
-					port: implementations.config.WStore.accounting_port,
-					path: implementations.config.WStore.accounting_path + accounting_info.reference + '/accounting',
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Content-Length': 194
-					}
-				});
-				assert.equal(spies.logger.warn.getCall(0).args[0], 'Resquest failed!');
-				done();
-			});
-		});
+        it('error while reseting the accounting', function(done) {
+            var implementations = {
+                getToken: function(callback) {
+                    return callback(null, 'token');
+                },
+                request: function(options, callback) {
+                    return callback(null, {statusCode: 200}, null);
+                },
+                WStore: {
+                    url: 'http://host:port/path/'    
+                },
+                resetAccounting: function(apiKey, callback) {
+                    return callback('Error');
+                }
+            }
+            mocker(implementations, function(notifier, spies){
+                notifier.notify(notificationInfo, function(err) {
+                    assert.equal(err, 'Error while reseting the accounting after notify the WStore');
+                    assert.equal(spies.getToken.callCount, 1);
+                    assert.equal(spies.request.callCount, 1);
+                    assert.equal(spies.request.getCall(0).args[0].url , implementations.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId);
+                    assert.equal(spies.request.getCall(0).args[0].headers['X-API-KEY'] , 'token');
+                    assert.equal(spies.resetAccounting.callCount, 1);
+                    assert.equal(spies.resetAccounting.getCall(0).args[0] , 'apiKey');
+                    done();
+                });
+            });
+        });
 
-		it('error reseting the accounting', function(done) {
-			implementations.http = {
-				request: function(options, callback) {
-					callback({
-						statusCode: 200
-					});
-					return {
-						write: function(body) {},
-						end: function() {}
-					}
-				}
-			}
-			implementations.db.resetCount = function(user, api_key, publicPath, callback) {
-				return callback('Error');
-			}
-			mocker(implementations, function(proxy_notifier, spies) {
-				proxy_notifier.notify(accounting_info);
-				assert.equal(spies.db.getAccountingInfo.callCount, 1);
-				assert.equal(spies.logger.warn.callCount, 1);
-				assert.equal(spies.logger.log.callCount, 2);
-				assert.equal(spies.http.request.callCount, 1);
-				assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], '/path');
-				assert.deepEqual(spies.db.getAccountingInfo.getCall(0).args[1], {
-					organization: accounting_info.organization,
-					name: accounting_info.name,
-					version: accounting_info.version
-				});
-				assert.deepEqual(spies.http.request.getCall(0).args[0], {
-					host: implementations.config.WStore.accounting_host,
-					port: implementations.config.WStore.accounting_port,
-					path: implementations.config.WStore.accounting_path + accounting_info.reference + '/accounting',
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Content-Length': 194
-					}
-				});
-				assert.equal(spies.logger.warn.getCall(0).args[0], 'Error while reseting the account');
-				done();
-			});
-		});
+        it('response from WStore failed', function(done) {
+            var implementations = {
+                getToken: function(callback) {
+                    return callback(null, 'token');
+                },
+                request: function(options, callback) {
+                    return callback(null, {statusCode: 400}, null);
+                },
+                WStore: {
+                    url: 'http://host:port/path/'    
+                }
+            }
+            mocker(implementations, function(notifier, spies){
+                notifier.notify(notificationInfo, function(err) {
+                    assert.equal(err, 'Error notifying the WStore');
+                    assert.equal(spies.getToken.callCount, 1);
+                    assert.equal(spies.request.callCount, 1);
+                    assert.equal(spies.request.getCall(0).args[0].url , implementations.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId);
+                    assert.equal(spies.request.getCall(0).args[0].headers['X-API-KEY'] , 'token');
+                    done();
+                });
+            });
+        });
 
-		it('correct notification', function(done) {
-			implementations.db.resetCount = function(user, api_key, publicPath, callback) {
-				return callback(null);
-			}
-			mocker(implementations, function(proxy_notifier, spies) {
-				proxy_notifier.notify(accounting_info);
-				assert.equal(spies.db.getAccountingInfo.callCount, 1);
-				assert.equal(spies.logger.warn.callCount, 0);
-				assert.equal(spies.logger.log.callCount, 2);
-				assert.equal(spies.http.request.callCount, 1);
-				assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], '/path');
-				assert.deepEqual(spies.db.getAccountingInfo.getCall(0).args[1], {
-					organization: accounting_info.organization,
-					name: accounting_info.name,
-					version: accounting_info.version
-				});
-				assert.deepEqual(spies.http.request.getCall(0).args[0], {
-					host: implementations.config.WStore.accounting_host,
-					port: implementations.config.WStore.accounting_port,
-					path: implementations.config.WStore.accounting_path + accounting_info.reference + '/accounting',
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Content-Length': 194
-					}
-				});
-				done();
-			});
-		});
-	});
+        it('correct', function(done) {
+            var implementations = {
+                getToken: function(callback) {
+                    return callback(null, 'token');
+                },
+                request: function(options, callback) {
+                    return callback(null, {statusCode: 200}, null);
+                },
+                WStore: {
+                    url: 'http://host:port/path/'    
+                },
+                resetAccounting: function(apiKey, callback) {
+                    return callback(null);
+                }
+            }
+            mocker(implementations, function(notifier, spies){
+                notifier.notify(notificationInfo, function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.getToken.callCount, 1);
+                    assert.equal(spies.request.callCount, 1);
+                    assert.equal(spies.request.getCall(0).args[0].url , implementations.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId);
+                    assert.equal(spies.request.getCall(0).args[0].headers['X-API-KEY'] , 'token');
+                    assert.equal(spies.resetAccounting.callCount, 1);
+                    assert.equal(spies.resetAccounting.getCall(0).args[0] , 'apiKey');
+                    done();
+                });
+            });
+        });
+    });
 });

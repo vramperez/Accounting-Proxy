@@ -3,122 +3,100 @@ var express = require('express'),
     api = require('./APIServer'),
     notifier = require('./notifier'),
     cron = require('node-schedule'),
-    contextBroker = require('./orion_context_broker/cb_handler'),
-    url = require('url'),
     bodyParser = require('body-parser'),
     async = require('async'),
-    winston = require('winston'),
+    url = require('url'),
     request = require('request'),
-    mkdirp = require('mkdirp');
+    contextBroker = require('./orion_context_broker/cb_handler'),
+    logger = require('winston');
 
 "use strict";
 
-var logger = new winston.Logger( {
-    transports: [
-        new winston.transports.File({
-            level: 'debug',
-            filename: './log/all-log',
-            colorize: false
-        }),
-        new winston.transports.Console({
-            level: 'info',
-            colorize: true
-        })
-    ],
-    exitOnError: false
-});
-
-mkdirp('./log', function(err) {
-    if (err) {
-        logger.info('Error creating "./log" path');
-    }
-});
-
-var db = require(config.database);
-db.init(); // Initialize the database
+var db = require(config.database.type); 
 var app = express();
 var acc_modules = {};
 
-exports.init = function() {
-    app.listen(app.get('port'));
-}
-
-var notify = function(callback) {
-    db.getApiKeys(function(err, api_keys) {
+/**
+ * Start and configure the server.
+ */
+exports.init = function(callback) {
+    async.series([
+        function(callback) {
+            db.init(callback);
+        },
+        function(callback) {
+            notify(callback);
+        }
+    ], function(err) {
         if (err) {
             return callback(err);
-        } else if (api_keys.length == 0){
-            logger.log('debug', "No data availiable");
-            return callback(null);
         } else {
-            async.each(api_keys, function(api_key, callback) {
-                db.getResources(api_key, function(err, resources) {
+            if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
+                logger.info('Loading module for Orion Context Broker...');
+                contextBroker.run();
+            }
+            /* Create daemon to update WStore every day
+             * Cron format:
+             * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+             */
+            cron.scheduleJob('00 00 * * *', function() {
+                logger.info('Sending accounting information...');
+                notify(function(err) {
                     if (err) {
-                        return callback(err);
-                    } else  if (resources.length == 0) {
-                        logger.log('debug', "No data availiable");
-                        return callback(null);
-                    } else {
-                        async.each(resources, function(resource, callback) {
-                            db.getNotificationInfo(api_key, resource, function(err, info) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    notifier.notify(info);
-                                    return callback(null);
-                                }
-                            });
-                        });
+                        logger.error('Error while notifying the WStore: ' + err);
                     }
                 });
             });
+            app.listen(app.get('port'));
+            return callback(null);
         }
     });
 }
 
-/* Create daemon to update WStore every day
- * Cron format:
- * [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+/**
+ * Call the notifier to send the accounting information to the WStore.
  */
-var job = cron.scheduleJob('00 00 * * *', function() {
-    logger.info('Sending accounting information...');
-    notify(function(err) {
+var notify = function(callback) {
+    db.getNotificationInfo(function(err, notificationInfo) {
         if (err) {
-            logger.error('Error while notifying the WStore');
+            return callback(err);
+        } else if (notificationInfo === null) { // Not notify
+            return callback(null);
+        } else {
+            logger.info('Notifying the WStore...');
+            async.each(notificationInfo, function(info, task_callback) {
+                notifier.notify(info, function(err) {
+                    if (err) {
+                        task_callback(err);
+                    } else {
+                        task_callback(null);
+                    }
+                })
+            }, callback);
         }
     });
-});
-
-logger.info("Loading accounting modules...");
-// Load accounting modules
-for (var u in config.modules.accounting) {
-    try {
-        acc_modules[config.modules.accounting[u]] = require("./acc_modules/" + config.modules.accounting[u]).count;
-    } catch (e) {
-        logger.error("No accounting module for unit '%s': missing file acc_modules\/%s.js" +  config.modules.accounting[u], config.modules.accounting[u]);
-    }
 }
 
-// Start ContextBroker Server for subscription notifications if it is enabled in the config
-if (config.resources.contextBroker) {
-    logger.info("Loading module for Orion Context Broker...");
-    contextBroker.run();
-}
-
-notify(function(err) {
-    logger.info("Notifying the WStore...");
-    if (err){
-        logger.warn("Notification to the WStore failed");
+/**
+ * Auxiliar function for making the accounting.
+ * 
+ * @param  {string}   apiKey   Product identifier.
+ * @param  {string}   unit     Unit for make the accounting.
+ * @param  {Object}   body     Endpoint response body.
+ */
+exports.count = function(apiKey, unit, body, callback) {
+    if (acc_modules[unit] === undefined) {
+        try {
+            acc_modules[unit] = require('./acc_modules/' + unit).count;
+        } catch (e) {
+            return callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' +  unit, unit);
+        }
     }
-});
-
-// Auxiliar function for accounting
-exports.count = function(user, API_KEY, publicPath, unit, response, callback) {
-    acc_modules[unit](response, function(err, amount) {
+    acc_modules[unit](body, function(err, amount) {
         if (err) {
             return callback(err);
         } else {
-            db.count(user, API_KEY, publicPath, amount, function(err){
+            db.makeAccounting(apiKey, amount, function(err) {
                 if (err) {
                     return callback(err);
                 } else {
@@ -129,103 +107,128 @@ exports.count = function(user, API_KEY, publicPath, unit, response, callback) {
     });
 };
 
-// Auxiliar functon that handles ContextBroker request
-var CBrequestHandler = function(req, response, service, options, unit) {
-    var userID = req.get('X-Actor-ID');
-    var API_KEY = req.get('X-API-KEY');
-    var publicPath = req.path;
-
-    contextBroker.getOperation(service.url, req, function(err, operation) {
-        if (err) {
-            logger.error('Error obtaining the operation based on CB path %s', url.parse(options.url).pathname );
-        } else if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
-            contextBroker.requestHandler(req, response, service, unit, operation, function(err) {
+/**
+ * Auxiliar functon that handles ContextBroker request.
+ * 
+ * @param {Object} req      Incoming request.
+ * @param {Object} res      Outgoing response.
+ * @param {Object} options  Options for make the request to the endpoint.
+ * @param {[type]} unit     Unit for the accounting.
+ */
+var CBrequestHandler = function(req, res, options, unit) {
+    var user = req.get('X-Actor-ID');
+    var apiKey = req.get('X-API-KEY');
+    
+    contextBroker.getOperation(url.parse(options.url).pathname, req, function(operation) {
+        if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
+            contextBroker.subscriptionHandler(req, res, options.url, unit, operation, function(err) {
                 if (err) {
-                    logger.error('Error processing CB request');
+                    logger.error(err);
                 } 
             });
         } else {
-            request(options, function(error, resp, body) {
-                if (error) {
-                    response.status(500).send(error);
-                    logger.warn("An error ocurred requesting Context-Broker");
-                } else {
-                    for (var i in resp.headers) {
-                        response.setHeader(i, resp.headers[i])
-                    }
-                    exports.count(userID, API_KEY, publicPath, unit, body, function(err){
-                        if(err) {
-                            logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
-                        }
-                        response.send(body);
-                    });
-                }
-            });
+            requestHandler(options, res, apiKey, unit);
         }
     });
 }
 
-// Auxiliar function that handles generic requests (no ContextBroker)
-var requestHandler = function(req, response, options, unit) {
-    var userID = req.get('X-Actor-ID');
-    var API_KEY = req.get('X-API-KEY');
-    var publicPath = req.path;
-
+/**
+ * Send the request to the endpoint, make the accounting and send the response to the user.
+ * 
+ * @param  {Object} options Request options.
+ * @param  {Object} res     Outgoing response to the user.
+ * @param  {string} apiKey  Product identifier.
+ * @param  {string} unit    Accounting unit.
+ */
+var requestHandler = function(options, res, apiKey, unit) {
     request(options, function(error, resp, body) {
         if (error) {
-            response.status(500).send(error);
-            logger.warn("An error ocurred requesting the endpoint");
+            res.status(504).send();
+            logger.warn('An error ocurred requesting the endpoint: ' + options.url);
         } else {
-            for (var i in resp.headers) {
-                response.setHeader(i, resp.headers[i])
+            for (var header in resp.headers) {
+                res.setHeader(header, resp.headers[header]);
             }
-            exports.count(userID, API_KEY, publicPath, unit, body, function(err){
+            exports.count(apiKey, unit, body, function(err){
                 if(err) {
-                    logger.warn("[%s] An error ocurred while making the accounting", API_KEY);
+                    logger.warn('[%s] Error making the accounting: ' + err, apiKey);
+                    res.status(500).send();
+                } else {
+                    res.send(body);
                 }
-                response.send(body);
             });
         }
     });
 }
 
-var handler = function(request, response) {
-    var userID = request.get('X-Actor-ID');
-    var API_KEY = request.get('X-API-KEY');
-    var publicPath = request.path;
+/**
+ * Return the endpoint path for the request.
+ * 
+ * @param  {string}   reqPath    Complete request path.
+ * @param  {string}   publicPath Public path associated with the product.
+ */
+var getEndpointPath = function(reqPath, publicPath, callback) {
+    if (reqPath === publicPath) { // Public path is the same
+        return callback(null, publicPath);
+    } else {
+        var splitPath = reqPath.split('/');
+        if ('/' + splitPath[1] === publicPath) {
+            return callback(null, '/' + reqPath.substring(splitPath[1].length + 2));
+        } else {
+            return callback('Invalid path', null);
+        }
+    }
+}
 
-    logger.log('debug', "[%s] New request", API_KEY); 
-    if(userID === undefined) {
-        logger.log('debug', "[%s] Undefined username", API_KEY);
-        response.status(400).json({ error: 'Undefined "X-Actor-ID" header'});
+/**
+ * Request handler.
+ * 
+ * @param  {Object} req Incoming request.
+ * @param  {Object} res Outgoing response.
+ */
+var handler = function(req, res) {
+    var user = req.get('X-Actor-ID');
+    var apiKey = req.get('X-API-KEY');
 
-    } else if (API_KEY === undefined) {
-        logger.log('debug', "[%s] Undefined API_KEY", API_KEY);
-        response.status(400).json({ error: 'Undefined "X-API-KEY" header'});
+    if(user === undefined) {
+        logger.log('debug', 'Undefined username');
+        res.status(401).json({ error: 'Undefined "X-Actor-ID" header'});
+
+    } else if (apiKey === undefined) {
+        logger.log('debug', 'Undefined API_KEY');
+        res.status(401).json({ error: 'Undefined "X-API-KEY" header'});
 
     } else {
-        db.checkInfo(userID, API_KEY, publicPath, function(err, unit) {
+        db.checkRequest(user, apiKey, function(err, correct) {
             if (err) {
-                response.status(500).end();
-            } else if (unit === null) { // Invalid API_KEY, user or path
-                response.status(401).json({ error: 'Invalid API_KEY, user or path'});
+                res.status(500).send();
+            } else if (! correct) { // Invalid apiKey or user
+                res.status(401).json({ error: 'Invalid API_KEY or user'});
             } else {
-                db.getService(publicPath ,function(err, service) {
+                db.getAccountingInfo(apiKey, function(err, accountingInfo) {
                     if (err) {
-                        response.status(500).end();
+                        res.status(500).send();
+                    } else if (accountingInfo === null) {
+                        res.status(500).send();
                     } else {
-                        var options = {
-                            url: service.url,
-                            json: true,
-                            method: request.method,
-                            headers: request.headers,
-                            body: request.body
-                        };
-                        if (config.resources.contextBroker && /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(url.parse(options.url).pathname)) { // Orion ContextBroker request
-                            CBrequestHandler(request, response, service, options, unit);
-                        } else {
-                            requestHandler(request, response, options, unit)
-                        }
+                        getEndpointPath(req.path, accountingInfo.publicPath, function(err, path) {
+                            if (err) {
+                                res.status(400).json({ error: 'Invalid public path ' + req.path});
+                            } else {
+                                var options = {
+                                    url: accountingInfo.url + path,
+                                    method: req.method,
+                                    headers: req.headers
+                                }
+
+                                if (config.resources.contextBroker && 
+                                    /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(url.parse(options.url).pathname)) { // Orion ContextBroker request
+                                        CBrequestHandler(req, res, options, accountingInfo.unit);
+                                } else {
+                                    requestHandler(options, res, apiKey, accountingInfo.unit);
+                                }
+                            }
+                        });
                     }
                 });
             }
@@ -235,6 +238,13 @@ var handler = function(request, response) {
 
 app.set('port', config.accounting_proxy.port);
 app.use(bodyParser.json());
+
+app.post('/api/resources', api.checkIsJSON, api.checkUrl);
+app.post('/api/users', api.checkIsJSON, api.newBuy);
+app.get('/api/users/keys', api.getApiKeys);
+app.get('/api/units', api.getUnits);
+
 app.use('/', handler);
-api.run();
+
 module.exports.app = app;
+module.exports.logger = logger;

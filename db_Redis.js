@@ -10,7 +10,7 @@ var db = redis.createClient();
 exports.init = function(callback) {
     db.select(config.database.name, function(err) {
         if (err) {
-            return callback('Error selecting datbase ' + config.database.name + ': ' + err);
+            return callback('Error selecting datbase ' + config.database.name + ': ' + err + '. Database name must be a number between 0 and 14.');
         } else {
             return callback(null);
         }
@@ -53,13 +53,17 @@ exports.getToken = function(callback) {
  * @param  {string} publicPath      Path for the users.
  * @param  {string} url             Endpoint url.
  */
-exports.newService = function(publicPath, url, callback) {
+exports.newService = function(publicPath, url, appId, callback) {
     var multi = db.multi();
 
-    multi.hmset('services', publicPath, url);
+    multi.sadd(['services', publicPath]);
+    multi.hmset(publicPath, {
+        url: url,
+        appId: appId
+    });
     multi.exec(function(err) {
         if (err) {
-            return callback(err);
+            return callback('[ERROR] Error in database adding the new service.');
         } else {
             return callback(null);
         }
@@ -72,7 +76,7 @@ exports.newService = function(publicPath, url, callback) {
  * @param  {string}   publicPath Service public path.
  */
 var associatedApiKeys = function(publicPath, callback) {
-    db.smembers(publicPath, function(err, apiKeys) {
+    db.smembers(publicPath + 'apiKeys', function(err, apiKeys) {
         if (err) {
             return callback(err, null);
         } else {
@@ -115,8 +119,10 @@ var associatedSubscriptions = function(apiKeys, callback) {
 exports.deleteService = function(publicPath, callback) {
     var multi = db.multi();
 
-    multi.hdel('services', publicPath);
+    multi.srem('services', publicPath);
     multi.del(publicPath);
+    multi.del(publicPath + 'apiKeys');
+    multi.del(publicPath + 'admins');
     async.waterfall([
         async.apply(associatedApiKeys, publicPath),
         associatedSubscriptions,
@@ -142,7 +148,7 @@ exports.deleteService = function(publicPath, callback) {
                 } else {
                     multi.exec(function(err) {
                         if (err) {
-                            return callback(err);
+                            return callback('[ERROR] Error in datbase deleting the service.');
                         } else {
                             return callback(null);
                         }
@@ -154,18 +160,200 @@ exports.deleteService = function(publicPath, callback) {
 }
 
 /**
- * Return the service, the public path and the endpoint url associated with the path-
+ * Return the service, the public path and the endpoint url associated with the path.
  * 
  * @param  {string} publicPath      Public path for the users.
  */
 exports.getService = function(publicPath, callback) {
-    db.hget('services', publicPath, function(err, url) {
+    db.hgetall(publicPath, function(err, service) {
         if (err) {
-            return callback(err, null);
-        } else if (url === null){
+            return callback('[ERROR] Error in database getting the service.', null);
+        } else if (service === null){
             return callback(null, null);
         } else {
-            return callback(null, url);
+            return callback(null, service);
+        }
+    });
+}
+
+/**
+ * Return all the registered services.
+ */
+exports.getAllServices = function(callback) {
+    var toReturn = [];
+
+    db.smembers('services', function(err, publicPaths) {
+        if (err) {
+            return callback('[ERROR] Error in database getting the services.', null);
+        } else {
+            async.each(publicPaths, function(publicPath, task_callback) {
+                db.hgetall(publicPath, function(err, service) {
+                    if (err) {
+                        task_callback(err);
+                    } else {
+                        service.publicPath = publicPath;
+                        toReturn.push(service);
+                        task_callback(null);
+                    }
+                });
+            }, function(err) {
+                if (err) {
+                    return callback('[ERROR] Error in database getting the services.');
+                } else {
+                    return callback(null, toReturn);
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Return the appId associated with the specified service by its public path.
+ * 
+ * @param  {string}   publicPath Service public path.
+ */
+exports.getAppId = function(publicPath, callback) {
+    db.hget(publicPath, 'appId', function(err, appId) {
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, appId);
+        }
+    });
+}
+
+/**
+ * Add a new administrator.
+ * 
+ * @param {string}   idAdmin      Administrator user name.
+ */
+exports.addAdmin = function(idAdmin, callback) {
+    db.sadd(['admins', idAdmin], function(err) {
+        if (err) {
+            return callback('[ERROR] Error in database adding admin: ' + idAdmin + '.');
+        } else {
+            return callback(null);
+        }
+    });
+}
+
+/**
+ * Delete the specified administrator.
+ * 
+ * @param  {string}   idAdmin  Administrator identifier.
+ */
+exports.deleteAdmin = function(idAdmin, callback) {
+    exports.getAllServices(function(err, services) {
+        if (err) {
+            return callback('[ERROR] Error in database removing admin ' + idAdmin);
+        } else {
+            async.each(services, function(service, task_callback) {
+                db.srem(service.publicPath + 'admins', idAdmin, function(err) {
+                    if (err) {
+                        return callback('[ERROR] Error in database removing admin ' + idAdmin);
+                    } else {
+                        task_callback();
+                    }
+                })
+            }, function() {
+                db.srem('admins', idAdmin, function(err) {
+                    if (err) {
+                        return callback('[ERROR] Error in database removing admin: ' + idAdmin + '.');
+                    } else {
+                        return callback(null);
+                    }
+                });
+            });
+        }
+    });
+}
+
+/**
+ * Add a new administrator for the service passed as argument (publicPath).
+ * 
+ * @param {string}   admin      Administrator user name.
+ * @param {string}   publicPath Public path of the service.
+ */
+exports.bindAdmin = function(idAdmin, publicPath, callback) {
+    exports.getService(publicPath, function(err, url) {
+        if (err || url === null) {
+            return callback('[ERROR] Invalid public path.')
+        } else {
+            db.smembers('admins', function(err, admins) {
+                if (err || admins.indexOf(idAdmin) === -1) {
+                    return callback('[ERROR] Invalid admin.')
+                } else {
+                    db.sadd(publicPath + 'admins', idAdmin, function(err) {
+                        if (err) {
+                            return callback('[ERROR] Error adding the administrator.')
+                        } else {
+                            return callback(null);
+                        }
+                    });
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Delete the specified admin for the specified service by its public path.
+ * 
+ * @param  {string}   admin      Administrator user name.
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.unbindAdmin = function(idAdmin, publicPath, callback) {
+    db.srem(publicPath + 'admins', idAdmin, function(err) {
+        if (err) {
+            return callback('[ERROR] Error in database deleting the administrator.');
+        } else {
+            return callback(null);
+        }
+    });
+}
+
+/**
+ * Return all the administrators for the service specified by its public path.
+ * 
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.getAdmins = function(publicPath, callback) {
+    var toReturn = []
+
+    db.smembers(publicPath + 'admins', function(err, admins) {
+        if (err) {
+            return callback('[ERROR] Error in database getting the administrators.', null);
+        } else {
+            async.each(admins, function(admin, task_callback) {
+                toReturn.push({idAdmin: admin});
+                task_callback();
+            }, function() {
+                return callback(null, toReturn);
+            });
+        }
+    });
+}
+
+/**
+ * Return the endpoint url if the user is an administrator of the service; otherwise return null.
+ * 
+ * @param  {string}   idAdmin    Administrator identifier.
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.getAdminUrl = function(idAdmin, publicPath, callback) { 
+    db.smembers(publicPath + 'admins', function(err, admins) {
+        if (err) {
+            return callback(err, null);
+        } else if (admins.indexOf(idAdmin) === -1) { // Not an admin
+            return callback(null, null); 
+        } else {
+            db.hget(publicPath, 'url', function(err, url) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, url);
+                }
+            });
         }
     });
 }
@@ -176,19 +364,13 @@ exports.getService = function(publicPath, callback) {
  * @param  {string} publicPath         Path to check.
  */
 exports.checkPath = function(publicPath, callback) {
-    db.hgetall('services', function(err, services) {
+    db.smembers('services', function(err, publicPaths) {
         if (err) {
             return callback(err, false);
+        } else if (publicPaths.indexOf(publicPath) === -1) {
+            return callback(null, false);
         } else {
-            async.forEachOf(services, function(endpoint, path, task_callback) {
-                if (publicPath === path) {
-                    return callback(null, true);
-                } else {
-                    task_callback(null);
-                }
-            }, function() {
-                return callback(null, false);
-            });
+            return callback(null, true);
         }
     });
 }
@@ -291,14 +473,13 @@ exports.getAccountingInfo = function(apiKey, callback) {
         } else if (accountingInfo === null) {
             return callback(null, null);
         } else {
-            db.hget('services', accountingInfo.publicPath, function(err, url) {
+            db.hget(accountingInfo.publicPath, 'url', function(err, url) {
                 if (err) {
                     return callback(err, null);
                 } else {
                     return callback(null, {
                         unit: accountingInfo.unit,
-                        url: url,
-                        publicPath: accountingInfo.publicPath
+                        url: url
                     });
                 }
             });

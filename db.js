@@ -23,6 +23,7 @@ exports.init = function(callback) {
         db.run('CREATE TABLE IF NOT EXISTS services ( \
                     publicPath      TEXT, \
                     url             TEXT, \
+                    appId           TEXT, \
                     PRIMARY KEY (publicPath) \
         )');
 
@@ -47,6 +48,20 @@ exports.init = function(callback) {
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
         )');
+
+        db.run('CREATE TABLE IF NOT EXISTS admins ( \
+                    idAdmin             TEXT, \
+                    PRIMARY KEY (idAdmin)\
+        )');
+
+        db.run('CREATE TABLE IF NOT EXISTS administer ( \
+                    idAdmin             TEXT, \
+                    publicPath          TEXT, \
+                    PRIMARY KEY (idAdmin, publicPath), \
+                    FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE, \
+                    FOREIGN KEY (idAdmin) REFERENCES admins (idAdmin) ON DELETE CASCADE\
+        )');
+
         return callback(null);
     });
 };
@@ -92,15 +107,16 @@ exports.getToken = function(callback) {
 /**
  * Map the publicPath with the endpoint url.
  * 
- * @param  {string} publicPath      Path for the users.
+ * @param  {string} publicPath      Service public path.
  * @param  {string} url             Endpoint url.
  */
-exports.newService = function(publicPath, url, callback) {
+exports.newService = function(publicPath, url, appId, callback) {
     db.run('INSERT OR REPLACE INTO services \
-            VALUES ($path, $url)',
+            VALUES ($path, $url, $appId)',
         {
             $path: publicPath,
-            $url: url
+            $url: url,
+            $appId: appId
         }, function(err) {
             if (err) {
                 return callback(err);
@@ -113,7 +129,7 @@ exports.newService = function(publicPath, url, callback) {
 /**
  * Delete the service.
  * 
- * @param  {string} publicPath      Public path for the users.
+ * @param  {string} publicPath      Service public path.
  */
 exports.deleteService = function(publicPath, callback) {
     db.run('DELETE FROM services \
@@ -132,10 +148,10 @@ exports.deleteService = function(publicPath, callback) {
 /**
  * Return the service, the public path and the endpoint url associated with the path-
  * 
- * @param  {string} publicPath      Public path for the users.
+ * @param  {string} publicPath      Service public path.
  */
 exports.getService = function(publicPath, callback) {
-    db.all('SELECT url \
+    db.all('SELECT url, appId \
             FROM services \
             WHERE publicPath=$path', {
                 $path: publicPath
@@ -145,7 +161,168 @@ exports.getService = function(publicPath, callback) {
                 } else if (service.length ===  0) {
                     return callback(null, null);
                 } else {
-                    return callback(null, service[0].url);
+                    return callback(null, {url: service[0].url, appId: service[0].appId} );
+                }
+    });
+}
+
+/**
+ * Return all the registered services.
+ */
+exports.getAllServices = function(callback) {
+    db.all('SELECT * \
+            FROM services', function(err, services) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, services);
+                }
+    });
+}
+
+/**
+ * Return the appId associated with the specified service by its public path.
+ * 
+ * @param  {string}   publicPath Service public path.
+ */
+exports.getAppId = function(publicPath, callback) {
+    db.all('SELECT appId \
+            FROM services \
+            WHERE $publicPath=publicPath',
+            {
+                $publicPath: publicPath
+            }, function(err, appId) {
+                if (err) {
+                    return callback(err, null);
+                } else if (appId.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, appId[0].appId);
+                }
+    });
+}
+
+/**
+ * Add a new administrator.
+ * 
+ * @param {string}   idAdmin      Administrator user name.
+ */
+exports.addAdmin = function(idAdmin, callback) {
+    db.run('INSERT OR REPLACE INTO admins \
+            VALUES ($idAdmin)',
+            {
+                $idAdmin: idAdmin
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+    });
+}
+
+/**
+ * Delete the specified administrator.
+ * 
+ * @param  {string}   idAdmin  Administrator identifier.
+ */
+exports.deleteAdmin = function(idAdmin, callback) {
+    db.run('DELETE FROM admins \
+            WHERE $idAdmin=idAdmin',
+            {
+                $idAdmin: idAdmin
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+    });
+}
+
+/**
+ * Bind the administrator to the service.
+ * 
+ * @param  {string}   idAdmin    Administrator identifier.
+ * @param  {string}   publicPath Service public path.
+ */
+exports.bindAdmin = function(idAdmin, publicPath, callback) {
+    db.run('INSERT OR REPLACE INTO administer \
+            VALUES ($idAdmin, $publicPath)',
+            {
+                $idAdmin: idAdmin,
+                $publicPath: publicPath
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+    });
+}
+
+/**
+ * Unbind the specified admin for the specified service by its public path.
+ * 
+ * @param  {string}   admin      Administrator user name.
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.unbindAdmin = function(idAdmin, publicPath, callback) {
+    db.run('DELETE FROM administer \
+            WHERE idAdmin=$idAdmin AND publicPath=$publicPath',
+            {
+                $idAdmin: idAdmin,
+                $publicPath: publicPath
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+    });
+}
+
+/**
+ * Return all the administrators for the service specified by its public path.
+ * 
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.getAdmins = function(publicPath, callback) {
+    db.all('SELECT idAdmin \
+            FROM administer \
+            WHERE $publicPath=publicPath',
+            {
+                $publicPath: publicPath
+            }, function(err, admins) {
+                if (err) {
+                    return callback(err, null);
+                } else {
+                    return callback(null, admins);
+                }
+    });
+}
+
+/**
+ * Return the endpoint url if the user is an administrator of the service; otherwise return null.
+ * 
+ * @param  {string}   idAdmin    Administrator identifier.
+ * @param  {string}   publicPath Public path of the service.
+ */
+exports.getAdminUrl = function(idAdmin, publicPath, callback) {
+    db.all('SELECT services.url \
+            FROM administer, services \
+            WHERE administer.publicPath=services.publicPath AND \
+                administer.idAdmin=$idAdmin AND services.publicPath=$publicPath',
+            {
+                $idAdmin: idAdmin,
+                $publicPath: publicPath
+            }, function(err, result) {
+                if (err) {
+                    return callback(err, null);
+                } else if (result.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, result[0].url);
                 }
     });
 }
@@ -253,7 +430,7 @@ exports.checkRequest = function(customer, apiKey, callback) {
  * @param  {string}   apiKey   Product identifier.
  */
 exports.getAccountingInfo = function(apiKey, callback) {
-    db.all('SELECT accounting.unit, services.url, accounting.publicPath \
+    db.all('SELECT accounting.unit, services.url \
             FROM accounting , services \
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey', 
             {

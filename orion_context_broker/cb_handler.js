@@ -86,14 +86,12 @@ exports.getOperation = function(privatePath, req, callback) {
  * @param  {string}   operation Context Broker operation (subscribe, unsubscribe).
  */
 exports.subscriptionHandler = function(req, res, url, unit, operation, callback) {
+
     var options = {
         url: url,
         method: req.method,
         json: true,
-        headers: {
-            'content-type': 'application/json',
-            'accept': 'application/json'
-        }
+        headers: req.headers
     }
     
     if (operation === 'subscribe') {
@@ -107,7 +105,7 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
             if (error) {
                 res.status(504).send();
                 return callback('Error sending the subscription to the CB');
-            } else {
+            } else if (body.subscribeResponse !== undefined) {
                 var subscriptionId = body.subscribeResponse.subscriptionId;
                 res.status(resp.statusCode);
                 async.forEachOf(resp.headers, function(header, key, task_callback) {
@@ -123,11 +121,14 @@ exports.subscriptionHandler = function(req, res, url, unit, operation, callback)
                             } else {
                                 return callback(null);
                             }
-                        })
+                        });
                     } else {
                         return callback(null);
                     }
                 });
+            } else {
+                res.status(resp.statusCode).send(body);
+                return callback(null);
             }
         });
 

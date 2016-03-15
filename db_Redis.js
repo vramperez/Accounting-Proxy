@@ -198,7 +198,7 @@ exports.getAllServices = function(callback) {
                 });
             }, function(err) {
                 if (err) {
-                    return callback('[ERROR] Error in database getting the services.');
+                    return callback('[ERROR] Error in database getting the services.', null);
                 } else {
                     return callback(null, toReturn);
                 }

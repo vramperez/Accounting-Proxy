@@ -1,5 +1,8 @@
 var mkdirp = require('mkdirp'),
-    server = require('./server');
+    server = require('./server'),
+    async = require('async');
+
+"use strict";
 
 // Create directory ./log if not exists
 mkdirp('./log', function(err) {
@@ -8,8 +11,8 @@ mkdirp('./log', function(err) {
     }
 });
 
-// Start the accounting proxy server
-server.init(function(err) {
+// Start the accounting proxy
+server.init(function(err){
     if (err) {
         logger.error(err);
         process.exit(1);

@@ -135,7 +135,10 @@ exports.headerAuthentication = function(req, res, next) {
             } else {
                 // Check that the provided access token is valid for the given service
                 verifyAppId(userProfile.appId, req, function(err, valid) {
-                    if (valid) {
+                    if (err) {
+                        res.status(500).send();
+                        logger.error('Error in database getting the appId');
+                    } else if (valid) {
                         req.user = userProfile;
                         req.user.accessToken = authToken;
                         attachUserHeaders(req.headers, userProfile);
@@ -149,7 +152,6 @@ exports.headerAuthentication = function(req, res, next) {
         });
 
     } catch (err) {
-
         if (err.name === 'AuthorizationTokenNotFound') {
             res.status(401).json({error: err.message});
         } else {

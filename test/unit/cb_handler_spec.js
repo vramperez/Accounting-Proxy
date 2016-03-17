@@ -357,7 +357,11 @@ describe('Testing ContextBroker Handler', function() {
             var unit = 'megabyte';
             var req = {
                 method: 'POST',
-                body: body
+                body: body,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                }
             }
             var res = {
                 status: function(statusCode) {
@@ -378,10 +382,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -405,7 +406,11 @@ describe('Testing ContextBroker Handler', function() {
             var unit = 'megabyte';
             var req = {
                 method: 'POST',
-                body: body
+                body: body,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                }
             }
             var res = {
                 status: function(statusCode) {
@@ -436,10 +441,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -471,6 +473,10 @@ describe('Testing ContextBroker Handler', function() {
             var req = {
                 method: 'POST',
                 body: body,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                },
                 get: function(header) {
                     return apiKey;
                 }
@@ -509,10 +515,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -538,6 +541,65 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
+        it('[subscription] incorrect subscription', function(done) {
+            var subscriptionId = 'subscriptionId';
+            var apiKey = 'apiKey';
+            var body = {
+                reference: 'http://reference/path',
+            }
+            var unit = 'megabyte';
+            var req = {
+                method: 'POST',
+                body: body,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                },
+                get: function(header) {
+                    return apiKey;
+                }
+            }
+            var res = {
+                status: function(statusCode) {
+                    return this;
+                },
+                send: function(body) {}
+            };
+            var resp =  { 
+                statusCode: 200, 
+                headers: {header1: 'header1'}
+            }
+            var body_CB = {}
+            var implementations = {
+                req: req,
+                requester: {
+                    request: function(options, callback) {
+                        return callback(null, resp, body_CB);
+                    }    
+                },
+                res: res
+            }
+            var options = {
+                url: 'http://contextBroker/path',
+                method: req.method,
+                json: true,
+                headers: implementations.req.headers,
+                body: body
+            }
+            mocker(implementations, function(cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.requester.request.callCount, 1);
+                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
+                    assert.equal(spies.res.send.callCount, 1);
+                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
+                    done();
+                });
+            });
+        });
+
         it('[subscription] correct subscription', function(done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
@@ -548,6 +610,10 @@ describe('Testing ContextBroker Handler', function() {
             var req = {
                 method: 'POST',
                 body: body,
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                },
                 get: function(header) {
                     return apiKey;
                 }
@@ -586,10 +652,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -621,7 +684,11 @@ describe('Testing ContextBroker Handler', function() {
                 body: {
                     subscriptionId: subscriptionId
                 },
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                }
             }
             var res = {
                 status: function(statusCode) {
@@ -642,10 +709,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: req.body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -661,11 +725,15 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] error deleting the subscription from database', function(done) {
+        it('[unsubscribe] error, context broker response no OK', function(done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
                     subscriptionId: subscriptionId
+                },
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
                 },
                 method: 'POST'
             }
@@ -693,10 +761,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: req.body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -723,6 +788,10 @@ describe('Testing ContextBroker Handler', function() {
             var req = {
                 body: {
                     subscriptionId: subscriptionId
+                },
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
                 },
                 method: 'POST'
             }
@@ -755,10 +824,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: req.body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -789,7 +855,11 @@ describe('Testing ContextBroker Handler', function() {
                     subscriptionId: subscriptionId
                 },
                 method: 'DELETE',
-                path: '/path/subscriptionId'
+                path: '/path/subscriptionId',
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                }
             }
             var resp = {
                 headers: { header1: 'header1'},
@@ -820,10 +890,7 @@ describe('Testing ContextBroker Handler', function() {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
+                headers: implementations.req.headers,
                 body: req.body
             }
             mocker(implementations, function(cb_handler, spies) {
@@ -842,6 +909,65 @@ describe('Testing ContextBroker Handler', function() {
                     assert.deepEqual(spies.res.send.getCall(0).args[0], {});
                     assert.equal(spies.db.deleteCBSubscription.callCount, 1);
                     assert.deepEqual(spies.db.deleteCBSubscription.getCall(0).args[0], req.body.subscriptionId);
+                    done();
+                });
+            });
+        });
+
+        it('[unsubscribe] correct unsubscription', function(done) {
+            var subscriptionId = 'subscriptionId';
+            var req = {
+                body: {
+                    subscriptionId: subscriptionId
+                },
+                method: 'DELETE',
+                path: '/path/subscriptionId',
+                headers: {
+                    'content-type': 'application/json',
+                    'accept': 'application/json'
+                }
+            }
+            var resp = {
+                headers: { header1: 'header1'},
+                statusCode: 400
+            }
+            var res = {
+                status: function(statusCode) {
+                    return this;
+                },
+                setHeader: function(header, value) {},
+                send: function(body) {}
+            }
+            var implementations = {
+                requester: {
+                    request: function(options, callback) {
+                        return callback(null, resp, {});
+                    }
+                },
+                req: req,
+                res: res
+            }
+            var options = {
+                url: 'http://contextBroker/path',
+                method: req.method,
+                json: true,
+                headers: implementations.req.headers,
+                body: req.body
+            }
+            mocker(implementations, function(cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.requester.request.callCount, 1);
+                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
+                    assert.equal(spies.async.forEachOf.callCount, 1);
+                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
+                    assert.equal(spies.res.setHeader.callCount, 1);
+                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
+                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
+                    assert.equal(spies.res.send.callCount, 1);
+                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
                     done();
                 });
             });

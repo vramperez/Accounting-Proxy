@@ -118,7 +118,7 @@ exports.count = function(apiKey, unit, body, callback) {
  */
 var CBrequestHandler = function(req, res, options, unit) {
     var apiKey = req.get('X-API-KEY');
-    
+
     contextBroker.getOperation(url.parse(options.url).pathname, req, function(operation) {
         if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.subscriptionHandler(req, res, options.url, unit, operation, function(err) {

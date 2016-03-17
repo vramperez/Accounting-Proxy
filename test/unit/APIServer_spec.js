@@ -188,7 +188,7 @@ describe('Testing APIServer', function() {
                     status: function(code) {
                         return this;
                     },
-                    send: function() {}
+                    json: function(msg) {}
                 },
                 db: {
                     getApiKeys: function(user, callback) {
@@ -203,8 +203,9 @@ describe('Testing APIServer', function() {
                 assert.equal(spies.db.getApiKeys.callCount, 1);
                 assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
                 assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 400);
-                assert.equal(spies.res.send.callCount, 1);
+                assert.equal(spies.res.status.getCall(0).args[0], 404);
+                assert.equal(spies.res.json.callCount, 1);
+                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'No api-keys available for the user ' + user});
                 done();
             });
         });

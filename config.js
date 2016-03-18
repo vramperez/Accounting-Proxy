@@ -85,7 +85,7 @@ config.api = {
 //--------------------------------------------------
 // Configures the OAuth2  parameters.
 config.oauth2 = {
-    'roles': {
+    roles: {
         'admin': '106',
         'customer': '',
         'seller': ''

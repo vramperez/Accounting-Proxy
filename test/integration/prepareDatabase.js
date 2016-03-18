@@ -5,7 +5,7 @@ var db_mock;
 var loadServices = function(services, callback) {
     if (services.length != 0) {
         async.each(services, function(service, task_callback) {
-            db_mock.newService(service.publicPath, service.url, function(err) {
+            db_mock.newService(service.publicPath, service.url, service.appId, function(err) {
                 if (err) {
                     task_callback(err);
                 } else {
@@ -50,8 +50,30 @@ var loadSubscriptions = function(subscriptions, callback) {
     }
 }
 
+var loadAdmins = function(admins, callback) {
+    if (admins.length != 0) {
+        async.each(admins, function(admin, task_callback) {
+            db_mock.addAdmin(admin.idAdmin, function(err) {
+                if (err) {
+                    task_callback(err);
+                } else {
+                    db_mock.bindAdmin(admin.idAdmin, admin.publicPath, function(err) {
+                        if (err) {
+                            task_callback(err);
+                        } else {
+                            task_callback(null);
+                        }
+                    });
+                }
+            })
+        }, callback);
+    } else {
+        return callback();
+    }
+}
+
 // Prepare the database for the test adding the services, buy information, subscriptions.
-exports.addToDatabase = function(db, services, buys, subscriptions, callback) {
+exports.addToDatabase = function(db, services, buys, subscriptions, admins, callback) {
     db_mock = db;
 
     loadServices(services, function(err) {
@@ -66,7 +88,13 @@ exports.addToDatabase = function(db, services, buys, subscriptions, callback) {
                         if (err) {
                             return callback(err);
                         } else {
-                            return callback(null);
+                            loadAdmins(admins, function(err) {
+                                if (err) {
+                                    return callback(err);
+                                } else {
+                                    return callback(null);
+                                }
+                            });
                         }
                     });
                 }

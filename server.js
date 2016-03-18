@@ -217,7 +217,7 @@ var prepareRequest = function(req, res, endpointUrl, apiKey, unit) {
         if (config.resources.contextBroker && 
             /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/.test(url.parse(options.url).pathname)) {
 
-                if (!isJSON) { 
+                if (createMehtods.indexOf(req.method) > -1 && !isJSON) {
                     res.status(415).json({error: 'Content-Type must be "application/json"'});
                 } else {
                     CBrequestHandler(req, res, options, unit);

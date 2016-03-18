@@ -7,6 +7,9 @@
 	* [Basic configuration](#basicconfiguration)
 	* [Orion Context Broker Configuration](#orionconfiguration)
 	* [Customizing Accounting Proxy for other components](#customizeconfiguration)
+* [Authentication](#authentication)
+* [Authorization](#authorization)
+	* [Administrators](#administrators)
 * [Running](#running)
 * [Proxy API](#proxyapi)
 * [Development](#development)
@@ -78,6 +81,7 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
         accounting_port: 9010
 }
 ```
+
 * `config.resources`: configuration of the resources accounted by the proxy.
 	- `contextBroker`: set this option to `true` if the resource accounted is an Orion Context Broker. Otherwise set this option to `false` (default value).
 	- `notification_port`: port qhere the accounting proxy is listening to subscription notifications from the Orion Context Broker (port 9002 by default).
@@ -87,6 +91,9 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
         notification_port: 9002
 }
 ```
+
+* `config.api.administration_paths`: configuration of the administration paths.
+* `config.oauth2.roles`: configuration of the OAuth2 roles.
 
 ### <a name="componentsconfiguration"/> Components configuration
 -------------------------------
@@ -103,20 +110,6 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 }
 ```
 
-* After that, copy the `./fiware-pep-steelskin/config.js` file into your PEP-Proxy folder and overwrite the existing `config.js` file.
-* Then, copy the `./fiware-pep-steelskin/lib/plugins/accountingPlugin.js` file into your PEP-Proxy plugins folder (`fiware-pep-steelskin/lib/plugins`).
-* Finally, configure the PEP-Proxy `config.js` file copied in the previous step:
-	- `config.resource.original.host`: the Accounting Proxy host.
-	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
-	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
-```
-{
-        host: 'localhost',
-        port: 9000,
-        admin_paths: ['/api/users', '/api/resources', '/api/users/keys', '/api/units']
-}
-```
-
 #### <a name="customizeconfiguration"/> Customizing Accounting Proxy for other components
 
 In order to configure the Accounting Proxy working with other components follow this two steps:
@@ -125,23 +118,15 @@ In order to configure the Accounting Proxy working with other components follow 
 	- `contextBroker`: set `false` this parameter to disable the Context Broker accounting.
 	- The rest of information in `config.resources` is unnecessary in this case.
 
-* After that, copy the `./fiware-pep-steelskin/config.js` file into your PEP-Proxy folder and overwrite the existing `config.js` file.
-* Then, copy the `./fiware-pep-steelskin/restAccountingPlugin.js` file into your PEP-Proxy plugins folder (`fiware-pep-steelskin/lib/plugins`).
-* Finally, configure the PEP-Proxy `config.js` file copied in the previous step:
-	- `config.resource.original.host`: the Accounting Proxy host.
-	- `port`: the Accounting Proxy port (the same previously configured in the Accounting Proxy `config.js` as `config.accounting_proxy.port`, 9000 by default).
-	- `admin_paths`: the administration paths used by WStore to notify the Accounting Proxy. (Do not change it).
 
-```
-{
-	host: 'localhost',
-    port: 9000,
-    admin_paths: ['/api/users', '/api/resources', '/api/users/keys', '/api/units']
-}
-```
+## <a name="authentication"/> Authentication
+The authentication process is based on OAuth2 v2 tokens. The Accounting-Proxy expects that all the requests have a header `x-auth-token` containing a valid access token from the IDM or a `authorization` header containing `bearer "token"` where token is a valid access token from the IDM.
 
+## <a name="authorization"/> Authorization
+If the authentication process success, the Accounting-Proxy check the authorization. The Accounting-Proxy expects that all the requests have a header `X-API-KEY` containing a valid API-KEY corresponding to the requested service.
 
-
+### <a name="administrators"/> Administrators
+If the user is an administrator of the service, the administrator request must omit the "X-API-KEY" header. After the administrator request is authenticated, the request will be directly redirect to the service and no accounting will be make.
 
 ## <a name="running"/> Running
 Before run the Accounting Proxy you must have the PEP-Proxy and the Orion Context Broker running.
@@ -154,9 +139,16 @@ node accounting-proxy
 ## <a name="cli"/> CLI
 
 In order to manage servicies, use 'cli' tool. There are four commands available:
-* `./cli addService <publicPath> <url>`: binds the public path with the url specified.
-* `./cli getService <publicPath>`: returns the url associated with the public path.
+* `./cli addService <publicPath> <url> <appId>`: binds the public path with the url specified.
+* `./cli getService <publicPath>`: returns the url and appID associated with the public path.
+* `./cli getAllServices`: display all the registered services (public path, URL and appId).
 * `./cli deleteService <publicPath>`: delete the service associated with the public path.
+* `./cli addAdmin <userId>: add a new administrator.
+* `./cli deleteAdmin <userId>`: delete the specified admin.
+* `./bindAdmin <userId> <publicPath>`: add the specified administrator to the service specified by the public path.
+* `./cli unbindAdmin <userId> <publicPath>`: delete the specified administrator for the specified service by its public path.
+* `./cli unbindAdmin <userId> <publicPath>`: delete the specified administrator for the specified service by its public path.
+* `./getAdmins <publicPath>`: display all the administrator for the specified service.
 
 To display brief information: `./cli -h` or `./cli --help`.
 
@@ -164,7 +156,7 @@ To display brief information: `./cli -h` or `./cli --help`.
 
 Proxy's api is in port **9000** by default and root path **/api/..**.
 
-### POST ../users
+### POST ../accounting_proxy/buys
 
 Use by the store to notify a new buy:
 ```json
@@ -181,7 +173,7 @@ Use by the store to notify a new buy:
 ```
 * `unit`: accounting unit (`megabyte`, `call`, ...).
 
-### POST ../resources
+### POST ../accounting_proxy/urls
 
 Use by the store to check an URL:
 ```json
@@ -190,7 +182,7 @@ Use by the store to check an URL:
 }
 ```
 
-### GET ../users/keys
+### GET ../accounting_proxy/keys
 
 Retrieve the user's API_KEYs in a json:
 
@@ -204,7 +196,7 @@ Retrieve the user's API_KEYs in a json:
 ]
 ```
 
-### GET /api/units
+### GET /accounting_proxy/units
 
 Retrieve the supported accounting units by the accounting proxy in a JSON:
 ```json
@@ -244,4 +236,4 @@ npm test
 Test reporter generates a directory `./coverage` with all the coverage information (coverage reporter is generated by Istanbul).
 
 ---
-Last updated: _02/03/2016
+Last updated: _18/03/2016

@@ -68,4 +68,28 @@ config.resources = {
 
 };
 
+// Administration API configuration.
+//--------------------------------------------------
+// Configures the administration paths for the administration API used by the WStore
+config.api = {
+
+    administration_paths: {
+        keys: '/accounting_proxy/keys',
+        units: '/accounting_proxy/units',
+        newBuy: '/accounting_proxy/buys',
+        checkUrl: '/accounting_proxy/urls',
+    }
+};
+
+// OAuth2 configuration.
+//--------------------------------------------------
+// Configures the OAuth2  parameters.
+config.oauth2 = {
+    roles: {
+        'admin': '106',
+        'customer': '',
+        'seller': ''
+    }
+};
+
 module.exports = config;

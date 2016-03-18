@@ -28,6 +28,8 @@ exports.checkUrl = function(req, res) {
                 }
             });
         }
+        // Only check the path because the host and port are the same used for make this request,
+        // so they must be correct.
         db.checkPath(url.parse(body.url).pathname, function(err, correct) {
             if (err) {
                 res.status(500).send();
@@ -91,7 +93,7 @@ exports.getApiKeys = function(req, res) {
             if (err) {
                 res.status(500).send();
             } else if (apiKeysInfo === null) {
-                res.status(400).send();
+                res.status(404).json({error: 'No api-keys available for the user ' + user});
             } else {
                 res.status(200).json(apiKeysInfo);
             }

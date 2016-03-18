@@ -1,4 +1,4 @@
-var proxyquire = require('proxyquire'),
+var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     sinon = require('sinon');
 

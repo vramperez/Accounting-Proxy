@@ -14,7 +14,15 @@ var mock_config = {
     accounting_proxy: {
         port: 9000
     },
-    database: {}
+    database: {},
+    api: {
+        administration_paths: {
+            keys: '/accounting_proxy/keys',
+            units: '/accounting_proxy/units',
+            newBuy: '/accounting_proxy/buys',
+            checkUrl: '/accounting_proxy/urls',
+        }
+    }
 };
 
 var log_mock = {
@@ -108,28 +116,29 @@ async.each(test_config.databases, function(database, task_callback) {
 
         describe('with database: ' + database, function() {
 
-            describe('[GET: /api/units] accounting units request', function() {
+            describe('[GET:' + mock_config.api.administration_paths.units + '] accounting units request', function() {
 
                 it('correct (200) return all the accounting units', function(done) {
                     request(server.app)
-                        .get('/api/units')
-                        .expect(200, {units: ['call', 'megabyte']}, done);
+                        .get(mock_config.api.administration_paths.units)
+                        .expect(200, {units: mock_config.modules.accounting}, done);
                 });
             });
 
-            describe('[GET: /api/users/keys] user api-keys request', function() {
+            describe('[GET:' +  mock_config.api.administration_paths.keys + '] user api-keys request', function() {
 
                 it('no "X-Actor-ID header" (400)', function(done) {
                     request(server.app)
-                        .get('/api/users/keys')
+                        .get(mock_config.api.administration_paths.keys)
                         .expect(400, {error: 'Undefined "X-Actor-ID" header'}, done);
                 });
 
                 it('no valid user (400)', function(done) {
+                    var user = 'wrong';
                     request(server.app)
-                        .get('/api/users/keys')
-                        .set('X-Actor-ID', 'wrong')
-                        .expect(400, done);
+                        .get('/accounting_proxy/keys')
+                        .set('X-Actor-ID', user)
+                        .expect(404, {error: 'No api-keys available for the user ' + user}, done);
                 });
 
                 it('correct (200) return api-keys', function(done) {
@@ -142,7 +151,7 @@ async.each(test_config.databases, function(database, task_callback) {
                         unit: 'megabyte',
                         recordType: 'data'
                     }
-                    db_mock.newService(buyInfo1.publicPath, 'http://localhost/private', function(err) {
+                    db_mock.newService(buyInfo1.publicPath, 'http://localhost/private', 'appId', function(err) {
                         if (err) {
                             console.log('Error adding new service');
                             process.exit(1);
@@ -153,9 +162,9 @@ async.each(test_config.databases, function(database, task_callback) {
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                        .get('/api/users/keys')
+                                        .get('/accounting_proxy/keys')
                                         .set('X-Actor-ID', buyInfo1.customer)
-                                        .expect(200, [{ apiKey: 'apiKey1', productId: 'productId', orderId: 'orderId1' }], done);
+                                        .expect(200, [{ apiKey: buyInfo1.apiKey, productId: buyInfo1.productId, orderId: buyInfo1.orderId }], done);
                                 }
                             });
                         }
@@ -163,11 +172,11 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            describe('[POST: /api/resources] checkUrl request', function() {
+            describe('[POST:' + mock_config.api.administration_paths.checkUrl +'] checkUrl request', function() {
 
                 it('invalid content-type (415)', function(done) {
                     request(server.app)
-                        .post('/api/resources')
+                        .post(mock_config.api.administration_paths.checkUrl)
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
@@ -175,7 +184,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 it('incorrect body (400)', function(done) {
                     var url = 'http://localhost:9000/path';
                     request(server.app)
-                        .post('/api/resources')
+                        .post(mock_config.api.administration_paths.checkUrl)
                         .set('content-type', 'application/json')
                         .expect(400, {error: 'Invalid body, url undefined'}, done);
                 });
@@ -183,7 +192,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 it('invalid url (400)', function(done) {
                     var url = 'http://localhost:9000/wrong_path';
                     request(server.app)
-                        .post('/api/resources')
+                        .post(mock_config.api.administration_paths.checkUrl)
                         .set('content-type', 'application/json')
                         .send({url: url})
                         .expect(400, {error: 'Incorrect url ' + url}, done);
@@ -191,25 +200,26 @@ async.each(test_config.databases, function(database, task_callback) {
 
                 it('correct url and update the token (200)', function(done) {
                     var url = 'http://localhost:9000/path';
+                    var newToken = 'token2';
                     db_mock.addToken('token1', function(err) {
                         if (err) {
                             console.log('Error adding token');
                             process.exit(1);
                         } else {
-                            db_mock.newService('/public2', url, function(err) {
+                            db_mock.newService('/public2', url, 'appId', function(err) {
                                 if (err) {
                                     console.log('Error adding new service');
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                        .post('/api/resources')
+                                        .post(mock_config.api.administration_paths.checkUrl)
                                         .set('content-type', 'application/json')
-                                        .set('X-API-KEY', 'token2')
+                                        .set('X-API-KEY', newToken)
                                         .send({url: url})
                                         .expect(200, function() {
                                             db_mock.getToken(function(err, token) {
                                                 assert.equal(err, null);
-                                                assert.equal(token, 'token2');
+                                                assert.equal(token, newToken);
                                                 done();
                                             });
                                     });
@@ -220,24 +230,25 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            describe('[POST: /api/users] new buy request', function() {
+            describe('[POST: ' + mock_config.api.administration_paths.newBuy +'] new buy request', function() {
 
                 it('invalid content-type (415)', function(done) {
                     request(server.app)
-                        .post('/api/users')
+                        .post(mock_config.api.administration_paths.newBuy)
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('invalid json (400)', function(done) {
                     request(server.app)
-                            .post('/api/users')
+                            .post(mock_config.api.administration_paths.newBuy)
                             .set('content-type', 'application/json')
                             .send({})
                             .expect(400, {error: 'Invalid json'}, done);
                 });
 
                 it('correct buy request (200)', function(done) {
+                    var url = 'http://example.com/path';
                     var buy = {
                         orderId: 'orderId3',
                         productId: 'productId3',
@@ -248,26 +259,25 @@ async.each(test_config.databases, function(database, task_callback) {
                             recordType: 'data',
                         }
                     }
-                    db_mock.newService('/path3', 'http://example.com/path', function(err) {
+                    db_mock.newService('/path3', url, 'appId', function(err) {
                         if (err) {
                             console.log('Error adding new service');
                             process.exit(1);
                         } else {
                             request(server.app)
-                                .post('/api/users')
+                                .post(mock_config.api.administration_paths.newBuy)
                                 .set('content-type', 'application/json')
                                 .send(buy)
                                 .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, function() {
                                     db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function(err, res) {
                                         assert.equal(err, null);
-                                        assert.deepEqual(res, { unit: 'megabyte',
-                                          url: 'http://example.com/path',
-                                          publicPath: '/path3' });
+                                        assert.deepEqual(res, { unit: buy.productSpecification.unit,
+                                          url: url});
                                         done();
                                     });
                             });
                         }
-                    })
+                    });
                 });
             });
         });

@@ -1,6 +1,7 @@
 var mkdirp = require('mkdirp'),
     server = require('./server'),
-    async = require('async');
+    async = require('async'),
+    logger = require('winston');
 
 "use strict";
 

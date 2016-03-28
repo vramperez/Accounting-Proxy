@@ -131,7 +131,7 @@ describe('Testing Notifier', function() {
                     return callback(null, 'token');
                 },
                 request: function(options, callback) {
-                    return callback(null, {statusCode: 400}, null);
+                    return callback(null, {statusCode: 401, statusMessage: 'Unauthorized'}, null);
                 },
                 WStore: {
                     url: 'http://host:port/path/'    
@@ -139,7 +139,7 @@ describe('Testing Notifier', function() {
             }
             mocker(implementations, function(notifier, spies){
                 notifier.notify(notificationInfo, function(err) {
-                    assert.equal(err, 'Error notifying the WStore');
+                    assert.equal(err, 'Error notifying the WStore. 401 Unauthorized');
                     assert.equal(spies.getToken.callCount, 1);
                     assert.equal(spies.request.callCount, 1);
                     assert.equal(spies.request.getCall(0).args[0].url , implementations.WStore.url + notificationInfo.orderId + '/' + notificationInfo.productId);

@@ -180,16 +180,34 @@ describe('Testing SQLITE database', function() {
         it('error getting the token', function(done) {
             var implementations = {
                 get: function(sentence, callback) {
-                    return callback('Error');
+                    return callback('Error', null);
                 }
             }
             mocker(implementations, function(db, spies) {
                 db.getToken(function(err, token) {
                     assert.equal(err, 'Error');
+                    assert.equal(token, null);
                     assert.equal(spies.get.callCount, 1);
                     assert.equal(spies.get.getCall(0).args[0], sentence);
                     done();
                 })
+            });
+        });
+
+        it('no available token', function(done) {
+            var implementations = {
+                get: function(sentence, callback) {
+                    return callback(null, undefined);
+                }
+            }
+            mocker(implementations, function(db, spies) {
+                db.getToken(function(err, token) {
+                    assert.equal(err, null);
+                    assert.equal(token, undefined);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
+                    done();
+                });
             });
         });
 

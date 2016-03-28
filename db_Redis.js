@@ -41,6 +41,8 @@ exports.getToken = function(callback) {
     db.smembers('token', function(err, token) {
         if (err) {
             return callback(err, null);
+        } else if (token.length === 0) {
+            return callback(null, null);
         } else {
             return callback(null, token[0]);
         }

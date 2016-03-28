@@ -150,14 +150,32 @@ describe('Testing REDIS database', function() {
         it('error getting token', function(done) {
             var implementations = {
                 smembers: function(key, callback) {
-                    return callback('Error');
+                    return callback('Error', null);
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.getToken(function(err) {
+                db.getToken(function(err, token) {
                     assert.equal(err, 'Error');
+                    assert.equal(token, null);
                     assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], token);
+                    assert.equal(spies.smembers.getCall(0).args[0], 'token');
+                    done();
+                });
+            });
+        });
+
+        it('no available token', function(done) {
+            var implementations = {
+                smembers: function(key, callback) {
+                    return callback(null, []);
+                }
+            }
+            mocker(implementations, function(db, spies) {
+                db.getToken(function(err, token) {
+                    assert.equal(err, null);
+                    assert.equal(token, null);
+                    assert.equal(spies.smembers.callCount, 1);
+                    assert.equal(spies.smembers.getCall(0).args[0], 'token');
                     done();
                 });
             });
@@ -166,12 +184,13 @@ describe('Testing REDIS database', function() {
         it('correct', function(done) {
             var implementations = {
                 smembers: function(key, callback) {
-                    return callback(null, ['token']);
+                    return callback(null, [token]);
                 }
             }
             mocker(implementations, function(db, spies) {
-                db.getToken(function(err) {
+                db.getToken(function(err, token) {
                     assert.equal(err, null);
+                    assert.equal(token, token);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'token');
                     done();

@@ -47,7 +47,7 @@ exports.notify = function(notificationInfo, callback) {
                         }
                     });
                 } else {
-                    return callback('Error notifying the WStore');
+                    return callback('Error notifying the WStore. ' + resp.statusCode + ' ' + resp.statusMessage);
                 }
             });
         }

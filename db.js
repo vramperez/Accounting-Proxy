@@ -98,6 +98,8 @@ exports.getToken = function(callback) {
         function(err, token) {
             if (err) {
                 return callback(err, null);
+            } else if (token === undefined) {
+                return callback(null, null);
             } else {
                 return callback(null, token.token);
             }

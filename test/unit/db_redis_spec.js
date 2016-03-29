@@ -4,19 +4,19 @@ var proxyquire = require('proxyquire'),
     async = require('async');
 
 /**
- * Return an object database with the mocked dependencies and object with the neecessary spies specified in implementations. 
- * 
+ * Return an object database with the mocked dependencies and object with the neecessary spies specified in implementations.
+ *
  * @param  {Object}   implementations Dependencies to mock and spy.
  */
-var mocker = function(implementations, callback) {
+var mocker = function (implementations, callback) {
 
     var config_mock = {
         database: {
             name: 15
         }
-    }
+    };
     var db_mock = {
-        multi: function() {
+        multi: function () {
             return this;
         },
         sadd: implementations.sadd,
@@ -29,50 +29,50 @@ var mocker = function(implementations, callback) {
         del: implementations.del,
         exec: implementations.exec,
         select: implementations.select
-    }
+    };
     var redis_stub = {
-        createClient: function() {
+        createClient: function () {
             return db_mock;
         }
-    }
+    };
     var async_stub = {
         each: async.each,
         waterfall: async.waterfall,
         apply: async.apply,
         forEachOf: async.forEachOf
-    }
+    };
     // Create necessary spies
     var spies = {
         each: sinon.spy(async_stub, 'each'),
         apply: sinon.spy(async_stub, 'apply'),
         waterfall: sinon.spy(async_stub, 'waterfall'),
         forEachOf: sinon.spy(async_stub, 'forEachOf')
-    }
-    async.forEachOf(implementations, function(implementation, method, task_callback) {
+    };
+    async.forEachOf(implementations, function (implementation, method, task_callback) {
         spies[method.toString()] = sinon.spy(db_mock, method.toString());
         task_callback();
-    }, function() {
+    }, function () {
         var db = proxyquire('../../db_Redis', {
-            'redis': redis_stub,
+            redis: redis_stub,
             './config': config_mock,
-            'async': async_stub
+            async: async_stub
         });
         return callback(db, spies);
     });
-}
+};
 
-describe('Testing REDIS database', function() {
+describe('Testing REDIS database', function () {
 
-    describe('Function "init"', function() {
+    describe('Function "init"', function () {
 
-        it('initialization', function(done) {
+        it('initialization', function (done) {
             var implementations = {
-                select: function(db, callback) {
+                select: function (db, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.init(function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.init(function (err) {
                     assert.equal(err, 'Error selecting datbase 15: Error. Database name must be a number between 0 and 14.');
                     assert.equal(spies.select.callCount, 1);
                     assert.equal(spies.select.getCall(0).args[0], 15);
@@ -81,14 +81,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct intialization', function(done) {
+        it('correct intialization', function (done) {
             var implementations = {
-                select: function(db, callback) {
+                select: function (db, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.init(function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.init(function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.select.callCount, 1);
                     assert.equal(spies.select.getCall(0).args[0], 15);
@@ -98,19 +98,19 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "addToken"', function() {
+    describe('Function "addToken"', function () {
         var token = 'token';
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                del: function() {},
-                sadd: function() {},
-                exec: function(callback) {
+                del: function () {},
+                sadd: function () {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addToken(token, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addToken(token, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.del.callCount, 1);
                     assert.equal(spies.del.getCall(0).args[0], token);
@@ -122,16 +122,16 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('token added', function(done) {
+        it('token added', function (done) {
             var implementations = {
-                del: function() {},
-                sadd: function() {},
-                exec: function(callback) {
+                del: function () {},
+                sadd: function () {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addToken(token, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addToken(token, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.del.callCount, 1);
                     assert.equal(spies.del.getCall(0).args[0], token);
@@ -144,17 +144,17 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getToken"', function() {
+    describe('Function "getToken"', function () {
         var token = 'token';
 
-        it('error getting token', function(done) {
+        it('error getting token', function (done) {
             var implementations = {
-                smembers: function(key, callback) {
+                smembers: function (key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getToken(function(err, token) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
                     assert.equal(err, 'Error');
                     assert.equal(token, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -164,14 +164,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no available token', function(done) {
+        it('no available token', function (done) {
             var implementations = {
-                smembers: function(key, callback) {
+                smembers: function (key, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getToken(function(err, token) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
                     assert.equal(err, null);
                     assert.equal(token, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -181,14 +181,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                smembers: function(key, callback) {
+                smembers: function (key, callback) {
                     return callback(null, [token]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getToken(function(err, token) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
                     assert.equal(err, null);
                     assert.equal(token, token);
                     assert.equal(spies.smembers.callCount, 1);
@@ -199,23 +199,23 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "newService"', function() {
+    describe('Function "newService"', function () {
         var publicPath = '/public';
         var appId = 'appId';
         var url = 'http://example.com/path';
         var saddParams = ['services', publicPath];
         var hmsetParams = { url: url, appId: appId};
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                hmset: function(hash, key, value){},
-                sadd: function(list) {},
-                exec: function(callback) {
+                hmset: function (hash, key, value){},
+                sadd: function (list) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newService(publicPath, url, appId, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newService(publicPath, url, appId, function (err) {
                     assert.equal(err, '[ERROR] Error in database adding the new service.');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], saddParams);
@@ -228,16 +228,16 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hmset: function(hash, key, value){},
-                sadd: function(list) {},
-                exec: function(callback) {
+                hmset: function (hash, key, value){},
+                sadd: function (list) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newService(publicPath, url, appId, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newService(publicPath, url, appId, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], saddParams);
@@ -251,19 +251,19 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "deleteService"', function() {
+    describe('Function "deleteService"', function () {
         var publicPath = '/public';
 
-        it('Error getting the api-keys', function(done) {
+        it('Error getting the api-keys', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error', null);
                 },
-                srem: function(hash, key) {},
-                del: function(hash) {}
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteService('/public', function(err) {
+                srem: function (hash, key) {},
+                del: function (hash) {}
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteService('/public', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
@@ -274,25 +274,25 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.waterfall.callCount, 1);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    done();                  
+                    done();
                 });
             });
         });
 
-        it('error getting subscriptions', function(done) {
+        it('error getting subscriptions', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys') {
                         return callback(null, ['apiKey1']);
                     } else {
                         return callback('Error');
                     }
                 },
-                srem: function(hash, key) {},
-                del: function(hash) {}
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteService('/public', function(err) {
+                srem: function (hash, key) {},
+                del: function (hash) {}
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteService('/public', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
@@ -306,14 +306,14 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.smembers.callCount, 2);
                     assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
                     assert.equal(spies.smembers.getCall(1).args[0] , 'apiKey1subs');
-                    done();                  
+                    done();
                 });
             });
         });
 
-        it('error getting the customer', function(done) {
+        it('error getting the customer', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys') {
                         return callback(null, ['apiKey1', 'apiKey2']);
                     } else if (hash === 'apiKey1subs'){
@@ -322,15 +322,15 @@ describe('Testing REDIS database', function() {
                         return callback(null, ['subs1']);
                     }
                 },
-                srem: function(hash, key) {},
-                hdel: function(hash, value) {},
-                del: function(hash) {},
-                hget: function(hash, key, callback) {
+                srem: function (hash, key) {},
+                hdel: function (hash, value) {},
+                del: function (hash) {},
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteService('/public', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteService('/public', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
@@ -347,14 +347,14 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.smembers.getCall(2).args[0] , 'apiKey2subs');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey1');
-                    done();                  
+                    done();
                 });
             });
         });
 
-        it('error executing the query', function(done) {
+        it('error executing the query', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys' ) {
                         return callback(null, ['apiKey1', 'apiKey2']);
                     } else if (hash === 'apiKey1subs'){
@@ -363,24 +363,24 @@ describe('Testing REDIS database', function() {
                         return callback(null, ['subs1']);
                     }
                 },
-                del: function(hash) {},
-                hget: function(hash, key, callback) {
+                del: function (hash) {},
+                hget: function (hash, key, callback) {
                     return callback(null, '0001');
                 },
-                srem: function(hash, key) {},
-                exec: function(callback) {
+                srem: function (hash, key) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
+            };
             var del_args = [publicPath, publicPath + 'apiKeys', publicPath + 'admins', 'apiKey1', 'apiKey1subs', 'apiKey2', 'apiKey2subs', 'subs1', 'subs1subs'];
             var hget_args = ['apiKey1', 'apiKey2', 'subs1'];
-            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys', '0001', 'apiKeys']
-            mocker(implementations, function(db, spies) {
-                db.deleteService('/public', function(err) {
+            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys', '0001', 'apiKeys'];
+            mocker(implementations, function (db, spies) {
+                db.deleteService('/public', function (err) {
                     assert.equal(err, '[ERROR] Error in datbase deleting the service.');
                     assert.equal(spies.del.callCount, 9);
                     assert.equal(spies.del.getCall(0).args[0] , '/public');
-                    async.forEachOf(del_args, function(arg, i, task_callback) {
+                    async.forEachOf(del_args, function (arg, i, task_callback) {
                         assert.equal(spies.del.getCall(i).args[0] , arg);
                     });
                     assert.equal(spies.waterfall.callCount, 1);
@@ -391,21 +391,21 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.smembers.getCall(1).args[0] , 'apiKey1subs');
                     assert.equal(spies.smembers.getCall(2).args[0] , 'apiKey2subs');
                     assert.equal(spies.hget.callCount, 3);
-                    async.forEachOf(hget_args, function(arg, i, task_callback) {
+                    async.forEachOf(hget_args, function (arg, i, task_callback) {
                         assert.equal(spies.hget.getCall(i).args[0] , arg);
                     });
                     assert.equal(spies.srem.callCount, 7);
-                    async.forEachOf(srem_args, function(arg, i, task_callback) {
+                    async.forEachOf(srem_args, function (arg, i, task_callback) {
                         assert.equal(spies.srem.getCall(i).args[0] , arg);
                     });
-                    done();                  
+                    done();
                 });
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     if (hash === '/public') {
                         return callback(null, ['apiKey1', 'apiKey2']);
                     } else if (hash === 'apiKey1subs'){
@@ -414,24 +414,24 @@ describe('Testing REDIS database', function() {
                         return callback(null, ['subs1']);
                     }
                 },
-                del: function(hash) {},
-                hget: function(hash, key, callback) {
+                del: function (hash) {},
+                hget: function (hash, key, callback) {
                     return callback(null, '0001');
                 },
-                srem: function(hash, key) {},
-                exec: function(callback) {
+                srem: function (hash, key) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
+            };
             var del_args = [publicPath, publicPath + 'apiKeys', publicPath + 'admins',  'subs1', 'subs1subs', 'subs1', 'subs1subs'];
             var hget_args = ['subs1', 'subs1'];
-            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys']
-            mocker(implementations, function(db, spies) {
-                db.deleteService('/public', function(err) {
+            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys'];
+            mocker(implementations, function (db, spies) {
+                db.deleteService('/public', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.del.callCount, 7);
                     assert.equal(spies.del.getCall(0).args[0] , '/public');
-                    async.forEachOf(del_args, function(arg, i, task_callback) {
+                    async.forEachOf(del_args, function (arg, i, task_callback) {
                         assert.equal(spies.del.getCall(i).args[0] , arg);
                     });
                     assert.equal(spies.waterfall.callCount, 1);
@@ -441,34 +441,34 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
                     assert.equal(spies.smembers.getCall(1).args[0] , 'subs1subs');
                     assert.equal(spies.hget.callCount, 2);
-                    async.forEachOf(hget_args, function(arg, i, task_callback) {
+                    async.forEachOf(hget_args, function (arg, i, task_callback) {
                         assert.equal(spies.hget.getCall(i).args[0] , arg);
                     });
                     assert.equal(spies.srem.callCount, 5);
-                    async.forEachOf(srem_args, function(arg, i, task_callback) {
+                    async.forEachOf(srem_args, function (arg, i, task_callback) {
                         assert.equal(spies.srem.getCall(i).args[0] , arg);
                     });
-                    done();                  
+                    done();
                 });
             });
         });
     });
 
-    describe('Function "getService"', function() {
+    describe('Function "getService"', function () {
         var hgetallArgs = ['/public'];
         var service = {
             url: 'http://example.com/url',
             appId: 'appId'
         };
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getService('/public', function(err, service) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getService('/public', function (err, service) {
                     assert.equal(err, '[ERROR] Error in database getting the service.');
                     assert.equal(service, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -478,14 +478,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no service available', function(done) {
+        it('no service available', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, null);
                 }
             }
-            mocker(implementations, function(db, spies) {
-                db.getService('/public', function(err, service) {
+            mocker(implementations, function (db, spies) {
+                db.getService('/public', function (err, service) {
                     assert.equal(err, null);
                     assert.equal(service, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -495,14 +495,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, service);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getService('/public', function(err, result) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getService('/public', function (err, result) {
                     assert.equal(err, null);
                     assert.equal(result, service);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -513,7 +513,7 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getAllServices"', function() {
+    describe('Function "getAllServices"', function () {
         var services = [
             {
                 publicPath: '/public1',
@@ -528,14 +528,14 @@ describe('Testing REDIS database', function() {
         ];
         var publicPaths = ['/public1', '/public2'];
 
-        it('error in smsmeber', function(done) {
+        it('error in smsmeber', function (done) {
             var implementations = {
-                smembers: function(has, callback) {
+                smembers: function (has, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAllServices(function(err, services) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAllServices(function (err, services) {
                     assert.equal(err, '[ERROR] Error in database getting the services.');
                     assert.equal(services, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -545,17 +545,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error in hgetall', function(done) {
+        it('error in hgetall', function (done) {
             var implementations = {
-                smembers: function(has, callback) {
+                smembers: function (has, callback) {
                     return callback(null, publicPaths);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAllServices(function(err, services) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAllServices(function (err, services) {
                     assert.equal(err, '[ERROR] Error in database getting the services.');
                     assert.deepEqual(services, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -569,21 +569,21 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, return two services', function(done) {
+        it('correct, return two services', function (done) {
             var implementations = {
-                smembers: function(has, callback) {
+                smembers: function (has, callback) {
                     return callback(null, publicPaths);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     if (hash === publicPaths[0]) {
                         return callback(null, { url: services[0].url, appId: services[0].appId});
                     } else {
                         return callback(null, { url: services[1].url, appId: services[1].appId});
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAllServices(function(err, result) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAllServices(function (err, result) {
                     assert.equal(err, null);
                     assert.deepEqual(result, services);
                     assert.equal(spies.smembers.callCount, 1);
@@ -599,18 +599,18 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getAppId"', function() {
+    describe('Function "getAppId"', function () {
         var publicPath = '/public';
         var appId = 'appId';
 
-        it('error getting the appId', function(done) {
+        it('error getting the appId', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAppId(publicPath, function(err, appId) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAppId(publicPath, function (err, appId) {
                     assert.equal(err, 'Error');
                     assert.equal(appId, null);
                     assert.equal(spies.hget.callCount, 1);
@@ -621,14 +621,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, return the appId', function(done) {
+        it('correct, return the appId', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, appId);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAppId(publicPath, function(err, appId) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAppId(publicPath, function (err, appId) {
                     assert.equal(err, null);
                     assert.equal(appId, appId);
                     assert.equal(spies.hget.callCount, 1);
@@ -640,17 +640,17 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "addAdmin"', function() {
+    describe('Function "addAdmin"', function () {
         var idAdmin = 'idAdmin';
 
-        it('error adding the admin', function(done) {
+        it('error adding the admin', function (done) {
             var implementations = {
-                sadd: function(list, callback) {
+                sadd: function (list, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addAdmin(idAdmin, function (err) {
                     assert.equal(err, '[ERROR] Error in database adding admin: ' + idAdmin + '.');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['admins', idAdmin]);
@@ -659,14 +659,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, added admin', function(done) {
+        it('correct, added admin', function (done) {
             var implementations = {
-                sadd: function(list, callback) {
+                sadd: function (list, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addAdmin(idAdmin, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['admins', idAdmin]);
@@ -676,19 +676,19 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "deleteAdmin"', function() {
+    describe('Function "deleteAdmin"', function () {
         var idAdmin = 'idAdmin';
         var publicPaths = ['/public'];
         var service = {publicPath: '/public1'};
 
-        it('error getting all services', function(done) {
+        it('error getting all services', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error');
                 }
             };
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, '[ERROR] Error in database removing admin ' + idAdmin);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -697,20 +697,20 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error in the first remove', function(done) {
+        it('error in the first remove', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, publicPaths);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, service);
                 },
-                srem: function(hash, key, callback) {
+                srem: function (hash, key, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, '[ERROR] Error in database removing admin ' + idAdmin);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -726,24 +726,24 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error in the second remove', function(done) {
+        it('error in the second remove', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, publicPaths);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, service);
                 },
-                srem: function(hash, key, callback) {
+                srem: function (hash, key, callback) {
                     if (hash === 'admins') {
                         return callback('Error');
                     } else {
                         return callback(null);
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, '[ERROR] Error in database removing admin: ' + idAdmin + '.');
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -762,20 +762,20 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, removed admin', function(done) {
+        it('correct, removed admin', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, publicPaths);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, service);
                 },
-                srem: function(hash, key, callback) {
+                srem: function (hash, key, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -795,61 +795,61 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "bindAdmin"', function() {
+    describe('Function "bindAdmin"', function () {
         var idAdmin = 'idAdmin';
         var publicPath = 'publicPath';
 
-        it('error, invalid public path', function(done) {
+        it('error, invalid public path', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, '[ERROR] Invalid public path.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
                     done();
-                }); 
+                });
             });
         });
 
-        it('error, invalid admin', function(done) {
+        it('error, invalid admin', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
                 },
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, '[ERROR] Invalid admin.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'admins');
                     done();
-                }); 
+                });
             });
         });
 
-        it('error adding the administrator', function(done) {
+        it('error adding the administrator', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
                 },
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, [idAdmin]);
                 },
-                sadd: function(hash, key, callback) {
+                sadd: function (hash, key, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, '[ERROR] Error adding the administrator.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
@@ -859,24 +859,24 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.sadd.getCall(0).args[0], publicPath + 'admins');
                     assert.equal(spies.sadd.getCall(0).args[1], idAdmin);
                     done();
-                }); 
+                });
             });
         });
 
-        it('new administrator added', function(done) {
+        it('new administrator added', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
                 },
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, [idAdmin]);
                 },
-                sadd: function(hash, key, callback) {
+                sadd: function (hash, key, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
@@ -886,23 +886,23 @@ describe('Testing REDIS database', function() {
                     assert.equal(spies.sadd.getCall(0).args[0], publicPath + 'admins');
                     assert.equal(spies.sadd.getCall(0).args[1], idAdmin);
                     done();
-                }); 
+                });
             });
         });
     });
 
-    describe('Function "unbindAdmin"', function() {
+    describe('Function "unbindAdmin"', function () {
         var idAdmin = 'idAdmin';
         var publicPath = '/public';
 
-        it('error unbinding the admin', function(done) {
+        it('error unbinding the admin', function (done) {
             var implementations = {
-                srem: function(hash, key, callback) {
+                srem: function (hash, key, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.unbindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, '[ERROR] Error in database deleting the administrator.');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], publicPath + 'admins');
@@ -912,14 +912,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct unbinding', function(done) {
+        it('correct unbinding', function (done) {
             var implementations = {
-                srem: function(hash, key, callback) {
+                srem: function (hash, key, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.unbindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], publicPath + 'admins');
@@ -930,18 +930,18 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getAdmins"', function() {
+    describe('Function "getAdmins"', function () {
         var publicPath = '/public';
         var admins = ['admin1', 'admin2'];
 
-        it('error getting the admins', function(done) {
+        it('error getting the admins', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdmins(publicPath, function(err, admins) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdmins(publicPath, function (err, admins) {
                     assert.equal(err, '[ERROR] Error in database getting the administrators.');
                     assert.equal(admins, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -951,14 +951,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, return two admins', function(done) {
+        it('correct, return two admins', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, admins);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdmins(publicPath, function(err, result) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdmins(publicPath, function (err, result) {
                     assert.equal(err, null);
                     assert.deepEqual(result,[{idAdmin: admins[0]}, {idAdmin: admins[1]}]);
                     assert.equal(spies.smembers.callCount, 1);
@@ -971,19 +971,19 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('FUnction "getAdminUrl"', function() {
+    describe('FUnction "getAdminUrl"', function () {
         var idAdmin = 'idAdmin';
         var publicPath = '/public';
-        var url = 'http://example.com/path'
+        var url = 'http://example.com/path';
 
-        it('error getting the administrators', function(done) {
+        it('error getting the administrators', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, adminUrl) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
                     assert.equal(err, 'Error');
                     assert.equal(adminUrl, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -993,14 +993,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error, not an admin', function(done) {
+        it('error, not an admin', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, ['no_admin']);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, adminUrl) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
                     assert.equal(err, null);
                     assert.equal(adminUrl, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1010,17 +1010,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error, getting the url', function(done) {
+        it('error, getting the url', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, [idAdmin, 'otherAdmin']);
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, adminUrl) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
                     assert.equal(err, 'Error');
                     assert.equal(adminUrl, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1033,17 +1033,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct, should return the admin url', function(done) {
+        it('correct, should return the admin url', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, [idAdmin, 'otherAdmin']);
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, url);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, adminUrl) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
                     assert.equal(err, null);
                     assert.equal(adminUrl, url);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1057,35 +1057,35 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "checkPath"', function(done) {
+    describe('Function "checkPath"', function (done) {
         var publicPath = '/public';
         var services = ['/public','/public2'];
 
-        it('error getting the service', function(done) {
+        it('error getting the service', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath(publicPath, function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath(publicPath, function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
                     done();
                 });
-            }); 
+            });
         });
 
-        it('invalid url', function(done) {
+        it('invalid url', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, ['other_path']);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath(publicPath, function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath(publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1095,25 +1095,25 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct url', function(done) {
+        it('correct url', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, services);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath(publicPath, function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath(publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
                     done();
                 });
-            }); 
+            });
         });
     });
-    
-    describe('Function "newBuy"', function() {
+
+    describe('Function "newBuy"', function () {
         var buyInfo = {
             apiKey: 'apiKey',
             publicPath: '/public',
@@ -1139,16 +1139,16 @@ describe('Testing REDIS database', function() {
             }
         };
 
-        it('executing error', function(done) {
+        it('executing error', function (done) {
             var implementations = {
-                sadd: function(list) {},
-                hmset: function(hash, object) {},
-                exec: function(callback) {
+                sadd: function (list) {},
+                hmset: function (hash, object) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newBuy(buyInfo, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newBuy(buyInfo, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.sadd.callCount, 3);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], args.sadd[0]);
@@ -1163,16 +1163,16 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct buy', function(done) {
+        it('correct buy', function (done) {
             var implementations = {
-                sadd: function(list) {},
-                hmset: function(hash, object) {},
-                exec: function(callback) {
+                sadd: function (list) {},
+                hmset: function (hash, object) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newBuy(buyInfo, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newBuy(buyInfo, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.sadd.callCount, 3);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], args.sadd[0]);
@@ -1188,17 +1188,17 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getApiKeys"', function(done) {
+    describe('Function "getApiKeys"', function (done) {
         var keys = ['apiKey1', 'apiKey2'];
 
-        it('error getting user api-keys', function(done) {
+        it('error getting user api-keys', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, 'Error');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1207,14 +1207,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no api-keys available', function(done) {
+        it('no api-keys available', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, null);
                     assert.equal(apiKeys, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1224,17 +1224,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error getting accounting info', function(done) {
+        it('error getting accounting info', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, ['apiKey1']);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, 'Error');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1246,17 +1246,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, keys);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     if(hash === keys[0]) {
                         return callback(null, {
                             apiKey: hash,
                             productId: 'productId1',
-                            orderId: 'orderId1',
+                            orderId: 'orderId1'
                         });
                     } else {
                         return callback(null, {
@@ -1266,9 +1266,9 @@ describe('Testing REDIS database', function() {
                         });
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, null);
                     assert.deepEqual(apiKeys, [
                     {
@@ -1295,16 +1295,16 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "checkRequest"', function(done) {
+    describe('Function "checkRequest"', function (done) {
 
-        it('error getting accounting information', function(done) {
+        it('error getting accounting information', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', 'apiKey1', function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
                     assert.equal(spies.hget.callCount, 1);
@@ -1313,14 +1313,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no info available', function(done) {
+        it('no info available', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, '0002');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', 'apiKey1', function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.hget.callCount, 1);
@@ -1329,14 +1329,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, '0001');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', 'apiKey1', function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
                     assert.equal(spies.hget.callCount, 1);
@@ -1346,7 +1346,7 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getAccountingInfo"', function(done) {
+    describe('Function "getAccountingInfo"', function (done) {
         var apiKey = 'apiKey';
         var accountingInfo = {
             url: 'http://example.com/path',
@@ -1354,14 +1354,14 @@ describe('Testing REDIS database', function() {
             unit: 'megabyte'
         }
 
-        it('error getting the accounting info', function(done) {
+        it('error getting the accounting info', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo(apiKey, function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo(apiKey, function (err, accInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(accInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1371,14 +1371,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no accounting info available', function(done) {
+        it('no accounting info available', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo(apiKey, function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo(apiKey, function (err, accInfo) {
                     assert.equal(err, null);
                     assert.equal(accInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1388,17 +1388,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error getting the url', function(done) {
+        it('error getting the url', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, accountingInfo);
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo(apiKey, function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo(apiKey, function (err, accInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(accInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1411,17 +1411,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, accountingInfo);
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, accountingInfo.url);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo(apiKey, function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo(apiKey, function (err, accInfo) {
                     assert.equal(err, null);
                     assert.deepEqual(accInfo, {
                         unit: accountingInfo.unit,
@@ -1438,16 +1438,16 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getNotificationInfo"', function() {
+    describe('Function "getNotificationInfo"', function () {
 
-        it('error getting apiKeys', function(done) {
+        it('error getting apiKeys', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1457,17 +1457,17 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error getting accounting information', function(done) {
+        it('error getting accounting information', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, ['apiKey']);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);25
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1477,14 +1477,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no notification info available', function(done) {
+        it('no notification info available', function (done) {
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, null);
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1496,7 +1496,7 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var notificationInfo1 = {
                 apiKey: 'apiKey1',
                 orderId: 'orderId',
@@ -1506,24 +1506,24 @@ describe('Testing REDIS database', function() {
                 correlationNumber: 2,
                 recordType: 'callUsage',
                 unit: 'call'
-            }
+            };
             var notificationInfo2 = {
                 value: 0
-            }
+            };
             var implementations = {
-                smembers: function(hash, callback) {
+                smembers: function (hash, callback) {
                     return callback(null, ['apiKey1', 'apiKey2']);
                 },
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     if (hash === 'apiKey1') {
                         return callback(null, notificationInfo1);
                     } else {
                         return callback(null, notificationInfo2);
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, null);
                     assert.deepEqual(notificationInfo, [notificationInfo1]);
                     assert.equal(spies.smembers.callCount, 1);
@@ -1537,25 +1537,25 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "makeAccounting"', function() {
+    describe('Function "makeAccounting"', function () {
 
-        it('amount less than 0', function(done) {
-            mocker({}, function(db, spies) {
-                db.makeAccounting('apikey', -1.3, function(err) {
+        it('amount less than 0', function (done) {
+            mocker({}, function (db, spies) {
+                db.makeAccounting('apikey', -1.3, function (err) {
                     assert.equal(err, '[ERROR] The aomunt must be greater than 0');
                     done();
                 });
             });
         });
 
-        it('error getting previous value', function(done) {
+        it('error getting previous value', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.3, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.3, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1565,18 +1565,18 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 1);
                 },
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.3, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.3, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1592,18 +1592,18 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 1);
                 },
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.3, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.3, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1620,16 +1620,16 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "resetAccounting"', function() {
+    describe('Function "resetAccounting"', function () {
 
-        it('error getting correlation number', function(done) {
+        it('error getting correlation number', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1639,18 +1639,18 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 0);
                 },
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
             }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1667,18 +1667,18 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 0);
                 },
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
@@ -1696,18 +1696,18 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "addCBSubscription"', function() {
+    describe('Function "addCBSubscription"', function () {
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                sadd: function(list) {},
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                sadd: function (list) {},
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['apiKeysubs', 'subsId']);
@@ -1720,16 +1720,16 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                sadd: function(list) {},
-                hmset: function(hash, value) {},
-                exec: function(callback) {
+                sadd: function (list) {},
+                hmset: function (hash, value) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['apiKeysubs', 'subsId']);
@@ -1743,16 +1743,16 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "getCBSubscription"', function() {
+    describe('Function "getCBSubscription"', function () {
 
-        it('error getting subscription info', function(done) {
+        it('error getting subscription info', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subsId', function(err, subsInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subsId', function (err, subsInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(subsInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1762,14 +1762,14 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('no subscription info available', function(done) {
+        it('no subscription info available', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subsId', function(err, subsInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subsId', function (err, subsInfo) {
                     assert.equal(err, null);
                     assert.equal(subsInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1779,20 +1779,20 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error getting the unit', function(done) {
+        it('error getting the unit', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, {
                         apiKey: 'apiKey',
                         notificationUrl: 'http://example.com/url'
                     });
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subsId', function(err, subsInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subsId', function (err, subsInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(subsInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
@@ -1805,20 +1805,20 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hgetall: function(hash, callback) {
+                hgetall: function (hash, callback) {
                     return callback(null, {
                         apiKey: 'apiKey',
                         notificationUrl: 'http://example.com/url'
                     });
                 },
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 'call');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subsId', function(err, subsInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subsId', function (err, subsInfo) {
                     assert.equal(err, null);
                     assert.deepEqual(subsInfo, {
                         apiKey: 'apiKey',
@@ -1836,16 +1836,16 @@ describe('Testing REDIS database', function() {
         });
     });
 
-    describe('Function "deleteCBSubscription"', function() {
+    describe('Function "deleteCBSubscription"', function () {
 
-        it('error getting the api-key', function(done) {
+        it('error getting the api-key', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteCBSubscription('subsId', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteCBSubscription('subsId', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
@@ -1855,19 +1855,19 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('error executing', function(done) {
+        it('error executing', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 'apiKey');
                 },
-                srem: function(key, value) {},
-                del: function(hash) {},
-                exec: function(callback) {
+                srem: function (key, value) {},
+                del: function (hash) {},
+                exec: function (callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteCBSubscription('subsId', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteCBSubscription('subsId', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
@@ -1883,19 +1883,19 @@ describe('Testing REDIS database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                hget: function(hash, key, callback) {
+                hget: function (hash, key, callback) {
                     return callback(null, 'apiKey');
                 },
-                srem: function(key, value) {},
-                del: function(hash) {},
-                exec: function(callback) {
+                srem: function (key, value) {},
+                del: function (hash) {},
+                exec: function (callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteCBSubscription('subsId', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteCBSubscription('subsId', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'subsId');

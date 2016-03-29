@@ -12,34 +12,34 @@ var server, db_mock, cb_handler_mock, authentication_mock;
 var mock_config = {};
 
 var logger_mock = { // Avoid display server information while running the tests
-    Logger: function(transports) {
+    Logger: function (transports) {
         return {
-            log: function(level, msg) {},
-            info: function(msg) {},
-            warn: function(msg) {},
-            error: function(msg) {}
+            log: function (level, msg) {},
+            info: function (msg) {},
+            warn: function (msg) {},
+            error: function (msg) {}
         } 
     }
-}
+};
 
 var api_mock = {
-    checkIsJSON: function() {},
-    checkUrl: function() {},
-    newBuy: function() {},
-    getApiKeys: function(){},
-    getUnits: function() {}
-}
+    checkIsJSON: function () {},
+    checkUrl: function () {},
+    newBuy: function () {},
+    getApiKeys: function (){},
+    getUnits: function () {}
+};
 
 var notifier_mock = {
-    notify: function(info) {}
-}
+    notify: function (info) {}
+};
 
 var log_mock = {
-    log: function(level, msg) {},
-    info: function(msg) {},
-    warn: function(msg) {},
-    error: function(msg) {}
-}
+    log: function (level, msg) {},
+    info: function (msg) {},
+    warn: function (msg) {},
+    error: function (msg) {}
+};
 
 var mock_config = {
     accounting_proxy: {
@@ -73,23 +73,23 @@ var userProfile = {
     displayName: 'userName',
     roles: [{id: '106'}],
     appId: 'appId'
-}
+};
 
 var FIWAREStrategy_mock = {
-    OAuth2Strategy: function(options, callback) {
+    OAuth2Strategy: function (options, callback) {
         return {
-            userProfile: function(authToken, callback) {
+            userProfile: function (authToken, callback) {
                 return callback(null, userProfile);
             }
         }
     }
-}
+};
 
-var mocker = function(database, done) {
+var mocker = function (database, done) {
     switch (database) {
         case 'sql':
             async.series([
-                function(callback) {
+                function (callback) {
                     mock_config.database.type = './db';
                     mock_config.database.name = 'testDB_accounting.sqlite';
                     db_mock = proxyquire('../../db', {
@@ -97,7 +97,7 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 },
-                function(callback) {
+                function (callback) {
                     authentication_mock = proxyquire('../../OAuth2_authentication', {
                         'passport-fiware-oauth': FIWAREStrategy_mock,
                         './config': mock_config,
@@ -106,14 +106,14 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 },
-                function(callback) {
+                function (callback) {
                     cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                         '../config': mock_config,
                         'winston': log_mock,
                         '.././db': db_mock
                     });
                     callback(null);
-                }, function(callback) {
+                }, function (callback) {
                     server = proxyquire('../../server', {
                         './config': mock_config,
                         './db': db_mock,
@@ -125,8 +125,8 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 }
-            ], function() {
-                db_mock.init(function(err) {
+            ], function () {
+                db_mock.init(function (err) {
                     if (err) {
                         console.log('Error initializing the database');
                         process.exit(1);
@@ -138,7 +138,7 @@ var mocker = function(database, done) {
             break;
         case 'redis':
             async.series([
-                function(callback) {
+                function (callback) {
                     mock_config.database.type = './db_Redis';
                     mock_config.database.name = test_config.database_redis;
                     db_mock = proxyquire('../../db_Redis', {
@@ -146,7 +146,7 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 },
-                function(callback) {
+                function (callback) {
                     authentication_mock = proxyquire('../../OAuth2_authentication', {
                         'passport-fiware-oauth': FIWAREStrategy_mock,
                         './config': mock_config,
@@ -155,14 +155,14 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 },
-                function(callback) {
+                function (callback) {
                    cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                         '../config': mock_config,
                         'winston': log_mock,
                         '.././db_Redis': db_mock
                     });
                     callback(null);
-                }, function(callback) {
+                }, function (callback) {
                     server = proxyquire('../../server', {
                         './config': mock_config,
                         './db_Redis': db_mock,
@@ -174,8 +174,8 @@ var mocker = function(database, done) {
                     });
                     callback(null);
                 }
-            ], function() {
-                db_mock.init(function(err) {
+            ], function () {
+                db_mock.init(function (err) {
                     if (err) {
                         console.log('Error initializing the database');
                         process.exit(1);
@@ -186,15 +186,15 @@ var mocker = function(database, done) {
             })
             break;
     }
-}
+};
 
-var checkAccounting = function(apiKey, value, callback) {
-    db_mock.getNotificationInfo(function(err, allAccInfo) {
+var checkAccounting = function (apiKey, value, callback) {
+    db_mock.getNotificationInfo(function (err, allAccInfo) {
         if (err) {
             console.log('Error checking the accounting');
             return callback();
         } else {
-            async.each(allAccInfo, function(accInfo, task_callback) {
+            async.each(allAccInfo, function (accInfo, task_callback) {
                 if(accInfo.apiKey === apiKey) {
                     assert.equal(accInfo.value, value);
                     return callback();
@@ -204,22 +204,22 @@ var checkAccounting = function(apiKey, value, callback) {
             });
         }
     });
-}
+};
 
 console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run(test_config.accounting_CB_port);
 
-async.each(test_config.databases, function(database, task_callback) {  
-    
-    describe('Testing the accounting API. Orion Context-Broker requests', function() { 
+async.each(test_config.databases, function (database, task_callback) {
 
-        before(function(done) {
+    describe('Testing the accounting API. Orion Context-Broker requests', function () {
+
+        before(function (done) {
             mocker(database, done);
         });
 
-        after(function(task_callback) {
+        after(function (task_callback) {
             if (database === 'sql') {
-                fs.access('./testDB_accounting.sqlite', fs.F_OK, function(err) {
+                fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
                     if (!err) {
                         fs.unlinkSync('./testDB_accounting.sqlite');
                     }
@@ -227,7 +227,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 task_callback();
             } else {
                 var client = redis.createClient();
-                client.select(test_config.database_redis, function(err) {
+                client.select(test_config.database_redis, function (err) {
                     if (err) {
                         console.log('Error deleting redis database');
                         task_callback();
@@ -239,13 +239,13 @@ async.each(test_config.databases, function(database, task_callback) {
             }
         });
 
-        describe('with database ' + database, function() { 
+        describe('with database ' + database, function () {
 
-            it('undefined "X-API-KEY" header', function(done) {
+            it('undefined "X-API-KEY" header', function (done) {
                 var publicPath = '/public1';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
-                prepare_test.addToDatabase(db_mock, services, [], [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -258,7 +258,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('invalid api-key or user', function(done) {
+            it('invalid api-key or user', function (done) {
                 var publicPath = '/public2';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url , appId: userProfile.appId}];
@@ -271,7 +271,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -285,7 +285,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('error sending the request to endpoint (504)', function(done) {
+            it('error sending the request to endpoint (504)', function (done) {
                 var publicPath = '/public3';
                 var url = 'wrong';
                 var apiKey = 'apiKey2';
@@ -299,7 +299,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -313,7 +313,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('error making th accounting, wrong unit (500)', function(done) {
+            it('error making th accounting, wrong unit (500)', function (done) {
                 var publicPath = '/public4';
                 var apiKey = 'apiKey3';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -327,7 +327,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'wrong',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -341,7 +341,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Get entity (200), correct accounting (megabyte unit)', function(done) {
+            it('Get entity (200), correct accounting (megabyte unit)', function (done) {
                 var publicPath = '/public5';
                 var apiKey = 'apiKey4';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -355,7 +355,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -364,8 +364,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextEntity/Room1')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 0.00022125244140625, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 0.00022125244140625, function () {
                                 done();
                             });
                         });
@@ -373,7 +373,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Get entity (200), correct accounting (call unit)', function(done) {
+            it('Get entity (200), correct accounting (call unit)', function (done) {
                 var publicPath = '/public6';
                 var apiKey = 'apiKey5';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -387,7 +387,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -396,8 +396,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextEntity/Room1')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 1, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 1, function () {
                                 done();
                             });
                         });
@@ -405,7 +405,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Get all entities (200), correct accounting (megabyte unit)', function(done) {
+            it('Get all entities (200), correct accounting (megabyte unit)', function (done) {
                 var publicPath = '/public7';
                 var apiKey = 'apiKey6';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -419,7 +419,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -428,8 +428,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextEnties')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 0.00002765655517578125, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 0.00002765655517578125, function () {
                                 done();
                             });
                         });
@@ -437,7 +437,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Get all entities (200), correct accounting (call unit)', function(done) {
+            it('Get all entities (200), correct accounting (call unit)', function (done) {
                 var publicPath = '/public8';
                 var apiKey = 'apiKey7';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -451,7 +451,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -460,8 +460,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextEnties')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 1, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 1, function () {
                                 done();
                             });
                         });
@@ -469,7 +469,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Browse all types and detailed information (200), correct accounting (megabyte unit)', function(done) {
+            it('Browse all types and detailed information (200), correct accounting (megabyte unit)', function (done) {
                 var publicPath = '/public9';
                 var apiKey = 'apiKey8';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -483,7 +483,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -492,8 +492,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextTypes')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 0.0001773834228515625, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 0.0001773834228515625, function () {
                                 done();
                             });
                         });
@@ -501,7 +501,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('Browse all types and detailed information (200), correct accounting (call unit)', function(done) {
+            it('Browse all types and detailed information (200), correct accounting (call unit)', function (done) {
                 var publicPath = '/public9';
                 var apiKey = 'apiKey8';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -515,7 +515,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -524,8 +524,8 @@ async.each(test_config.databases, function(database, task_callback) {
                         .get(publicPath + '/v1/contextTypes')
                         .set('x-auth-token', userProfile.accessToken)
                         .set('X-API-KEY', apiKey)
-                        .expect(500, function() {
-                            checkAccounting(buys[0].apiKey, 1, function() {
+                        .expect(500, function () {
+                            checkAccounting(buys[0].apiKey, 1, function () {
                                 done();
                             });
                         });
@@ -533,7 +533,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Error, "content-type" different from "application/json"', function(done) {
+            it('[Subscribe] Error, "content-type" different from "application/json"', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
                 var url = 'http://localhost';
@@ -570,7 +570,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -586,7 +586,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Error sending the request to Context-Broker (504)', function(done) {
+            it('[Subscribe] Error sending the request to Context-Broker (504)', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
                 var url = 'http://localhost';
@@ -623,7 +623,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -640,7 +640,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Correct subscription (200)', function(done) {
+            it('[Subscribe] Correct subscription (200)', function (done) {
                 var publicPath = '/public11';
                 var apiKey = 'apiKey10';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -677,7 +677,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -690,13 +690,13 @@ async.each(test_config.databases, function(database, task_callback) {
                         .type('json')
                         .send(JSON.stringify(payload))
                         .expect(200)
-                        .end(function(err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function(err, subsInfo) {
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                 assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { 
+                                assert.deepEqual(subsInfo, {
                                     apiKey: apiKey,
                                     notificationUrl: payload["reference"],
-                                    unit: buys[0].unit 
+                                    unit: buys[0].unit
                                 });
                                 done();
                             });
@@ -705,7 +705,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[ubscribe] Error sending the request to Context-Broker (504)', function(done) {
+            it('[ubscribe] Error sending the request to Context-Broker (504)', function (done) {
                 var publicPath = '/public12';
                 var apiKey = 'apiKey11';
                 var url = 'http://localhost';
@@ -720,7 +720,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     recordType: 'callusage'
                 }];
                 var payload = {};
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -737,7 +737,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[Unubscribe (POST)] Correct subscription (200)', function(done) {
+            it('[Unubscribe (POST)] Correct subscription (200)', function (done) {
                 var publicPath = '/public13';
                 var apiKey = 'apiKey12';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -774,7 +774,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -787,12 +787,12 @@ async.each(test_config.databases, function(database, task_callback) {
                         .type('json')
                         .send(JSON.stringify(payload))
                         .expect(200)
-                        .end(function(err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function(err, subsInfo) {
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                 assert.equal(err, null);
                                 assert.deepEqual(subsInfo, { apiKey: apiKey,
                                     notificationUrl: payload["reference"],
-                                    unit: buys[0].unit 
+                                    unit: buys[0].unit
                                 });
                                 request(server.app)
                                 .post(publicPath + '/v1/unsubscribeContext')
@@ -801,8 +801,8 @@ async.each(test_config.databases, function(database, task_callback) {
                                 .type('json')
                                 .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
                                 .expect(200)
-                                .end(function(err, res) {
-                                    db_mock.getCBSubscription(res.body.subscriptionId, function(err, subsInfo) {
+                                .end(function (err, res) {
+                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
                                         assert.equal(subsInfo, null);
                                         done();
@@ -814,7 +814,7 @@ async.each(test_config.databases, function(database, task_callback) {
                 });
             });
 
-            it('[Unubscribe (DELETE)] Correct subscription (200)', function(done) {
+            it('[Unubscribe (DELETE)] Correct subscription (200)', function (done) {
                 var publicPath = '/public14';
                 var apiKey = 'apiKey13';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -851,7 +851,7 @@ async.each(test_config.databases, function(database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function(err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -864,12 +864,12 @@ async.each(test_config.databases, function(database, task_callback) {
                         .type('json')
                         .send(JSON.stringify(payload))
                         .expect(200)
-                        .end(function(err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function(err, subsInfo) {
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                 assert.equal(err, null);
                                 assert.deepEqual(subsInfo, { apiKey: apiKey,
                                     notificationUrl: payload["reference"],
-                                    unit: buys[0].unit 
+                                    unit: buys[0].unit
                                 });
                                 request(server.app)
                                 .delete(publicPath + '/v1/unsubscribeContext' + res.body.subscribeResponse.subscriptionId)
@@ -878,8 +878,8 @@ async.each(test_config.databases, function(database, task_callback) {
                                 .type('json')
                                 .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
                                 .expect(200)
-                                .end(function(err, res) {
-                                    db_mock.getCBSubscription(res.body.subscriptionId, function(err, subsInfo) {
+                                .end(function (err, res) {
+                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
                                         assert.equal(subsInfo, null);
                                         done();

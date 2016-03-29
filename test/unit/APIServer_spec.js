@@ -11,7 +11,7 @@ var mocker = function(implementations, callback) {
             set: function(prop, value) {},
             use: function(middleware) {} ,
             post: function(path, middleware, handler) {} ,
-            get: function(path, handler) {},
+            get: function(path, handler) {}
         },
         db: {},
         req: {},
@@ -22,7 +22,7 @@ var mocker = function(implementations, callback) {
         logger: {
                 error: function(msg) {}
         }
-    }
+    };
     var spies = {
         app: {},
         db: {},
@@ -31,9 +31,9 @@ var mocker = function(implementations, callback) {
         url: {},
         validation: {},
         logger: {
-            error: sinon.spy(mocks.logger, 'error'),
+            error: sinon.spy(mocks.logger, 'error')
         }
-    }
+    };
     // Complete app mock implementation and add spies.
     async.each(Object.keys(implementations), function(obj, task_callback1) {
         async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
@@ -57,25 +57,25 @@ var mocker = function(implementations, callback) {
                 accounting_proxy: {
                     admin_port: 9001
                 }
-            }
+            };
         } else if (implementations.config.accounting_proxy == undefined) {
             mocks.config.accounting_proxy = {
                 admin_port: 9001
-            }
+            };
         }
         mocks.config.database = {
             type:'./db'
-        }
+        };
         api_server = proxyquire('../../APIServer', {
             './config': mocks.config,
             './db': mocks.db,
-            'url': mocks.url,
-            'winston': mocks.logger,
+            url: mocks.url,
+            winston: mocks.logger,
             './validation': mocks.validation
         });
         return callback(api_server, spies);
     });
-}
+};
 
 describe('Testing APIServer', function() {
 
@@ -103,7 +103,7 @@ describe('Testing APIServer', function() {
                         accounting: modules
                     }
                 }
-            }
+            };
             mocker(implementations, function(api, spies) {
                 api.getUnits(implementations.req, implementations.res);
                 assert.equal(spies.res.status.callCount, 1);
@@ -129,7 +129,7 @@ describe('Testing APIServer', function() {
                     },
                     json: function(body) {}
                 }
-            }
+            };
             mocker(implementations, function(api, spies) {
                 api.getApiKeys(implementations.req, implementations.res);
                 assert.equal(spies.req.get.callCount, 1);
@@ -503,7 +503,7 @@ describe('Testing APIServer', function() {
                     newBuy: function(buy, callback) {
                         return callback('Error');
                     }
-                }, 
+                },
                 url: {
                     parse: function(url) {
                         return {
@@ -566,7 +566,7 @@ describe('Testing APIServer', function() {
                     newBuy: function(buy, callback) {
                         return callback(null);
                     }
-                }, 
+                },
                 url: {
                     parse: function(url) {
                         return {

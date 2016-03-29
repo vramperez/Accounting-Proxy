@@ -1588,7 +1588,7 @@ describe('Testing Server', function() {
                     getOperation: function(path, req, callback) {
                         return callback(operation);
                     },
-                    subscriptionHandler: function(req, res, url, unit, operation, callback) {
+                    subscriptionHandler: function(req, res, url, operation, callback) {
                         return callback('Error');
                     }
                 }
@@ -1617,8 +1617,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.contextBroker.subscriptionHandler.callCount, 1);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[0], implementations.req);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[2], url + restPath);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], unit);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[4], operation);
+                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], operation);
                 assert.equal(spies.logger.error.callCount, 1);
                 assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
                 done();

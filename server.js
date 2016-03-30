@@ -19,30 +19,6 @@ var acc_modules = {};
 var admin_paths = config.api.administration_paths;
 
 /**
- * Call the notifier to send the accounting information to the WStore.
- */
-var notify = function (callback) {
-    db.getNotificationInfo(function (err, notificationInfo) {
-        if (err) {
-            return callback(err);
-        } else if (notificationInfo === null) { // Not notify
-            return callback(null);
-        } else {
-            logger.info('Notifying the WStore...');
-            async.each(notificationInfo, function (info, task_callback) {
-                notifier.notify(info, function (err) {
-                    if (err) {
-                        task_callback(err);
-                    } else {
-                        task_callback(null);
-                    }
-                });
-            }, callback);
-        }
-    });
-};
-
-/**
  * Start and configure the server.
  */
 exports.init = function (callback) {
@@ -51,7 +27,10 @@ exports.init = function (callback) {
             db.init(callback);
         },
         function (callback) {
-            notify(callback);
+            notifier.notifyUsageSpecification(callback);
+        },
+        function (callback) {
+            notifier.notifyUsage(callback);
         }
     ], function (err) {
         if (err) {
@@ -66,7 +45,7 @@ exports.init = function (callback) {
             // [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
             cron.scheduleJob('00 00 * * *', function () {
                 logger.info('Sending accounting information...');
-                notify(function (err) {
+                notifier.notifyUsage(function (err) {
                     if (err) {
                         logger.error('Error while notifying the WStore: ' + err);
                     }

@@ -20,10 +20,15 @@ exports.init = function (callback) {
                     token               TEXT \
         )');
 
+        db.run('CREATE TABLE IF NOT EXISTS units ( \
+                    unit                TEXT, \
+                    href                TEXT \
+        )');
+
         db.run('CREATE TABLE IF NOT EXISTS services ( \
-                    publicPath      TEXT, \
-                    url             TEXT, \
-                    appId           TEXT, \
+                    publicPath          TEXT, \
+                    url                 TEXT, \
+                    appId               TEXT, \
                     PRIMARY KEY (publicPath) \
         )');
 
@@ -103,6 +108,49 @@ exports.getToken = function (callback) {
             } else {
                 return callback(null, token.token);
             }
+    });
+};
+
+/**
+ * Bind the unit with the usage specification URL.
+ *
+ * @param {string}   unit     Accounting unit.
+ * @param {string}   href     Usage specification URL.
+ */
+exports.addSpecificationRef = function (unit, href, callback) {
+    db.run('INSERT INTO units \
+            VALUES ($unit, $href)', 
+            {
+                $unit: unit,
+                $href: href
+            }, function(err) {
+                if (err) {
+                    return callback(err);
+                } else {
+                    return callback(null);
+                }
+    });
+};
+
+/**
+ * Return the href binded to the specified. Otherwise return null.
+ *
+ * @param  {string}   unit     Accounting unit
+ */
+exports.getHref = function (unit, callback) {
+    db.get('SELECT href \
+            FROM units \
+            WHERE $unit=unit' ,
+            {
+                $unit: unit
+            }, function(err, href) {
+                if (err) {
+                    return callback('Error getting the href for unit ' + unit, null);
+                } else if (href === undefined) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, href.href);
+                }
     });
 };
 

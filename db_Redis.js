@@ -50,6 +50,40 @@ exports.getToken = function (callback) {
 };
 
 /**
+ * Bind the unit with the usage specification URL.
+ *
+ * @param {string}   unit     Accounting unit.
+ * @param {string}   href     Usage specification URL.
+ */
+exports.addSpecificationRef = function (unit, href, callback) {
+    var entry = {};
+    entry[unit] = href;
+
+    db.hmset('units', entry, function(err) {
+        if (err) {
+            return callback(err);
+        } else {
+            return callback(null);
+        }
+    });
+};
+
+/**
+ * Return the href binded to the specified. Otherwise return null.
+ *
+ * @param  {string}   unit     Accounting unit
+ */
+exports.getHref = function (unit, callback) {
+    db.hget('units', unit, function (err, href) {
+        if (err) {
+            return callback('Error getting the href for unit ' + unit, null);
+        } else {
+            return callback(null, href);
+        }
+    });
+};
+
+/**
  * Map the publicPath with the endpoint url.
  *
  * @param  {string} publicPath      Path for the users.

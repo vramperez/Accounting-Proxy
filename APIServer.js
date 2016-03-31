@@ -53,7 +53,7 @@ exports.newBuy = function (req, res) {
 
     validation.validate('product', body, function (err) { // Check if the json is correct
         if (err) {
-            res.status(400).json({error: 'Invalid json'}); // More specific error? (wich field is undefined)
+            res.status(400).json({error: 'Invalid json. ' + err}); // More specific error? (wich field is undefined)
         } else {
             generateApiKey(body.productId, body.orderId, body.customer, function (apiKey) {
                 db.newBuy({

@@ -1,6 +1,6 @@
 var mkdirp = require('mkdirp'),
     server = require('./server'),
-    logger = require('winston');
+    logger = require('./log');
 
 // Create directory ./log if not exists
 mkdirp('./log', function (err) {

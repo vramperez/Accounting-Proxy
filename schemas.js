@@ -1,7 +1,9 @@
 /*
 * Define the json in order to validate the administration requests
 */
-var Joi = require('joi');
+var Joi = require('joi'),
+    config = require('./config');
+
 var schemas = {};
 
 schemas.product = {
@@ -10,7 +12,7 @@ schemas.product = {
     customer: Joi.string().min(1).required(),
     productSpecification: Joi.object().keys({
         url: Joi.string().min(1).required(),
-        unit: Joi.string().min(1).required(),
+        unit: Joi.any().valid(config.modules.accounting),
         recordType: Joi.string().min(1).required()
     })
 };

@@ -13,32 +13,40 @@ var acc_modules = {};
  */
 var sendSpecification = function (unit, callback) {
     acc_modules[unit].getSpecification(function (specification) {
-        db.getToken(function (err, token) {
-            var options = {
-                url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
-                json: true,
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    authorization: token
-                },
-                body: specification
-            };
-
-            request(options, function (err, resp, body) {
-                if (err || resp.statusCode !== 201) {
-                    return callback('Error sending the Specification. ' + resp.statusCode + ' ' + resp.statusMessage);
+        if (specification === undefined) {
+            return callback('Error, specification no available for unit ' + unit);
+        } else {
+            db.getToken(function (err, token) {
+                if (err) {
+                    return callback('Error getting the access token from db');
                 } else {
-                    db.addSpecificationRef(unit, body.href, function (err) {
-                        if (err) {
-                            return callback(err);
+                    var options = {
+                        url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                        json: true,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            authorization: token
+                        },
+                        body: specification
+                    };
+
+                    request(options, function (err, resp, body) {
+                        if (err || resp.statusCode !== 201) {
+                            return callback('Error sending the Specification. ' + resp.statusCode + ' ' + resp.statusMessage);
                         } else {
-                            return callback(null);
+                            db.addSpecificationRef(unit, body.href, function (err) {
+                                if (err) {
+                                    return callback(err);
+                                } else {
+                                    return callback(null);
+                                }
+                            });
                         }
                     });
                 }
             });
-        });
+        }
     });
 };
 
@@ -127,7 +135,11 @@ var notifyUsageSpecification = function (callback) {
     var units = config.modules.accounting;
 
     async.each(units, function (unit, task_callback) {
-        acc_modules[unit] = require('./acc_modules/' + unit);
+        try {
+            acc_modules[unit] = require('./acc_modules/' + unit);
+        } catch (e) {
+            return callback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
+        }
         db.getHref(unit, function (err, href) {
             if (err) {
                 task_callback(err);
@@ -167,3 +179,4 @@ var notifyUsage = function (callback) {
 
 exports.notifyUsageSpecification = notifyUsageSpecification;
 exports.notifyUsage = notifyUsage;
+exports.acc_modules = acc_modules;

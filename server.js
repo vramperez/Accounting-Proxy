@@ -15,7 +15,7 @@ var express = require('express'),
 
 var db = require(config.database.type);
 var app = express();
-var acc_modules = {};
+var acc_modules = notifier.acc_modules;
 var admin_paths = config.api.administration_paths;
 
 /**
@@ -34,7 +34,7 @@ exports.init = function (callback) {
         }
     ], function (err) {
         if (err) {
-            return callback('Error starting the accounting-proxy. Error: ' + err);
+            return callback('Error starting the accounting-proxy. ' + err);
         } else {
             if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
                 logger.info('Loading module for Orion Context Broker...');
@@ -47,7 +47,7 @@ exports.init = function (callback) {
                 logger.info('Sending accounting information...');
                 notifier.notifyUsage(function (err) {
                     if (err) {
-                        logger.error('Error while notifying the WStore: ' + err);
+                        logger.error('Error while notifying the accounting: ' + err);
                     }
                 });
             });
@@ -66,13 +66,9 @@ exports.init = function (callback) {
  */
 exports.count = function (apiKey, unit, body, callback) {
     if (acc_modules[unit] === undefined) {
-        try {
-            acc_modules[unit] = require('./acc_modules/' + unit).count;
-        } catch (e) {
-            return callback('No accounting module for unit "%s": missing file acc_modules\/%s.js' + unit, unit);
-        }
+        return callback('invalid accounting unit "' + unit + '"');
     }
-    acc_modules[unit](body, function (err, amount) {
+    acc_modules[unit].count(body, function (err, amount) {
         if (err) {
             return callback(err);
         } else {

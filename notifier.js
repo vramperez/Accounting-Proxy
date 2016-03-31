@@ -12,42 +12,48 @@ var acc_modules = {};
  * @param  {string}   unit     Accounting unit.
  */
 var sendSpecification = function (unit, callback) {
-    acc_modules[unit].getSpecification(function (specification) {
-        if (specification === undefined) {
-            return callback('Error, specification no available for unit ' + unit);
-        } else {
-            db.getToken(function (err, token) {
-                if (err) {
-                    return callback('Error getting the access token from db');
-                } else {
-                    var options = {
-                        url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
-                        json: true,
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            authorization: token
-                        },
-                        body: specification
-                    };
+    if (acc_modules[unit].getSpecification === undefined) {
+        return callback('Error, function getSpecification undefined for unit ' + unit);
+    } else {
+        acc_modules[unit].getSpecification(function (specification) {
+            if (specification === undefined) {
+                return callback('Error, specification no available for unit ' + unit);
+            } else {
+                db.getToken(function (err, token) {
+                    if (err) {
+                        return callback('Error getting the access token from db');
+                    } else {
+                        var options = {
+                            url: 'http://' + config.usageAPI.host + ':' + 
+                                config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                            json: true,
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                authorization: token
+                            },
+                            body: specification
+                        };
 
-                    request(options, function (err, resp, body) {
-                        if (err || resp.statusCode !== 201) {
-                            return callback('Error sending the Specification. ' + resp.statusCode + ' ' + resp.statusMessage);
-                        } else {
-                            db.addSpecificationRef(unit, body.href, function (err) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    return callback(null);
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    });
+                        request(options, function (err, resp, body) {
+                            if (err || resp.statusCode !== 201) {
+                                return callback('Error sending the Specification. ' + 
+                                    resp.statusCode + ' ' + resp.statusMessage);
+                            } else {
+                                db.addSpecificationRef(unit, body.href, function (err) {
+                                    if (err) {
+                                        return callback(err);
+                                    } else {
+                                        return callback(null);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
 };
 
 /**

@@ -199,6 +199,88 @@ describe('Testing REDIS database', function () {
         });
     });
 
+    describe('Functoin "addSpecificationRef"', function () {
+        var unit = 'megabyte';
+        var href = 'http://example:999/api';
+        var entry = {};
+        entry[unit] = href;
+
+        it('error adding the specification href', function (done) {
+            var implementations = {
+                hmset: function (hash, object, callback) {
+                    return callback('Error');
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.addSpecificationRef(unit, href, function (err) {
+                    assert.equal(err, 'Error');
+                    assert.equal(spies.hmset.callCount, 1);
+                    assert.equal(spies.hmset.getCall(0).args[0], 'units');
+                    assert.deepEqual(spies.hmset.getCall(0).args[1], entry);
+                    done();
+                });
+            });
+        });
+
+        it('correct', function (done) {
+            var implementations = {
+                hmset: function (hash, object, callback) {
+                    return callback(null);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.addSpecificationRef(unit, href, function (err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.hmset.callCount, 1);
+                    assert.equal(spies.hmset.getCall(0).args[0], 'units');
+                    assert.deepEqual(spies.hmset.getCall(0).args[1], entry);
+                    done();
+                });
+            });
+        });
+    });
+
+    describe('Function "getHref"', function () {
+        var unit = 'megabye';
+        var href = 'http://example:999/api';
+
+        it('error getting the href', function (done) {
+            var implementations = {
+                hget: function (hash, key, callback) {
+                    return callback('Error', null);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getHref(unit, function (err, href) {
+                    assert.equal(err, 'Error getting the href for unit ' + unit);
+                    assert.equal(href, null);
+                    assert.equal(spies.hget.callCount, 1);
+                    assert.equal(spies.hget.getCall(0).args[0], 'units');
+                    assert.equal(spies.hget.getCall(0).args[1], unit);
+                    done();
+                });
+            });
+        });
+
+        it('correct', function (done) {
+            var implementations = {
+                hget: function (hash, key, callback) {
+                    return callback(null, href);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getHref(unit, function (err, res) {
+                    assert.equal(err, null);
+                    assert.equal(res, href);
+                    assert.equal(spies.hget.callCount, 1);
+                    assert.equal(spies.hget.getCall(0).args[0], 'units');
+                    assert.equal(spies.hget.getCall(0).args[1], unit);
+                    done();
+                });
+            });
+        });
+    });
+
     describe('Function "newService"', function () {
         var publicPath = '/public';
         var appId = 'appId';

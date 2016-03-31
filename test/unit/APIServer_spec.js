@@ -466,7 +466,7 @@ describe('Testing APIServer', function() {
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0] , 400);
                 assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Invalid json'});
+                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Invalid json. Error'});
                 done();
             });
         });

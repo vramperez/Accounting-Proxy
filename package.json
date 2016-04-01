@@ -1,8 +1,8 @@
 {
   "name": "accounting-proxy",
-  "version": "0.2.0",
+  "version": "2.1.0",
   "description": "Accounting proxy for FI-ware GE services",
-  "main": "server.js",
+  "main": "accounting-proxy.js",
   "author": "FI-WARE",
   "keywords": [
     "proxy",
@@ -11,14 +11,24 @@
     "wstore"
   ],
   "dependencies": {
-    "commander": "2.x.x",
-    "express": "4.x",
-    "node-schedule": "0.2.x",
-    "node-redis": "2.8.x"
+    "async": "1.5.2",
+    "commander": "2.9.0",
+    "express": "4.13.4",
+    "mkdirp": "0.5.1",
+    "node-schedule": "0.2.9",
+    "body-parser": "1.15.0",
+    "passport-fiware-oauth": "0.1.6",
+    "joi": "7.3.0",
+    "proxyquire": "1.7.4",
+    "redis": "2.4.2",
+    "request": "2.69.0",
+    "supertest": "1.2.0",
+    "sqlite3-transactions": "0.0.5",
+    "winston": "2.1.1"
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/FIWARE-TMForum/Accounting-Proxy"
   },
   "contributors": [
     {
@@ -36,6 +46,7 @@
     "integration": "_mocha test/integration"
   },
   "devDependencies": {
+    "mock-redis-client": "^0.91.13",
     "supertest": "^1.1.0"
   }
 }

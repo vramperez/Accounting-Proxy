@@ -68,13 +68,14 @@ var verifyAppId = function (reqAppId, req, callback) {
         if (err) {
             return callback(err, false);
         } else if (appId === reqAppId) {
+            req.restPath = '';
             // Public path is the whole path
             req.publicPath = req.path;
             return callback(null, true);
         } else {
 
             var splitPath = req.path.split('/');
-            db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first path of the path
+            db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first part of the path
                 if (err) {
                     return callback(err, false);
                 } else if (appId === reqAppId) {

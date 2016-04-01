@@ -246,6 +246,7 @@ describe('Testing Notifier', function () {
             var specification = {
                 'key1': 'value1'
             };
+            var errCode = 'ECONREFUSED';
             var implementations = {
                 config: {
                     modules: {
@@ -271,13 +272,73 @@ describe('Testing Notifier', function () {
                 },
                 requester: {
                     request: function (options, callback) {
-                        return callback('Error', {statusCode: 404, statusMessage: 'Not Found'}, null);
+                        return callback({code: errCode}, {statusCode: 404, statusMessage: 'Not Found'}, null);
                     }
                 }
             };
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
-                    assert.equal(err, 'Error sending the Specification. 404 Not Found');
+                    assert.equal(err, 'Error sending the Specification: '+ errCode);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
+                    assert.equal(spies.db.getHref.callCount, 1);
+                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    assert.equal(spies.requester.request.callCount, 1);
+                    assert.deepEqual(spies.requester.request.getCall(0).args[0], {
+                        url: 'http://' + implementations.config.usageAPI.host + ':' + implementations.config.usageAPI.port +
+                            implementations.config.usageAPI.path + '/usageSpecification',
+                        json: true,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            authorization: token
+                        },
+                        body: specification
+                    });
+                    done();
+                });
+            });
+        });
+
+        it('error, response status code other than 201', function (done) {
+            var unit = 'megabyte';
+            var token = 'token';
+            var specification = {
+                'key1': 'value1'
+            };
+            var implementations = {
+                config: {
+                    modules: {
+                        accounting: [unit]
+                    },
+                    usageAPI: {
+                        host: 'localhost',
+                        port: 8080
+                    }
+                },
+                db: {
+                    getHref: function (unit, callback) {
+                        return callback(null, null);
+                    },
+                    getToken: function (callback) {
+                        return callback(null, token);
+                    }
+                },
+                megabyte: {
+                    getSpecification: function (callback) { 
+                        return callback(specification);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(null, {statusCode: 404, statusMessage: 'Not Found'}, null);
+                    }
+                }
+            };
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsageSpecification( function(err) {
+                    assert.equal(err, 'Error, 404 Not Found');
                     assert.equal(spies.async.each.callCount, 1);
                     assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
                     assert.equal(spies.db.getHref.callCount, 1);

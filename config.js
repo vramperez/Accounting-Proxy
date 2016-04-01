@@ -42,11 +42,11 @@ config.modules = {
 
 // WStore sonfiguration.
 //--------------------------------------------------
-// Configures the WStore address and port.
+// Configures the usage managemnt API url.
 config.usageAPI = {
 
     /**
-     * WStore host.
+     * Usage Management API host.
      */
     host: 'localhost',
 

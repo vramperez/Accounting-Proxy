@@ -36,9 +36,10 @@ var sendSpecification = function (unit, callback) {
                         };
 
                         request(options, function (err, resp, body) {
-                            if (err || resp.statusCode !== 201) {
-                                return callback('Error sending the Specification. ' + 
-                                    resp.statusCode + ' ' + resp.statusMessage);
+                            if (err) {
+                                return callback('Error sending the Specification: ' + err.code);
+                            } else if (resp.statusCode !== 201) {
+                                return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
                             } else {
                                 db.addSpecificationRef(unit, body.href, function (err) {
                                     if (err) {

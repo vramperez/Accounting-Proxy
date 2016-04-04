@@ -35,6 +35,7 @@ var sendSpecification = function (unit, callback) {
                             body: specification
                         };
 
+                        logger.info('Sending specification for unit: ' + unit);
                         request(options, function (err, resp, body) {
                             if (err) {
                                 return callback('Error sending the Specification: ' + err.code);
@@ -115,9 +116,12 @@ var sendUsage = function (accInfo, callback) {
                         },
                         body: body
                     };
+
                     request(options, function (err, resp, body) {
-                        if (err || resp.statusCode !== 201) {
-                            return callback('Error sending the usage. ' + resp.statusCode + ' ' + resp.statusMessage);
+                        if (err) {
+                            return callback('Error sending the usage: ' + err.code);
+                        } else if (resp.statusCode !== 201){
+                            return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
                         } else {
                             db.resetAccounting(accInfo.apiKey, function (err) {
                                 if (err) {

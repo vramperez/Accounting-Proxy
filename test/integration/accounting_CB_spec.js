@@ -31,7 +31,16 @@ var api_mock = {
 };
 
 var notifier_mock = {
-    notify: function (info) {}
+    notifyUsageSpecification: function (callback) {
+        return callback(null);
+    },
+    notifyUsage: function (callback) {
+        return cllback(null);
+    },
+    acc_modules: {
+        megabyte: require('../../acc_modules/megabyte'),
+        call: require('../../acc_modules/call')
+    }
 };
 
 var log_mock = {
@@ -245,7 +254,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 var publicPath = '/public1';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
-                prepare_test.addToDatabase(db_mock, services, [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -271,7 +280,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -299,7 +308,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -327,7 +336,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'wrong',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -355,7 +364,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -387,7 +396,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -419,7 +428,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -451,7 +460,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -483,7 +492,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -515,7 +524,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -570,7 +579,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -623,7 +632,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -677,7 +686,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -720,7 +729,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     recordType: 'callusage'
                 }];
                 var payload = {};
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -774,7 +783,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
@@ -851,7 +860,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);

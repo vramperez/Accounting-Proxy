@@ -244,7 +244,7 @@ async.each(test_config.databases, function (database, task_callback) {
                             .post(mock_config.api.administration_paths.newBuy)
                             .set('content-type', 'application/json')
                             .send({})
-                            .expect(400, {error: 'Invalid json'}, done);
+                            .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
                 });
 
                 it('correct buy request (200)', function (done) {

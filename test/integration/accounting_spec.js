@@ -44,7 +44,15 @@ var api_mock = {
 }
 
 var notifier_mock = {
-    notify: function (info, callback) {}
+    notifyUsageSpecification: function (callback) {
+        return callback(null);
+    },
+    notifyUsage: function (callback) {
+        return cllback(null);
+    },
+    acc_modules: {
+        megabyte: require('../../acc_modules/megabyte')
+    }
 }
 
 var log_mock = {
@@ -84,15 +92,16 @@ var mocker = function (database) {
             authentication_mock = proxyquire('../../OAuth2_authentication', {
                 'passport-fiware-oauth': FIWAREStrategy_mock,
                 './config': mock_config,
-                'winston': log_mock
+                'winston': log_mock,
+                './db': db_mock
             });
             server = proxyquire('../../server', {
                 './config': mock_config,
                 './db': db_mock,
                 './APIServer': api_mock,
                 './notifier': notifier_mock,
-                'winston': log_mock, // Not display logger messages while testing
-                './orion_context_broker/db_handler': {},
+                'winston': log_mock, // Not display logger messages while testing,
+                './orion_context_broker/cb_handler': {},
                 'OAuth2_authentication': authentication_mock
             });
             break;
@@ -105,15 +114,16 @@ var mocker = function (database) {
             authentication_mock = proxyquire('../../OAuth2_authentication', {
                 'passport-fiware-oauth': FIWAREStrategy_mock,
                 './config': mock_config,
-                'winston': log_mock
+                'winston': log_mock,
+                './db_Redis': db_mock
             });
             server = proxyquire('../../server', {
                 './config': mock_config,
                 './db_Redis': db_mock,
                 './APIServer': api_mock,
                 './notifier': notifier_mock,
-                'winston': log_mock, // Not display logger messages while testing
-                './orion_context_broker/db_handler': {},
+                'winston': log_mock, // Not display logger messages while testing,
+                './orion_context_broker/cb_handler': {},
                 'OAuth2_authentication': authentication_mock
             });
             break;
@@ -191,7 +201,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     var publicPath = '/public1';
                     var services = [{publicPath: publicPath, url: 'wrong_url', appId: userProfile.appId}];
                     var admins = [{idAdmin: userProfile.id, publicPath: publicPath}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], admins, function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -209,7 +219,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
                     var admins = [{idAdmin: userProfile.id, publicPath: publicPath}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], admins, function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -229,7 +239,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     var publicPath = '/public3';
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -255,7 +265,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -283,7 +293,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -311,7 +321,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         unit: 'wrong',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -339,7 +349,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
@@ -390,7 +400,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         unit: 'megabyte',
                         recordType: 'amountData'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);

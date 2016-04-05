@@ -72,33 +72,66 @@ var loadAdmins = function (admins, callback) {
     }
 };
 
+var loadAccountings = function (accountings, callback) {
+    if (accountings.length != 0) {
+        async.each(accountings, function (accounting, task_callback) {
+            db_mock.makeAccounting(accounting.apiKey, accounting.value, function (err) {
+                if (err) {
+                    task_callback(err);
+                } else {
+                    task_callback(null);
+                }
+            });
+        }, callback);
+    } else {
+        return callback();
+    }
+};
+
+var loadSpecificationRefs = function (specifications, callback) {
+    if (specifications.length != 0) {
+        async.each(specifications, function (specification, task_callback) {
+            db_mock.addSpecificationRef(specification.unit, specification.href, function (err) {
+                if (err) {
+                    task_callback(err);
+                } else {
+                    task_callback(null);
+                }
+            });
+        }, callback);
+    } else {
+        return callback();
+    }
+};
+
 // Prepare the database for the test adding the services, buy information, subscriptions.
-exports.addToDatabase = function (db, services, buys, subscriptions, admins, callback) {
+exports.addToDatabase = function (db, services, buys, subscriptions, admins, accountings, specifications, callback) {
     db_mock = db;
 
-    loadServices(services, function (err) {
+    async.series([
+        function (callback) {
+            loadServices(services, callback);
+        },
+        function (callback) {
+            loadBuys(buys, callback);
+        },
+        function (callback) {
+            loadSubscriptions(subscriptions, callback);
+        },
+        function (callback) {
+            loadAdmins(admins, callback);
+        },
+        function (callback) {
+            loadAccountings(accountings, callback);
+        },
+        function (callback) {
+            loadSpecificationRefs(specifications, callback);
+        }
+    ], function (err) {
         if (err) {
             return callback(err);
         } else {
-            loadBuys(buys, function (err) {
-                if (err) {
-                    return callback(err);
-                } else {
-                    loadSubscriptions(subscriptions, function (err) {
-                        if (err) {
-                            return callback(err);
-                        } else {
-                            loadAdmins(admins, function (err) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    return callback(null);
-                                }
-                            });
-                        }
-                    });
-                }
-            });
+            return callback(null);
         }
     });
 };

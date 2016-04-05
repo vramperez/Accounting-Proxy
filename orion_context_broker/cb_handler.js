@@ -39,7 +39,6 @@ var notificationHandler = function (req, res) {
                     var options = {
                         url: subscription.notificationUrl,
                         method: req.method,
-                        headers: req.headers,
                         json: true,
                         body: body
                     }
@@ -47,6 +46,9 @@ var notificationHandler = function (req, res) {
                     request(options, function (error, resp, body) {
                         if (error) {
                             logger.error('An error ocurred notifying the user, url: ' + options.url);
+                            res.status(504).send();
+                        } else {
+                            res.status(resp.statusCode).send();
                         }
                     });
                 }
@@ -84,7 +86,6 @@ exports.getOperation = function (privatePath, req, callback) {
  * @param  {string}   operation Context Broker operation (subscribe, unsubscribe).
  */
 exports.subscriptionHandler = function (req, res, url, operation, callback) {
-
     var options = {
         url: url,
         method: req.method,

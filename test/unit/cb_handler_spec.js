@@ -300,7 +300,6 @@ describe('Testing ContextBroker Handler', function () {
             var options = {
                 url: subscriptionInfo.notificationUrl,
                 method: 'POST',
-                headers: {},
                 json: true,
                 body: body
             };
@@ -315,7 +314,12 @@ describe('Testing ContextBroker Handler', function () {
                     method: options.method,
                     headers: options.headers
                 },
-                res: {},
+                res: {
+                    status: function (code) {
+                        return this;
+                    },
+                    send: function () {}
+                },
                 app: {
                     post: function (path, handler) {
                         return handler(implementations.req, implementations.res);
@@ -343,6 +347,74 @@ describe('Testing ContextBroker Handler', function () {
                 assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
                 assert.equal(spies.logger.error.callCount, 1);
                 assert.equal(spies.logger.error.getCall(0).args[0], 'An error ocurred notifying the user, url: ' + options.url);
+                assert.equal(spies.res.status.callCount, 1);
+                assert.equal(spies.res.status.getCall(0).args[0], 504);
+                assert.equal(spies.res.send.callCount, 1);
+                done();
+            });
+        });
+
+        it('correct notification', function (done) {
+            var subscriptionId = 'subscriptionId';
+            var body = {
+                subscriptionId: subscriptionId
+            };
+            var subscriptionInfo = {
+                apiKey: 'apiKey',
+                unit: 'megabyte',
+                notificationUrl: 'http://example.com/path'
+            };
+            var options = {
+                url: subscriptionInfo.notificationUrl,
+                method: 'POST',
+                json: true,
+                body: body
+            };
+            var implementations = {
+                db: {
+                    getCBSubscription: function (subscriptionId, callback) {
+                        return callback(null, subscriptionInfo);
+                    }
+                },
+                req: {
+                    body: body,
+                    method: options.method,
+                    headers: options.headers
+                },
+                res: {
+                    status: function (code) {
+                        return this;
+                    },
+                    send: function () {}
+                },
+                app: {
+                    post: function (path, handler) {
+                        return handler(implementations.req, implementations.res);
+                    }
+                },
+                server: {
+                    count: function (apiKey, unit, body, callback) {
+                        return callback(null);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(null, {statusCode: 200}, null);
+                    }
+                }
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                assert.equal(spies.db.getCBSubscription.callCount, 1);
+                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
+                assert.equal(spies.server.count.callCount, 1);
+                assert.equal(spies.server.count.getCall(0).args[0], subscriptionInfo.apiKey);
+                assert.equal(spies.server.count.getCall(0).args[1], subscriptionInfo.unit);
+                assert.equal(spies.server.count.getCall(0).args[2], body);
+                assert.equal(spies.requester.request.callCount, 1);
+                assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                assert.equal(spies.res.status.callCount, 1);
+                assert.equal(spies.res.status.getCall(0).args[0], 200);
+                assert.equal(spies.res.send.callCount, 1);
                 done();
             });
         });

@@ -455,12 +455,13 @@ exports.getApiKeys = function (user, callback) {
  * @param  {string} customer    User identifier.
  * @param  {string} apiKey      Identifies the product.
  */
-exports.checkRequest = function (customer, apiKey, callback) {
+exports.checkRequest = function (customer, apiKey, publicPath, callback) {
     db.all('SELECT customer \
             FROM accounting \
-            WHERE apiKey=$apiKey',
+            WHERE apiKey=$apiKey AND publicPath=$publicPath',
             {
-                $apiKey: apiKey
+                $apiKey: apiKey,
+                $publicPath: publicPath
             }, function (err, user) {
                 if (err) {
                     return callback(err, false);

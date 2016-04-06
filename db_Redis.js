@@ -485,14 +485,15 @@ exports.getApiKeys = function (user, callback) {
  * @param  {string} customer    User identifier.
  * @param  {string} apiKey      Identifies the product.
  */
-exports.checkRequest = function (customer, apiKey, callback) {
-    db.hget(apiKey, 'customer', function (err, user) {
+exports.checkRequest = function (customer, apiKey, publicPath, callback) {
+    db.hgetall(apiKey, function (err, accountingInfo) {
         if (err) {
             return callback(err, false);
-        } else if (user === customer){
-            return callback(null, true);
-        } else {
+        } else if (accountingInfo === null) {
             return callback(null, false);
+        } else {
+            return callback(null, accountingInfo.customer === customer && 
+                accountingInfo.publicPath === publicPath);
         }
     });
 };

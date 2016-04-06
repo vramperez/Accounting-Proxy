@@ -1083,8 +1083,10 @@ describe('Testing SQLITE database', function () {
     describe('Function "checkRequest"', function () {
         var sentence = 'SELECT customer \
             FROM accounting \
-            WHERE apiKey=$apiKey';
-        var params = {'$apiKey': 'apiKey1'}
+            WHERE apiKey=$apiKey AND publicPath=$publicPath';
+        var publicPath = 'http://localhost/path';
+        var apiKey = 'apiKey1';
+        var params = {'$apiKey': apiKey, '$publicPath': publicPath}
 
         it('query error', function (done) {
             var implementations = {
@@ -1093,7 +1095,7 @@ describe('Testing SQLITE database', function () {
                 }
             };
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -1111,7 +1113,7 @@ describe('Testing SQLITE database', function () {
                 }
             };
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -1129,7 +1131,7 @@ describe('Testing SQLITE database', function () {
                 }
             };
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -1147,7 +1149,7 @@ describe('Testing SQLITE database', function () {
                 }
             };
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
                     assert.equal(spies.all.callCount, 1);

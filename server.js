@@ -227,10 +227,10 @@ var handler = function (req, res) {
                 logger.log('debug', 'Undefined API_KEY');
                 res.status(401).json({ error: 'Undefined "X-API-KEY" header'});
             } else {
-                db.checkRequest(req.user.id, apiKey, function (err, correct) {
+                db.checkRequest(req.user.id, apiKey, req.publicPath, function (err, correct) {
                     if (err) {
                         res.status(500).send();
-                    } else if (! correct) { // Invalid apiKey or user
+                    } else if (! correct) { // Invalid apiKey or user for the requested service
                         res.status(401).json({ error: 'Invalid API_KEY or user'});
                     } else {
                         db.getAccountingInfo(apiKey, function(err, accountingInfo) {

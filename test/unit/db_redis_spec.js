@@ -1381,15 +1381,17 @@ describe('Testing REDIS database', function () {
 
         it('error getting accounting information', function (done) {
             var implementations = {
-                hget: function (hash, key, callback) {
+                hgetall: function (hash, callback) {
                     return callback('Error', null);
                 }
             };
+            var apiKey = 'apiKey1';
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, 'http://localhost/path', function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
-                    assert.equal(spies.hget.callCount, 1);
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
                     done();
                 });
             });
@@ -1397,31 +1399,57 @@ describe('Testing REDIS database', function () {
 
         it('no info available', function (done) {
             var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, '0002');
+                hgetall: function (hash, callback) {
+                    return callback(null, null);
                 }
             };
+            var apiKey = 'apiKey1';
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest('0001', apiKey, 'http://localhost/path', function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
-                    assert.equal(spies.hget.callCount, 1);
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
                     done();
                 });
             });
         });
 
-        it('correct', function (done) {
+        it('wrong request', function (done) {
+            var customer = '0001';
+            var publicPath = 'http://localhost/path';
+            var apiKey = 'apiKey1';
             var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, '0001');
+                hgetall: function (hash, callback) {
+                    return callback(null, {customer: 'wrong', publicPath: publicPath});
                 }
             };
             mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', 'apiKey1', function (err, check) {
+                db.checkRequest(customer, apiKey, publicPath, function (err, check) {
+                    assert.equal(err, null);
+                    assert.equal(check, false);
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
+                    done();
+                });
+            });
+        });
+
+        it('correct request', function (done) {
+            var customer = '0001';
+            var publicPath = 'http://localhost/path';
+            var apiKey = 'apiKey1';
+            var implementations = {
+                hgetall: function (hash, callback) {
+                    return callback(null, {customer: customer, publicPath: publicPath});
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest(customer, apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
-                    assert.equal(spies.hget.callCount, 1);
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
                     done();
                 });
             });

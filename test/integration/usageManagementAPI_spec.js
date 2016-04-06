@@ -67,7 +67,8 @@ var mocker = function (database) {
                 './config': mock_config,
                 'winston': {
                     info: function (msg) {}
-                }
+                },
+                './db': db_mock
             });
             server = proxyquire('../../server', {
                 express: function () {
@@ -91,7 +92,8 @@ var mocker = function (database) {
                 './config': mock_config,
                 'winston': {
                     info: function (msg) {}
-                }
+                },
+                './db_Redis': db_mock
             });
             server = proxyquire('../../server', {
                 express: function () {

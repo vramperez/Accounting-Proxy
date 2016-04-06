@@ -552,7 +552,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback('Error', null);
                     }
                 }
@@ -571,6 +571,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0], 500);
                 assert.equal(spies.res.send.callCount, 1);
@@ -616,7 +617,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, false);
                     }
                 }
@@ -635,6 +636,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0], 401);
                 assert.equal(spies.res.json.callCount, 1);
@@ -681,7 +683,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -703,6 +705,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -750,7 +753,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -772,6 +775,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -824,7 +828,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -857,6 +861,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -917,7 +922,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -953,6 +958,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1019,7 +1025,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1061,6 +1067,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1128,7 +1135,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1173,6 +1180,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1243,7 +1251,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1288,6 +1296,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1356,7 +1365,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1389,6 +1398,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -1444,7 +1454,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1486,6 +1496,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.contextBroker.getOperation.callCount, 1);
@@ -1547,7 +1558,7 @@ describe('Testing Server', function () {
                     getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
@@ -1606,6 +1617,7 @@ describe('Testing Server', function () {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.contextBroker.getOperation.callCount, 1);

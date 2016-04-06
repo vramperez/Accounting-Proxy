@@ -7,4 +7,4 @@ logger.add(logger.transports.File, {
     colorize: false
 });
 
-module.exports = logger;
+module.exports = logger.cli();

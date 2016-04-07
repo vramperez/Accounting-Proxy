@@ -27,7 +27,7 @@ exports.addToken = function (token, callback) {
     multi.sadd(['token', token]);
     multi.exec(function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error adding the acces token "' + token + '".');
         } else {
             return callback(null);
         }
@@ -40,7 +40,7 @@ exports.addToken = function (token, callback) {
 exports.getToken = function (callback) {
     db.smembers('token', function (err, token) {
         if (err) {
-            return callback(err, null);
+            return callback('Error getting the access token.', null);
         } else if (token.length === 0) {
             return callback(null, null);
         } else {
@@ -61,7 +61,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
 
     db.hmset('units', entry, function(err) {
         if (err) {
-            return callback(err);
+            return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '".');
         } else {
             return callback(null);
         }
@@ -76,7 +76,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
 exports.getHref = function (unit, callback) {
     db.hget('units', unit, function (err, href) {
         if (err) {
-            return callback('Error getting the href for unit ' + unit, null);
+            return callback('Error getting the href for unit "' + unit + '".', null);
         } else {
             return callback(null, href);
         }
@@ -99,7 +99,7 @@ exports.newService = function (publicPath, url, appId, callback) {
     });
     multi.exec(function (err) {
         if (err) {
-            return callback('[ERROR] Error in database adding the new service.');
+            return callback('Error in database adding the new service.');
         } else {
             return callback(null);
         }
@@ -164,7 +164,7 @@ exports.deleteService = function (publicPath, callback) {
         associatedSubscriptions,
     ], function (err, keys) {
         if (err) {
-            return callback(err);
+            return callback('Error in database deleting the service.');
         } else {
             async.each(keys, function (key, task_callback) {
                 db.hget(key, 'customer', function (err, customer) {
@@ -180,11 +180,11 @@ exports.deleteService = function (publicPath, callback) {
                 });
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database deleting the service.');
                 } else {
                     multi.exec(function (err) {
                         if (err) {
-                            return callback('[ERROR] Error in datbase deleting the service.');
+                            return callback('Error in database deleting the service.');
                         } else {
                             return callback(null);
                         }
@@ -203,8 +203,8 @@ exports.deleteService = function (publicPath, callback) {
 exports.getService = function (publicPath, callback) {
     db.hgetall(publicPath, function (err, service) {
         if (err) {
-            return callback('[ERROR] Error in database getting the service.', null);
-        } else if (service === null){
+            return callback('Error in database getting the service.', null);
+        } else if (service === null) {
             return callback(null, null);
         } else {
             return callback(null, service);
@@ -220,7 +220,7 @@ exports.getAllServices = function (callback) {
 
     db.smembers('services', function (err, publicPaths) {
         if (err) {
-            return callback('[ERROR] Error in database getting the services.', null);
+            return callback('Error in database getting the services.', null);
         } else {
             async.each(publicPaths, function (publicPath, task_callback) {
                 db.hgetall(publicPath, function (err, service) {
@@ -234,7 +234,7 @@ exports.getAllServices = function (callback) {
                 });
             }, function (err) {
                 if (err) {
-                    return callback('[ERROR] Error in database getting the services.', null);
+                    return callback('Error in database getting the services.', null);
                 } else {
                     return callback(null, toReturn);
                 }
@@ -251,7 +251,7 @@ exports.getAllServices = function (callback) {
 exports.getAppId = function (publicPath, callback) {
     db.hget(publicPath, 'appId', function (err, appId) {
         if (err) {
-            return callback(err, null);
+            return callback('Error in database getting the appId.', null);
         } else {
             return callback(null, appId);
         }
@@ -266,7 +266,7 @@ exports.getAppId = function (publicPath, callback) {
 exports.addAdmin = function (idAdmin, callback) {
     db.sadd(['admins', idAdmin], function (err) {
         if (err) {
-            return callback('[ERROR] Error in database adding admin: ' + idAdmin + '.');
+            return callback('Error in database adding admin: "' + idAdmin + '".');
         } else {
             return callback(null);
         }
@@ -281,12 +281,12 @@ exports.addAdmin = function (idAdmin, callback) {
 exports.deleteAdmin = function (idAdmin, callback) {
     exports.getAllServices(function (err, services) {
         if (err) {
-            return callback('[ERROR] Error in database removing admin ' + idAdmin);
+            return callback('Error in database removing admin: "' + idAdmin + '".');
         } else {
             async.each(services, function (service, task_callback) {
                 db.srem(service.publicPath + 'admins', idAdmin, function (err) {
                     if (err) {
-                        return callback('[ERROR] Error in database removing admin ' + idAdmin);
+                        return callback('Error in database removing admin: "' + idAdmin + '".');
                     } else {
                         task_callback();
                     }
@@ -294,7 +294,7 @@ exports.deleteAdmin = function (idAdmin, callback) {
             }, function () {
                 db.srem('admins', idAdmin, function (err) {
                     if (err) {
-                        return callback('[ERROR] Error in database removing admin: ' + idAdmin + '.');
+                        return callback('Error in database removing admin: "' + idAdmin + '".');
                     } else {
                         return callback(null);
                     }
@@ -312,16 +312,20 @@ exports.deleteAdmin = function (idAdmin, callback) {
  */
 exports.bindAdmin = function (idAdmin, publicPath, callback) {
     exports.getService(publicPath, function (err, url) {
-        if (err || url === null) {
-            return callback('[ERROR] Invalid public path.')
+        if (err) {
+            return callback('Error in database binding the admin to the service.');
+        } else if (url === null) {
+            return callback('Invalid public path.');
         } else {
             db.smembers('admins', function (err, admins) {
-                if (err || admins.indexOf(idAdmin) === -1) {
-                    return callback('[ERROR] Invalid admin.')
+                if (err) {
+                    return callback('Error in database binding the admin to the service.');
+                } else if (admins.indexOf(idAdmin) === -1) {
+                    return callback('Admin: "' + idAdmin + '" not exists. Admin must be added before binding it.');
                 } else {
                     db.sadd(publicPath + 'admins', idAdmin, function (err) {
                         if (err) {
-                            return callback('[ERROR] Error adding the administrator.')
+                            return callback('Error in database binding the admin to the service.');
                         } else {
                             return callback(null);
                         }
@@ -341,7 +345,7 @@ exports.bindAdmin = function (idAdmin, publicPath, callback) {
 exports.unbindAdmin = function (idAdmin, publicPath, callback) {
     db.srem(publicPath + 'admins', idAdmin, function (err) {
         if (err) {
-            return callback('[ERROR] Error in database deleting the administrator.');
+            return callback('Error in database unbinding the administrator.');
         } else {
             return callback(null);
         }
@@ -358,7 +362,7 @@ exports.getAdmins = function (publicPath, callback) {
 
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
-            return callback('[ERROR] Error in database getting the administrators.', null);
+            return callback('Error in database getting the administrators.', null);
         } else {
             async.each(admins, function (admin, task_callback) {
                 toReturn.push({idAdmin: admin});
@@ -379,13 +383,13 @@ exports.getAdmins = function (publicPath, callback) {
 exports.getAdminUrl = function (idAdmin, publicPath, callback) {
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
-            return callback(err, null);
+            return callback('Error getting the admin url.', null);
         } else if (admins.indexOf(idAdmin) === -1) { // Not an admin
             return callback(null, null);
         } else {
             db.hget(publicPath, 'url', function (err, url) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the admin url.', null);
                 } else {
                     return callback(null, url);
                 }
@@ -402,7 +406,7 @@ exports.getAdminUrl = function (idAdmin, publicPath, callback) {
 exports.checkPath = function (publicPath, callback) {
     db.smembers('services', function (err, publicPaths) {
         if (err) {
-            return callback(err, false);
+            return callback('Error checking the path.', false);
         } else if (publicPaths.indexOf(publicPath) === -1) {
             return callback(null, false);
         } else {
@@ -434,7 +438,7 @@ exports.newBuy = function (buyInformation, callback) {
     });
     multi.exec(function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error in database adding the new buy.');
         } else {
             return callback(null);
         }
@@ -451,14 +455,14 @@ exports.getApiKeys = function (user, callback) {
 
     db.smembers(user, function (err, apiKeys) {
         if (err) {
-            return callback(err, null);
+            return callback('Error in databse getting api-keys.', null);
         } else if (apiKeys.length === 0) {
             return callback(null, null);
         } else {
             async.each(apiKeys, function (apiKey, task_callback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
                     if (err) {
-                        return task_callback(err);
+                        return task_callback('Error in databse getting api-keys.');
                     } else {
                         toReturn.push({
                             apiKey: apiKey,
@@ -470,7 +474,7 @@ exports.getApiKeys = function (user, callback) {
                 });
             }, function (err) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in databse getting api-keys.', null);
                 } else {
                     return callback(null, toReturn);
                 }
@@ -488,11 +492,11 @@ exports.getApiKeys = function (user, callback) {
 exports.checkRequest = function (customer, apiKey, publicPath, callback) {
     db.hgetall(apiKey, function (err, accountingInfo) {
         if (err) {
-            return callback(err, false);
+            return callback('Error in database checking the request.', false);
         } else if (accountingInfo === null) {
             return callback(null, false);
         } else {
-            return callback(null, accountingInfo.customer === customer && 
+            return callback(null, accountingInfo.customer === customer &&
                 accountingInfo.publicPath === publicPath);
         }
     });
@@ -506,13 +510,13 @@ exports.checkRequest = function (customer, apiKey, publicPath, callback) {
 exports.getAccountingInfo = function (apiKey, callback) {
     db.hgetall(apiKey, function (err, accountingInfo) {
         if (err) {
-            return callback(err, null);
+            return callback('Error in database getting the accounting info.', null);
         } else if (accountingInfo === null) {
             return callback(null, null);
         } else {
             db.hget(accountingInfo.publicPath, 'url', function (err, url) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the accounting info.', null);
                 } else {
                     return callback(null, {
                         unit: accountingInfo.unit,
@@ -533,7 +537,7 @@ exports.getNotificationInfo = function (callback) {
 
     db.smembers('apiKeys', function (err, apiKeys) {
         if (err) {
-            return callback(err, null);
+            return callback('Error in database getting the notification information.', null);
         } else {
             async.each(apiKeys, function (apiKey, task_callback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
@@ -557,7 +561,7 @@ exports.getNotificationInfo = function (callback) {
                 });
             }, function (err) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the notification information.', null);
                 } else if (notificationInfo.length === 0) {
                     return callback(null, null);
                 } else {
@@ -578,18 +582,18 @@ exports.makeAccounting = function (apiKey, amount, callback) {
     var multi = db.multi();
 
     if (amount < 0) {
-        return callback('[ERROR] The aomunt must be greater than 0');
+        return callback('The aomunt must be greater than 0.');
     } else {
         db.hget(apiKey, 'value', function (err, num) {
             if (err) {
-                return callback(err);
+                return callback('Error making the accounting.');
             } else {
                 multi.hmset(apiKey, {
                     value: parseFloat(num) + amount
                 });
                 multi.exec(function (err) {
                     if (err) {
-                        return callback(err);
+                        return callback('Error making the accounting.');
                     } else {
                         return callback(null);
                     }
@@ -609,7 +613,7 @@ exports.resetAccounting = function (apiKey, callback) {
 
     db.hget(apiKey, 'correlationNumber', function (err, correlationNumber) {
         if (err) {
-            return callback(err);
+            return callback('Error reseting the accounting.');
         } else {
             multi.hmset(apiKey, {
                 correlationNumber: parseInt(correlationNumber) + 1,
@@ -617,7 +621,7 @@ exports.resetAccounting = function (apiKey, callback) {
             });
             multi.exec(function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error reseting the accounting.');
                 } else {
                     return callback(null);
                 }
@@ -643,7 +647,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
     });
     multi.exec(function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error in database adding the subscription "' + subscriptionId + "'.");
         } else {
             return callback(null);
         }
@@ -658,13 +662,13 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
 exports.getCBSubscription = function (subscriptionId, callback) {
     db.hgetall(subscriptionId, function (err, subscriptionInfo) {
         if (err) {
-            return callback(err, null);
+            return callback('Error getting the subscription.', null);
         } else if (subscriptionInfo === null) {
             return callback(null, null);
         } else {
             db.hget(subscriptionInfo.apiKey, 'unit', function (err, unit) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the subscription.', null);
                 } else {
                     return callback(null, {
                         apiKey: subscriptionInfo.apiKey,
@@ -687,13 +691,13 @@ exports.deleteCBSubscription = function (subscriptionId, callback) {
 
     db.hget(subscriptionId, 'apiKey', function (err, apiKey) {
         if (err) {
-            return callback(err);
+            return callback('Error deleting the subscription "' + subscriptionId + '".');
         } else {
             multi.srem(apiKey + 'subs', subscriptionId);
             multi.del(subscriptionId);
             multi.exec(function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error deleting the subscription "' + subscriptionId + '".');
                 } else {
                     return callback(null);
                 }

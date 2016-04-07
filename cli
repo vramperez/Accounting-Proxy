@@ -76,7 +76,9 @@ cli
     .action(function(publicPath) {
         if (/\/((\w+)\/?)+$/.test(publicPath)){
             db.getService(publicPath, function(err, service) {
-                if(err || service === null) {
+                if(err) {
+                    console.log(err);
+                } else if (service === null) {
                     console.log('No service avaliable for path: ' + publicPath);
                 } else {
                     console.log('URL: ' + service.url + ' APP-ID: ' + service.appId);
@@ -182,7 +184,7 @@ cli
                 if (err) {
                     logger.error(err);
                 } else {
-                    logger.error('Admin ' + admin + ' added to service ' + publicPath);
+                    logger.info('Admin ' + admin + ' added to service ' + publicPath);
                 }
             });
         } else {

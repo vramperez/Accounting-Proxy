@@ -60,15 +60,15 @@ exports.init = function (callback) {
 /**
  * Auxiliar function for making the accounting.
  *
- * @param  {string}   apiKey   Purchase identifier.
- * @param  {string}   unit     Unit for make the accounting.
- * @param  {Object}   body     Endpoint response body.
+ * @param  {string}   apiKey        Purchase identifier.
+ * @param  {string}   unit          Unit for make the accounting.
+ * @param  {Object}   requestInfo   Request and response information useful for make the accounting.
  */
-exports.count = function (apiKey, unit, body, callback) {
+exports.count = function (apiKey, unit, requestInfo, callback) {
     if (acc_modules[unit] === undefined) {
         return callback('invalid accounting unit "' + unit + '"');
     }
-    acc_modules[unit].count(body, function (err, amount) {
+    acc_modules[unit].count(requestInfo, function (err, amount) {
         if (err) {
             return callback(err);
         } else {
@@ -98,7 +98,7 @@ var CBrequestHandler = function(req, res, options, unit) {
         if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
             contextBroker.subscriptionHandler(req, res, options.url, operation, function (err) {
                 if (err) {
-                    logger.error(err);
+                    logger.warn('[%s]', req.get('X-API-KEY') || 'Admin', err);
                 }
             });
         } else {
@@ -116,10 +116,19 @@ var CBrequestHandler = function(req, res, options, unit) {
  * @param  {string} unit    Accounting unit.
  */
 var requestHandler = function (options, res, apiKey, unit) {
+    var requestInfo = {};
+
+    // Save request Info
+    requestInfo.request = options;
+    requestInfo.request.time = new Date().getTime();
+
     request(options, function (error, resp, body) {
+        requestInfo.response = resp; // Save response info
+        requestInfo.response.time = new Date().getTime();
+
         if (error) {
             res.status(504).send();
-            logger.warn('An error ocurred requesting the endpoint: ' + options.url);
+            logger.warn('[%s] An error ocurred requesting the endpoint: ' + options.url, apiKey);
         } else {
             for (var header in resp.headers) {
                 res.setHeader(header, resp.headers[header]);
@@ -127,7 +136,7 @@ var requestHandler = function (options, res, apiKey, unit) {
             if (apiKey === null && unit === null) { // No accounting (admin user)
                 res.send(body);
             } else {
-                exports.count(apiKey, unit, body, function (err) {
+                exports.count(apiKey, unit, requestInfo, function (err) {
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                         res.status(500).send();

@@ -85,7 +85,7 @@ exports.addToken = function (token, callback) {
                     $token: token
                 }, function (err) {
                     if (err) {  
-                        return callback(err);
+                        return callback('Error adding the acces token "' + token + '".');
                     } else {
                         return callback(null);
                     }
@@ -102,7 +102,7 @@ exports.getToken = function (callback) {
             FROM token', 
         function (err, token) {
             if (err) {
-                return callback(err, null);
+                return callback('Error getting the access token.', null);
             } else if (token === undefined) {
                 return callback(null, null);
             } else {
@@ -125,7 +125,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
                 $href: href
             }, function(err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '".');
                 } else {
                     return callback(null);
                 }
@@ -145,7 +145,7 @@ exports.getHref = function (unit, callback) {
                 $unit: unit
             }, function(err, href) {
                 if (err) {
-                    return callback('Error getting the href for unit ' + unit, null);
+                    return callback('Error getting the href for unit "' + unit + '".', null);
                 } else if (href === undefined) {
                     return callback(null, null);
                 } else {
@@ -169,7 +169,7 @@ exports.newService = function (publicPath, url, appId, callback) {
             $appId: appId
         }, function (err) {
             if (err) {
-                return callback(err);
+                return callback('Error in database adding the new service.');
             } else {
                 return callback(null);
             }
@@ -188,7 +188,7 @@ exports.deleteService = function (publicPath, callback) {
             $path: publicPath
         }, function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error in database deleting the service.');
         } else {
             return callback(null);
         }
@@ -207,7 +207,7 @@ exports.getService = function (publicPath, callback) {
                 $path: publicPath
             }, function (err, service) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the service.', null);
                 } else if (service.length ===  0) {
                     return callback(null, null);
                 } else {
@@ -223,7 +223,7 @@ exports.getAllServices = function (callback) {
     db.all('SELECT * \
             FROM services', function (err, services) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the services.', null);
                 } else {
                     return callback(null, services);
                 }
@@ -243,7 +243,7 @@ exports.getAppId = function (publicPath, callback) {
                 $publicPath: publicPath
             }, function (err, appId) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the appId.', null);
                 } else if (appId.length === 0) {
                     return callback(null, null);
                 } else {
@@ -264,7 +264,7 @@ exports.addAdmin = function (idAdmin, callback) {
                 $idAdmin: idAdmin
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database adding admin: "' + idAdmin + '".');
                 } else {
                     return callback(null);
                 }
@@ -283,7 +283,7 @@ exports.deleteAdmin = function (idAdmin, callback) {
                 $idAdmin: idAdmin
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database removing admin: "' + idAdmin + '".');
                 } else {
                     return callback(null);
                 }
@@ -304,7 +304,7 @@ exports.bindAdmin = function (idAdmin, publicPath, callback) {
                 $publicPath: publicPath
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database binding the admin to the service.');
                 } else {
                     return callback(null);
                 }
@@ -325,7 +325,7 @@ exports.unbindAdmin = function (idAdmin, publicPath, callback) {
                 $publicPath: publicPath
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database unbinding the administrator.');
                 } else {
                     return callback(null);
                 }
@@ -345,7 +345,7 @@ exports.getAdmins = function (publicPath, callback) {
                 $publicPath: publicPath
             }, function (err, admins) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the administrators.', null);
                 } else {
                     return callback(null, admins);
                 }
@@ -368,7 +368,7 @@ exports.getAdminUrl = function (idAdmin, publicPath, callback) {
                 $publicPath: publicPath
             }, function (err, result) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the admin url.', null);
                 } else if (result.length === 0) {
                     return callback(null, null);
                 } else {
@@ -389,7 +389,7 @@ exports.checkPath = function (publicPath, callback) {
                 $publicPath: publicPath
             }, function (err, services) {
                 if (err) {
-                    return callback(err, false);
+                    return callback('Error checking the path.', false);
                 } else if (services.length === 0) {
                     return callback(null, false);
                 } else {
@@ -419,7 +419,7 @@ exports.newBuy = function (buyInformation, callback) {
                     $correlationNumber: 0
                 }, function (err) {
                     if (err) {
-                        return callback(err);
+                        return callback('Error in database adding the new buy.');
                     } else {
                         return callback(null);
                     }
@@ -440,7 +440,7 @@ exports.getApiKeys = function (user, callback) {
                 $user: user
             }, function (err, apiKeys) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in databse getting api-keys.', null);
                 } else if (apiKeys.length === 0) {
                     return callback(null, null);
                 } else {
@@ -464,7 +464,7 @@ exports.checkRequest = function (customer, apiKey, publicPath, callback) {
                 $publicPath: publicPath
             }, function (err, user) {
                 if (err) {
-                    return callback(err, false);
+                    return callback('Error in database checking the request.', false);
                 } else if (user.length === 0) {
                     return callback(null, false);
                 } else if (user[0].customer !== customer) {
@@ -488,7 +488,7 @@ exports.getAccountingInfo = function (apiKey, callback) {
                 $apiKey: apiKey
             }, function (err, accountingInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the accounting info.', null);
                 } else if (accountingInfo.length === 0) {
                     return callback(null, null);
                 } else {
@@ -507,7 +507,7 @@ exports.getNotificationInfo = function (callback) {
             WHERE value!=0', 
             function (err, notificationInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the notification information.', null);
                 } else if (notificationInfo.length === 0) {
                     return callback(null, null);
                 } else {
@@ -524,11 +524,11 @@ exports.getNotificationInfo = function (callback) {
  */
 exports.makeAccounting = function (apiKey, amount, callback) {
     if (amount < 0) {
-        return callback('[ERROR] The aomunt must be greater than 0');
+        return callback('The aomunt must be greater than 0.');
     } else {
         db.beginTransaction(function (err, transaction) {
             if (err) {
-                return callback(err);
+                return callback('Error making the accounting.');
             } else {
                 transaction.run(
                     'UPDATE accounting \
@@ -540,10 +540,15 @@ exports.makeAccounting = function (apiKey, amount, callback) {
                     }, function (err) {
                         if (err) {
                             transaction.rollback();
-                            return callback(err);
+                            return callback('Error making the accounting.');
                         } else {
-                            transaction.commit(function (error) {
-                                return callback(error);
+                            transaction.commit(function (err) {
+                                if (err) {
+                                    return callback('Error making the accounting.');    
+                                } else {
+                                    return callback(null);
+                                }
+                                
                             });
                         }
                 });
@@ -571,10 +576,14 @@ exports.resetAccounting = function (apiKey, callback) {
                 }, function (err) {
                     if (err) {
                         transaction.rollback();
-                        return callback(err);
+                        return callback('Error reseting the accounting.');
                     } else {
-                        transaction.commit(function (error) {
-                            return callback(error);
+                        transaction.commit(function (err) {
+                            if (err) {
+                                return callback('Error reseting the accounting.');
+                            } else {
+                                return callback(null);
+                            }
                         });
                     }
             });
@@ -599,7 +608,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
                     $notificationUrl: notificationUrl
                 }, function (err) {
                     if (err) {
-                        return callback(err);
+                        return callback('Error in database adding the subscription "' + subscriptionId + "'.");
                     } else {
                         return callback(null);
                     }
@@ -620,7 +629,7 @@ exports.getCBSubscription = function (subscriptionId, callback) {
                 $subscriptionId: subscriptionId
             }, function (err, subscriptionInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the subscription.', null);
                 } else if (subscriptionInfo.length === 0) {
                     return callback(null, null);
                 } else {
@@ -641,7 +650,7 @@ exports.deleteCBSubscription = function (subscriptionId, callback) {
                 $subscriptionId: subscriptionId
             }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error deleting the subscription "' + subscriptionId + '".');
                 } else {
                     return callback(null);
                 }

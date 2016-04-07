@@ -21,7 +21,7 @@ var sendSpecification = function (unit, callback) {
             } else {
                 db.getToken(function (err, token) {
                     if (err) {
-                        return callback('Error getting the access token from db');
+                        return callback(err);
                     } else {
                         var options = {
                             url: 'http://' + config.usageAPI.host + ':' + 
@@ -104,7 +104,7 @@ var sendUsage = function (accInfo, callback) {
 
             db.getToken(function (err, token) {
                 if (err) {
-                    return callback('Error obteining the token');
+                    return callback(err);
                 } else {
                     var options = {
                         url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usage',

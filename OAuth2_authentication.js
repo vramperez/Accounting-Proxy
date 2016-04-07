@@ -138,7 +138,7 @@ exports.headerAuthentication = function (req, res, next) {
                 verifyAppId(userProfile.appId, req, function (err, valid) {
                     if (err) {
                         res.status(500).send();
-                        logger.error('Error in database getting the appId');
+                        logger.error(err);
                     } else if (valid) {
                         req.user = userProfile;
                         req.user.accessToken = authToken;

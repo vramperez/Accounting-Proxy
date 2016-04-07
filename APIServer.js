@@ -23,7 +23,7 @@ exports.checkUrl = function (req, res) {
         if (req.get('X-API-KEY') !== undefined) { //Save the token to notify the WStore
             db.addToken(req.get('X-API-KEY'), function (err) {
                 if (err) {
-                    logger.error('Error saving the token in database');
+                    logger.error(err);
                 }
             });
         }

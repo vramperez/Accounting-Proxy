@@ -201,31 +201,32 @@ var unsubscribe = function (req, res, options, callback) {
  */
 var updateSubscription = function (req, res, options, callback) {
     options.body = req.body;
+    var subscriptionId = req.body.subscriptionId;
 
-    request(options, function (err, resp, body) { 
+    db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
         if (err) {
-            res.status(504).send();
-            return callback('Error sending the subscription to the CB');
+            return callback(err);
+        } else if (subscriptionInfo === null) {
+            return callback('Subscription "' + subscriptionId + '" not in database.')
+        } else {
+            request(options, function (err, resp, body) {
+                if (err) {
+                    res.status(504).send();
+                    return callback('Error sending the subscription to the CB');
 
-        } else if (body.subscribeResponse !== undefined) {
+                } else if (body.subscribeResponse !== undefined) {
 
-            var subscriptionId = body.subscribeResponse.subscriptionId;
-            var duration = body.subscribeResponse.duration;
-            res.status(resp.statusCode);
-            async.forEachOf(resp.headers, function (header, key, task_callback) {
-                res.setHeader(key, header);
-                task_callback();
-            }, function () {
+                    var subscriptionId = body.subscribeResponse.subscriptionId;
+                    var duration = body.subscribeResponse.duration;
+                    res.status(resp.statusCode);
+                    async.forEachOf(resp.headers, function (header, key, task_callback) {
+                        res.setHeader(key, header);
+                        task_callback();
+                    }, function () {
 
-                res.send(body);
-                var apiKey = req.get('X-API-KEY');
+                        res.send(body);
+                        var apiKey = req.get('X-API-KEY');
 
-                db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
-                    if (err) {
-                        return callback(err);
-                    } else if (subscriptionInfo === null) {
-                        return callback(null);
-                    } else {
                         if (acc_modules[subscriptionInfo.unit].subscriptionCount !== undefined) {
                             acc_proxy.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
@@ -235,12 +236,12 @@ var updateSubscription = function (req, res, options, callback) {
                                 }
                             });
                         }
-                    }
-                });
+                    });
+                } else {
+                    res.status(resp.statusCode).send(body);
+                    return callback(null);
+                }
             });
-        } else {
-            res.status(resp.statusCode).send(body);
-            return callback(null);
         }
     });
 };

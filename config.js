@@ -102,4 +102,9 @@ config.oauth2 = {
     }
 };
 
+// Logger configuration
+config.log = {
+
+    file: './log/all-log'
+};
 module.exports = config;

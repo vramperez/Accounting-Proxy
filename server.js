@@ -9,7 +9,8 @@ var express = require('express'),
     logger = require('winston'),
     notifier = require('./notifier'),
     cron = require('node-schedule'),
-    oauth2 = require('./OAuth2_authentication');
+    oauth2 = require('./OAuth2_authentication'),
+    expressWinston = require('express-winston');
 
 "use strict";
 
@@ -260,6 +261,16 @@ var handler = function (req, res) {
         }
     });
 };
+
+app.use(expressWinston.logger({
+    transports: [
+        new logger.transports.File({
+            level: 'debug',
+            filename: config.log.file,
+            colorize: false
+        })
+    ]
+}));
 
 app.set('port', config.accounting_proxy.port);
 

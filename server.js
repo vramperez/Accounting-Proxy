@@ -61,14 +61,15 @@ exports.init = function (callback) {
  * Auxiliar function for making the accounting.
  *
  * @param  {string}   apiKey        Purchase identifier.
- * @param  {string}   unit          Unit for make the accounting.
- * @param  {Object}   requestInfo   Request and response information useful for make the accounting.
+ * @param  {string}   unit          Unit for make accounting.
+ * @param  {Object}   countInfo     Information for calculate the accounting value.
+ * @param  {string}   countFunction Count function name in the accounting module for make the accounting.
  */
-exports.count = function (apiKey, unit, requestInfo, callback) {
+exports.count = function (apiKey, unit, countInfo, countFunction, callback) {
     if (acc_modules[unit] === undefined) {
         return callback('invalid accounting unit "' + unit + '"');
     }
-    acc_modules[unit].count(requestInfo, function (err, amount) {
+    acc_modules[unit][countFunction](countInfo, function (err, amount) {
         if (err) {
             return callback(err);
         } else {
@@ -95,8 +96,8 @@ var CBrequestHandler = function(req, res, options, unit) {
     var apiKey = req.get('X-API-KEY');
 
     contextBroker.getOperation(url.parse(options.url).pathname, req, function (operation) {
-        if (operation === 'subscribe' || operation === 'unsubscribe') { // (un)subscription request
-            contextBroker.subscriptionHandler(req, res, options.url, operation, function (err) {
+        if (operation === 'subscribe' || operation === 'unsubscribe' || operation === 'updateSubscription') {
+            contextBroker.subscriptionHandler(req, res, options.url, operation, unit, function (err) {
                 if (err) {
                     logger.warn('[%s]', req.get('X-API-KEY') || 'Admin', err);
                 }
@@ -136,7 +137,7 @@ var requestHandler = function (options, res, apiKey, unit) {
             if (apiKey === null && unit === null) { // No accounting (admin user)
                 res.send(body);
             } else {
-                exports.count(apiKey, unit, requestInfo, function (err) {
+                exports.count(apiKey, unit, requestInfo, 'count', function (err) {
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                         res.status(500).send();

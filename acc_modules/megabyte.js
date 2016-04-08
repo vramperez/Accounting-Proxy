@@ -61,8 +61,8 @@ var specification = {
     }]
 };
 
-var count = function (response, callback) {
-    return callback(null, Buffer.byteLength(response, 'utf8') / Math.pow(1024, 2));
+var count = function (countInfo, callback) {
+    return callback(null, Buffer.byteLength(countInfo.response.body, 'utf8') / Math.pow(1024, 2));
 };
 
 var getSpecification = function (callback) {

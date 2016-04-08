@@ -35,7 +35,7 @@ config.database = {
 // Configures the accounting modules used by the accounting proxy.
 config.modules = {
 
-    accounting: ['call', 'megabyte']
+    accounting: ['millisecond', 'call', 'megabyte']
 
 };
 

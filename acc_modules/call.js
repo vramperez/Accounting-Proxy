@@ -61,7 +61,7 @@ var specification = {
     }]
 };
 
-var count = function (response, callback) {
+var count = function (countInfo, callback) {
     return callback(null, 1);
 };
 

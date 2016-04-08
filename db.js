@@ -77,7 +77,7 @@ exports.init = function (callback) {
 exports.addToken = function (token, callback) {
     db.run('DELETE FROM token', function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error adding the acces token "' + token + '".');
         } else {
             db.run('INSERT OR REPLACE INTO token \
                 VALUES ($token)',
@@ -565,7 +565,7 @@ exports.makeAccounting = function (apiKey, amount, callback) {
 exports.resetAccounting = function (apiKey, callback) {
     db.beginTransaction(function (err, transaction) {
         if (err) {
-            return callback(err);
+            return callback('Error reseting the accounting.');
         } else {
             transaction.run(
                 'UPDATE accounting \

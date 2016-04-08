@@ -1,7 +1,7 @@
 {
   "name": "accounting-proxy",
-  "version": "2.1.0",
-  "description": "Accounting proxy for FI-ware GE services",
+  "version": "1.0.0",
+  "description": "Accounting proxy for FIWARE GE services",
   "main": "accounting-proxy.js",
   "author": "FI-WARE",
   "keywords": [
@@ -12,18 +12,19 @@
   ],
   "dependencies": {
     "async": "1.5.2",
+    "body-parser": "1.15.0",
     "commander": "2.9.0",
     "express": "4.13.4",
-    "mkdirp": "0.5.1",
-    "node-schedule": "0.2.9",
-    "body-parser": "1.15.0",
-    "passport-fiware-oauth": "0.1.6",
     "joi": "7.3.0",
+    "mkdirp": "0.5.1",
+    "moment": "^2.12.0",
+    "node-schedule": "0.2.9",
+    "passport-fiware-oauth": "0.1.6",
     "proxyquire": "1.7.4",
     "redis": "2.4.2",
     "request": "2.69.0",
-    "supertest": "1.2.0",
     "sqlite3-transactions": "0.0.5",
+    "supertest": "1.2.0",
     "winston": "2.1.1"
   },
   "repository": {
@@ -37,7 +38,7 @@
     },
     {
       "name": "Víctor Rampérez Martín",
-      "email": "vivctor.ramperez.martin@gmail.com"
+      "email": "victor.ramperez.martin@gmail.com"
     }
   ],
   "scripts": {

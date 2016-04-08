@@ -8,7 +8,7 @@ var Joi = require('joi');
 exports.validate = function(type, body, callback) {
     var validation_schema;
 
-    switch(type) {
+    switch (type) {
         case 'product':
             validation_schema = schemas.product;
             break;

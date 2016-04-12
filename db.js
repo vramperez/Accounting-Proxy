@@ -77,7 +77,7 @@ exports.init = function (callback) {
 exports.addToken = function (token, callback) {
     db.run('DELETE FROM token', function (err) {
         if (err) {
-            return callback('Error adding the acces token "' + token + '".');
+            return callback('Error adding the acces token "' + token + '" .');
         } else {
             db.run('INSERT OR REPLACE INTO token \
                 VALUES ($token)',
@@ -85,7 +85,7 @@ exports.addToken = function (token, callback) {
                     $token: token
                 }, function (err) {
                     if (err) {  
-                        return callback('Error adding the acces token "' + token + '".');
+                        return callback('Error adding the acces token "' + token + '" .');
                     } else {
                         return callback(null);
                     }
@@ -125,7 +125,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
                 $href: href
             }, function(err) {
                 if (err) {
-                    return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '".');
+                    return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
                 } else {
                     return callback(null);
                 }
@@ -145,7 +145,7 @@ exports.getHref = function (unit, callback) {
                 $unit: unit
             }, function(err, href) {
                 if (err) {
-                    return callback('Error getting the href for unit "' + unit + '".', null);
+                    return callback('Error getting the href for unit "' + unit + '" .', null);
                 } else if (href === undefined) {
                     return callback(null, null);
                 } else {
@@ -264,7 +264,7 @@ exports.addAdmin = function (idAdmin, callback) {
                 $idAdmin: idAdmin
             }, function (err) {
                 if (err) {
-                    return callback('Error in database adding admin: "' + idAdmin + '".');
+                    return callback('Error in database adding admin: "' + idAdmin + '" .');
                 } else {
                     return callback(null);
                 }
@@ -283,7 +283,7 @@ exports.deleteAdmin = function (idAdmin, callback) {
                 $idAdmin: idAdmin
             }, function (err) {
                 if (err) {
-                    return callback('Error in database removing admin: "' + idAdmin + '".');
+                    return callback('Error in database removing admin: "' + idAdmin + '" .');
                 } else {
                     return callback(null);
                 }
@@ -608,7 +608,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
                     $notificationUrl: notificationUrl
                 }, function (err) {
                     if (err) {
-                        return callback('Error in database adding the subscription "' + subscriptionId + "'.");
+                        return callback('Error in database adding the subscription "' + subscriptionId + '" .');
                     } else {
                         return callback(null);
                     }
@@ -650,7 +650,7 @@ exports.deleteCBSubscription = function (subscriptionId, callback) {
                 $subscriptionId: subscriptionId
             }, function (err) {
                 if (err) {
-                    return callback('Error deleting the subscription "' + subscriptionId + '".');
+                    return callback('Error deleting the subscription "' + subscriptionId + '" .');
                 } else {
                     return callback(null);
                 }

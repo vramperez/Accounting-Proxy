@@ -43,11 +43,11 @@
     }
   ],
   "scripts": {
-    "test": "npm run unit && npm run usageManagement && npm run accounting_generic && npm run accounting_CB && npm run administration",
+    "test": "npm run unit && npm run usageManagement && npm run accountingGeneric && npm run accountingCB && npm run administration",
     "unit": "istanbul cover _mocha test/unit",
     "usageManagement": "_mocha test/integration/usageManagementAPI_spec",
-    "accounting_generic": "_mocha test/integration/accounting_spec",
-    "accounting_CB": "_mocha test/integration/accounting_CB_spec",
+    "accountingGeneric": "_mocha test/integration/accounting_spec",
+    "accountingCB": "_mocha test/integration/accounting_CB_spec",
     "administration": "_mocha test/integration/administration_spec"
   },
   "devDependencies": {

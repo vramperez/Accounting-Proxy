@@ -27,7 +27,7 @@ exports.addToken = function (token, callback) {
     multi.sadd(['token', token]);
     multi.exec(function (err) {
         if (err) {
-            return callback('Error adding the acces token "' + token + '".');
+            return callback('Error adding the acces token "' + token + '" .');
         } else {
             return callback(null);
         }
@@ -61,7 +61,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
 
     db.hmset('units', entry, function(err) {
         if (err) {
-            return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '".');
+            return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
         } else {
             return callback(null);
         }
@@ -76,7 +76,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
 exports.getHref = function (unit, callback) {
     db.hget('units', unit, function (err, href) {
         if (err) {
-            return callback('Error getting the href for unit "' + unit + '".', null);
+            return callback('Error getting the href for unit "' + unit + '" .', null);
         } else {
             return callback(null, href);
         }
@@ -266,7 +266,7 @@ exports.getAppId = function (publicPath, callback) {
 exports.addAdmin = function (idAdmin, callback) {
     db.sadd(['admins', idAdmin], function (err) {
         if (err) {
-            return callback('Error in database adding admin: "' + idAdmin + '".');
+            return callback('Error in database adding admin: "' + idAdmin + '" .');
         } else {
             return callback(null);
         }
@@ -281,12 +281,12 @@ exports.addAdmin = function (idAdmin, callback) {
 exports.deleteAdmin = function (idAdmin, callback) {
     exports.getAllServices(function (err, services) {
         if (err) {
-            return callback('Error in database removing admin: "' + idAdmin + '".');
+            return callback('Error in database removing admin: "' + idAdmin + '" .');
         } else {
             async.each(services, function (service, task_callback) {
                 db.srem(service.publicPath + 'admins', idAdmin, function (err) {
                     if (err) {
-                        return callback('Error in database removing admin: "' + idAdmin + '".');
+                        return callback('Error in database removing admin: "' + idAdmin + '" .');
                     } else {
                         task_callback();
                     }
@@ -294,7 +294,7 @@ exports.deleteAdmin = function (idAdmin, callback) {
             }, function () {
                 db.srem('admins', idAdmin, function (err) {
                     if (err) {
-                        return callback('Error in database removing admin: "' + idAdmin + '".');
+                        return callback('Error in database removing admin: "' + idAdmin + '" .');
                     } else {
                         return callback(null);
                     }
@@ -647,7 +647,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
     });
     multi.exec(function (err) {
         if (err) {
-            return callback('Error in database adding the subscription "' + subscriptionId + "'.");
+            return callback('Error in database adding the subscription "' + subscriptionId + '" .');
         } else {
             return callback(null);
         }
@@ -691,13 +691,13 @@ exports.deleteCBSubscription = function (subscriptionId, callback) {
 
     db.hget(subscriptionId, 'apiKey', function (err, apiKey) {
         if (err) {
-            return callback('Error deleting the subscription "' + subscriptionId + '".');
+            return callback('Error deleting the subscription "' + subscriptionId + '" .');
         } else {
             multi.srem(apiKey + 'subs', subscriptionId);
             multi.del(subscriptionId);
             multi.exec(function (err) {
                 if (err) {
-                    return callback('Error deleting the subscription "' + subscriptionId + '".');
+                    return callback('Error deleting the subscription "' + subscriptionId + '" .');
                 } else {
                     return callback(null);
                 }

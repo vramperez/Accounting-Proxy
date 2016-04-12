@@ -30,7 +30,7 @@ var sendSpecification = function (unit, callback) {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                authorization: token
+                                authorization: 'Bearer ' + token
                             },
                             body: specification
                         };
@@ -112,7 +112,7 @@ var sendUsage = function (accInfo, callback) {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: token
+                            authorization: 'Bearer ' + token
                         },
                         body: body
                     };

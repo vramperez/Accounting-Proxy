@@ -7,16 +7,16 @@ var express = require('express'),
     request = require('request'),
     contextBroker = require('./orion_context_broker/cb_handler'),
     logger = require('winston'),
-    notifier = require('./notifier'),
+    accounter = require('./accounter'),
     cron = require('node-schedule'),
     oauth2 = require('./OAuth2_authentication'),
+    notifier = require('./notifier'),
     expressWinston = require('express-winston');
 
 "use strict";
 
 var db = require(config.database.type);
 var app = express();
-var acc_modules = notifier.acc_modules;
 var admin_paths = config.api.administration_paths;
 
 /**
@@ -59,33 +59,6 @@ exports.init = function (callback) {
 };
 
 /**
- * Auxiliar function for making the accounting.
- *
- * @param  {string}   apiKey        Purchase identifier.
- * @param  {string}   unit          Unit for make accounting.
- * @param  {Object}   countInfo     Information for calculate the accounting value.
- * @param  {string}   countFunction Count function name in the accounting module for make the accounting.
- */
-exports.count = function (apiKey, unit, countInfo, countFunction, callback) {
-    if (acc_modules[unit] === undefined) {
-        return callback('invalid accounting unit "' + unit + '"');
-    }
-    acc_modules[unit][countFunction](countInfo, function (err, amount) {
-        if (err) {
-            return callback(err);
-        } else {
-            db.makeAccounting(apiKey, amount, function (err) {
-                if (err) {
-                    return callback(err);
-                } else {
-                    return callback(null);
-                }
-            });
-        }
-    });
-};
-
-/**
  * Auxiliar functon that handles ContextBroker request.
  *
  * @param {Object} req      Incoming request.
@@ -100,7 +73,7 @@ var CBrequestHandler = function(req, res, options, unit) {
         if (operation === 'subscribe' || operation === 'unsubscribe' || operation === 'updateSubscription') {
             contextBroker.subscriptionHandler(req, res, options.url, operation, unit, function (err) {
                 if (err) {
-                    logger.warn('[%s]', req.get('X-API-KEY') || 'Admin', err);
+                    logger.warn('[%s] ' + err, apiKey || 'Admin');
                 }
             });
         } else {
@@ -125,20 +98,21 @@ var requestHandler = function (options, res, apiKey, unit) {
     requestInfo.request.time = new Date().getTime();
 
     request(options, function (error, resp, body) {
-        requestInfo.response = resp; // Save response info
-        requestInfo.response.time = new Date().getTime();
-
         if (error) {
             res.status(504).send();
             logger.warn('[%s] An error ocurred requesting the endpoint: ' + options.url, apiKey);
+
         } else {
+            requestInfo.response = resp; // Save response info
+            requestInfo.response.time = new Date().getTime();
+
             for (var header in resp.headers) {
                 res.setHeader(header, resp.headers[header]);
             }
             if (apiKey === null && unit === null) { // No accounting (admin user)
                 res.send(body);
             } else {
-                exports.count(apiKey, unit, requestInfo, 'count', function (err) {
+                accounter.count(apiKey, unit, requestInfo, 'count', function (err) {
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                         res.status(500).send();

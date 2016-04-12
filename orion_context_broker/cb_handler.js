@@ -2,7 +2,7 @@ var request = require('request'),
     subsUrls = require('./subsUrls'),
     config = require('../config'),
     express = require('express'),
-    acc_proxy = require('../server'),
+    accounter = require('../accounter'),
     bodyParser = require('body-parser'),
     logger = require('winston'),
     async = require('async'),
@@ -26,7 +26,7 @@ exports.run = function () {
  * @param  {Object} res Outgoing response.
  */
 var notificationHandler = function (req, res) {
-    var requestInfo = {
+    var countInfo = {
         request: req,
         response: {}
     };
@@ -38,7 +38,7 @@ var notificationHandler = function (req, res) {
             logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
         } else {
             // Make accounting
-            acc_proxy.count(subscription.apiKey, subscription.unit, requestInfo, 'count', function (err) {
+            accounter.count(subscription.apiKey, subscription.unit, countInfo, 'count', function (err) {
                 if (err) {
                     logger.error('An error ocurred while making the accounting');
                 } else {
@@ -123,7 +123,7 @@ var subscribe = function (req, res, unit, options, callback) {
                         return callback(err);
                     } else {
                         if (acc_modules[unit].subscriptionCount !== undefined) {
-                            acc_proxy.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
+                            accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
                                     return callback(err);
                                 } else {
@@ -228,13 +228,15 @@ var updateSubscription = function (req, res, options, callback) {
                         var apiKey = req.get('X-API-KEY');
 
                         if (acc_modules[subscriptionInfo.unit].subscriptionCount !== undefined) {
-                            acc_proxy.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
+                            accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
                                     return callback(err);
                                 } else {
                                     return callback(null);
                                 }
                             });
+                        } else {
+                            return callback(null);
                         }
                     });
                 } else {

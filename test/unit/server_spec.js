@@ -10,16 +10,16 @@ var adminPaths = {
     checkUrl: '/accounting_proxy/urls',
 }
 
-var mocker = function(implementations, callback) {
+var mocker = function (implementations, callback) {
     var mocks, spies, proxy_server;
 
     mocks = {
         app: {
-            set: function(prop, value) {},
-            listen: function(port) {},
-            get: function(prop) {},
-            use: function(middleware) {},
-            post: function(path, middleware, handler) {}
+            set: function (prop, value) {},
+            listen: function (port) {},
+            get: function (prop) {},
+            use: function (middleware) {},
+            post: function (path, middleware, handler) {}
         },
         req: {},
         res: {},
@@ -37,10 +37,10 @@ var mocker = function(implementations, callback) {
         },
         db: {},
         logger: {
-            log: function(level, msg) {},
-            info: function(msg) {},
-            warn: function(msg) {},
-            error: function(msg) {}
+            log: function (level, msg) {},
+            info: function (msg) {},
+            warn: function (msg) {},
+            error: function (msg) {}
         },
         contextBroker: {},
         acc_modules: {}
@@ -89,8 +89,8 @@ var mocker = function(implementations, callback) {
     mocks.config.api = {
         administration_paths: adminPaths
     }
-    async.each(Object.keys(implementations), function(obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
+    async.each(Object.keys(implementations), function (obj, task_callback1) {
+        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
             mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
             if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
                 if (obj == 'req' || obj == 'res') {
@@ -102,13 +102,13 @@ var mocker = function(implementations, callback) {
             } else {
                 task_callback2();
             }
-        }, function() {
+        }, function () {
             return task_callback1();
         });
-    }, function() {
+    }, function () {
         // Mocking dependencies
         server = proxyquire('../../server', {
-            express: function() {
+            express: function () {
                 return mocks.app;
             },
             request: mocks.requester.request,
@@ -127,21 +127,21 @@ var mocker = function(implementations, callback) {
     });
 }
 
-describe('Testing Server', function() {
+describe('Testing Server', function () {
 
-    describe('Function "initialize"', function() {
+    describe('Function "initialize"', function () {
 
-        it('error initializing the database', function(done) {
+        it('error initializing the database', function (done) {
             var implementations = {
                 db: {
-                    init: function(callback) {
+                    init: function (callback) {
                         return callback('Error');
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error: ' + 'Error');
+            mocker(implementations, function (server, spies) {
+                server.init(function (err) {
+                    assert.equal(err, 'Error starting the accounting-proxy. Error');
                     assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
                     done();
@@ -149,293 +149,162 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error notifying the WStore: error getting information from db', function(done) {
+        it('error notifying the specifications', function (done) {
             var implementations = {
                 db: {
-                    getNotificationInfo: function(callback) {
-                        return callback('Error');
-                    },
-                    init: function(callback) {
+                    init: function (callback) {
                         return callback(null);
-                    }
-                }
-            }
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error: ' + 'Error');
-                    assert.equal(spies.async.series.callCount, 1);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.db.getNotificationInfo.callCount, 1);
-                    done();
-                });
-            });
-        });
-
-        it('not necessary notify the WStore', function(done) {
-            var implementations = {
-                app: {
-                    listen: function(port) {},
-                    get: function(prop) {}
-                },
-                db: {
-                    getNotificationInfo: function(callback) {
-                        return callback(null, null);
-                    },
-                    init: function(callback) {
-                        return callback(null);
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: true
-                    }
-                },
-                contextBroker: {
-                    run: function() {}
-                },
-                cron: {
-                    scheduleJob: function(schedule, callback) {}
-                }
-            }
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.logger.info.callCount, 1);
-                    assert.equal(spies.logger.info.getCall(0).args[0], 'Loading module for Orion Context Broker...');
-                    assert.equal(spies.contextBroker.run.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
-                    assert.equal(spies.app.get.callCount, 3);
-                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
-                    assert.equal(spies.app.listen.callCount, 1);
-                    done();
-                });
-            });
-        });
-
-        it('error notifying the WStore', function(done) {
-            var notificationInfo = {
-                apiKey1: {
-                    customer: '0001',
-                    value: '1.3',
-                    correlationNumber: '2',
-                    recordType: 'callusage',
-                    unit: 'call'
-                }
-            }
-            var implementations = {
-                db: {
-                    getNotificationInfo: function(callback) {
-                        return callback(null, notificationInfo);
-                    },
-                    init: function(callback) {
-                        return callback(null);
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: true
                     }
                 },
                 notifier: {
-                    notify: function(info, callback) {
+                    notifyUsageSpecification: function (callback) {
                         return callback('Error');
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error: ' + 'Error');
+            mocker(implementations, function (server, spies) {
+                server.init(function (err) {
+                    assert.equal(err, 'Error starting the accounting-proxy. Error');
+                    assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.logger.info.callCount, 1);
-                    assert.equal(spies.logger.info.getCall(0).args[0], 'Notifying the WStore...');
-                    assert.equal(spies.async.each.callCount, 1);
-                    assert.deepEqual(spies.async.each.getCall(0).args[0], {
-                        apiKey1: {
-                            correlationNumber: "2",
-                            customer: "0001",
-                            recordType: "callusage",
-                            unit: "call",
-                            value: "1.3"
-                        }
-                    });
+                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
                     done();
                 });
             });
         });
 
-        it('error scheduling the notifications', function(done) {
+        it('error notifying the usage', function (done) {
             var implementations = {
-                app: {
-                    listen: function(port) {},
-                    get: function(prop) {}
-                },
                 db: {
-                    count: 0,
-                    getNotificationInfo: function(callback) {
-                        if (this.count == 0) {
-                            this.count++;
-                            return callback(null, null);
-                        } else {
-                            return callback('Error', null);
-                        }
-                    },
-                    init: function(callback) {
+                    init: function (callback) {
                         return callback(null);
                     }
+                },
+                notifier: {
+                    notifyUsageSpecification: function (callback) {
+                        return callback(null);
+                    },
+                    notifyUsage: function (callback) {
+                        return callback('Error');
+                    }
+                }
+            }
+            mocker(implementations, function (server, spies) {
+                server.init(function (err) {
+                    assert.equal(err, 'Error starting the accounting-proxy. Error');
+                    assert.equal(spies.async.series.callCount, 1);
+                    assert.equal(spies.db.init.callCount, 1);
+                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
+                    assert.equal(spies.notifier.notifyUsage.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('error notifying the accounting (cron service)', function (done) {
+            var cron = false;
+            var port = 9000;
+            var implementations = {
+                db: {
+                    init: function (callback) {
+                        return callback(null);
+                    }
+                },
+                notifier: {
+                    notifyUsageSpecification: function (callback) {
+                        return callback(null);
+                    },
+                    notifyUsage: function (callback) {
+                        if (cron) {
+                            cron = false;
+                            return callback('Error');
+                        } else {
+                            cron = true;
+                            return callback(null);
+                        }
+                    }
+                },
+                cron: {
+                    scheduleJob: function (config, callback) {
+                        return callback();
+                    }
+                },
+                app: {
+                    listen: function (port) {},
+                    get: function (prop) {
+                        return port;
+                    }
+                },
+                contextBroker: {
+                    run: function () {}
                 },
                 config: {
                     resources: {
                         contextBroker: true
                     }
-                },
-                contextBroker: {
-                    run: function() {}
-                },
-                cron: {
-                    scheduleJob: function(schedule, callback) {
-                        return callback();
-                    }
                 }
             }
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
+            mocker(implementations, function (server, spies) {
+                server.init(function (err) {
                     assert.equal(err, null);
+                    assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
+                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
+                    assert.equal(spies.notifier.notifyUsage.callCount, 2);
+                    assert.equal(spies.cron.scheduleJob.callCount, 1);
+                    assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
                     assert.equal(spies.logger.info.callCount, 2);
                     assert.equal(spies.logger.info.getCall(0).args[0], 'Loading module for Orion Context Broker...');
                     assert.equal(spies.logger.info.getCall(1).args[0], 'Sending accounting information...');
-                    assert.equal(spies.logger.error.callCount, 1);
-                    assert.equal(spies.logger.error.getCall(0).args[0], 'Error while notifying the WStore: Error');
                     assert.equal(spies.contextBroker.run.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
+                    assert.equal(spies.logger.error.callCount, 1);
+                    assert.equal(spies.logger.error.getCall(0).args[0], 'Error while notifying the accounting: Error');
+                    assert.equal(spies.app.listen.callCount, 1);
+                    assert.equal(spies.app.listen.getCall(0).args[0], port);
                     assert.equal(spies.app.get.callCount, 3);
                     assert.equal(spies.app.get.getCall(2).args[0], 'port');
-                    assert.equal(spies.app.listen.callCount, 1);
                     done();
                 });
             });
         });
 
-        it('correct initialization', function(done) {
-            var notificationInfo = {
-                apiKey1: {
-                    customer: '0001',
-                    value: '1.3',
-                    correlationNumber: '2',
-                    recordType: 'callusage',
-                    unit: 'call'
-                },
-                apiKey2: {
-                    customer: '0002',
-                    value: '1.3',
-                    correlationNumber: '2',
-                    recordType: 'callusage',
-                    unit: 'call'
-                }
-            }
-            var implementations = {
-                app: {
-                    listen: function(port) {},
-                    get: function(prop) {},
-                    post: function(path, middleware, handler) {},
-                    use: function(middleware) {}
-                },
-                db: {
-                    count: 0,
-                    getNotificationInfo: function(callback) {
-                        return callback(null, notificationInfo);
-                    },
-                    init: function(callback) {
-                        return callback(null);
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: true
-                    }
-                },
-                contextBroker: {
-                    run: function() {}
-                },
-                cron: {
-                    scheduleJob: function(schedule, callback) {
-                        return callback();
-                    }
-                },
-                api: {
-                    run: function() {}
-                },
-                notifier: {
-                    notify: function(info, callback) {
-                        return callback(null);
-                    }
-                }
-            }
-            var info_args = [ 'Notifying the WStore...', 'Loading module for Orion Context Broker...', 'Sending accounting information...',
-                            'Notifying the WStore...'];
-            mocker(implementations, function(server, spies) {
-                server.init(function(err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.logger.info.callCount, info_args.length);
-                    async.forEachOf(info_args, function(arg, i, task_callback) {
-                        assert.equal(spies.logger.info.getCall(i).args[0], arg);
-                        task_callback();
-                    });
-                    assert.equal(spies.contextBroker.run.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.getCall(0).args[0], '00 00 * * *');
-                    assert.equal(spies.app.post.callCount, 2);
-                    assert.equal(spies.app.post.getCall(0).args[0], adminPaths.checkUrl);
-                    assert.equal(spies.app.post.getCall(1).args[0], adminPaths.newBuy);
-                    assert.equal(spies.app.get.callCount, 3);
-                    assert.equal(spies.app.get.getCall(0).args[0], adminPaths.keys);
-                    assert.equal(spies.app.get.getCall(1).args[0], adminPaths.units);
-                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
-                    assert.equal(spies.app.listen.callCount, 1);
-                    done();
-                });
-            });
-        });
+        
     });
 
-    describe('[Admin]', function() {
+    describe('[Admin]', function () {
 
-        it('error getting url from dtabase', function(done) {
+        it('error getting url from dtabase', function (done) {
             var userId = 'admin';
             var publicPath = '/publicPath';
             var implementations = {
                 app: {
-                    use: function(path, middleware, middleware, handler) {
+                    use: function (path, middleware, middleware, handler) {
                         if (path === '/') {
                             return handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return undefined;
                     },
                     user: {id: userId},
                     publicPath: publicPath
                 },
                 res:{
-                    status: function(code) {
+                    status: function (code) {
                         return this;
                     },
-                    send: function() {}
+                    send: function () {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback('Error', null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.get.callCount, 1);
                 assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
                 assert.equal(spies.req.is.callCount, 1);
@@ -450,7 +319,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error redirecting the request to the service', function(done) {
+        it('error redirecting the request to the service', function (done) {
             var userId = 'admin';
             var publicPath = '/publicPath';
             var restPath = '/restPath';
@@ -458,15 +327,15 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware, middleware, handler) {
+                    use: function (path, middleware, middleware, handler) {
                         if (path === '/') {
                             return handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return undefined;
                     },
                     method: method,
@@ -476,23 +345,23 @@ describe('Testing Server', function() {
                     headers: {}
                 },
                 res:{
-                    status: function(code) {
+                    status: function (code) {
                         return this;
                     },
-                    send: function() {}
+                    send: function () {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, url);
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback('Error', null, null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.get.callCount, 1);
                 assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
                 assert.equal(spies.req.is.callCount, 2);
@@ -514,7 +383,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('correct redirection to the service', function(done) {
+        it('correct redirection to the service', function (done) {
             var userId = 'admin';
             var publicPath = '/publicPath';
             var restPath = '/restPath';
@@ -522,19 +391,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return undefined;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     method: method,
@@ -544,21 +413,21 @@ describe('Testing Server', function() {
                     headers: {}
                 },
                 res:{
-                    send: function(body) {},
-                    setHeader: function(header, value) {}
+                    send: function (body) {},
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, url);
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -582,9 +451,9 @@ describe('Testing Server', function() {
         });
     });
 
-    describe('[No Admin | REST API]', function() {
+    describe('[No Admin | REST API]', function () {
 
-        it('error, "API-KEY" header missing', function(done) {
+        it('error, "API-KEY" header missing', function (done) {
             var userId = 'user';
             var publicPath = '/publicPath';
             var restPath = '/restPath';
@@ -592,19 +461,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return undefined;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     user: {id: userId},
@@ -612,18 +481,18 @@ describe('Testing Server', function() {
                     restPath: restPath,
                 },
                 res:{
-                    json: function(json) {},
-                    status: function(code) {
+                    json: function (json) {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -645,7 +514,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error checking the request', function(done) {
+        it('error checking the request', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -654,19 +523,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     user: {id: userId},
@@ -674,21 +543,21 @@ describe('Testing Server', function() {
                     restPath: restPath,
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback('Error', null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -702,6 +571,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0], 500);
                 assert.equal(spies.res.send.callCount, 1);
@@ -709,7 +579,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error, invalid api-key or user', function(done) {
+        it('error, invalid api-key or user', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -718,19 +588,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     user: {id: userId},
@@ -738,21 +608,21 @@ describe('Testing Server', function() {
                     restPath: restPath,
                 },
                 res:{
-                    json: function(json) {},
-                    status: function(code) {
+                    json: function (json) {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, false);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -766,6 +636,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0], 401);
                 assert.equal(spies.res.json.callCount, 1);
@@ -774,7 +645,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error getting accounting info', function(done) {
+        it('error getting accounting info', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -783,19 +654,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     user: {id: userId},
@@ -803,24 +674,24 @@ describe('Testing Server', function() {
                     restPath: restPath,
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback('Error', null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -834,6 +705,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -843,7 +715,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error, no accounting info available', function(done) {
+        it('error, no accounting info available', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -852,19 +724,19 @@ describe('Testing Server', function() {
             var method = 'GET';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) {},
-                    get: function(header) {
+                    is: function (type) {},
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback();
                     },
                     user: {id: userId},
@@ -872,24 +744,24 @@ describe('Testing Server', function() {
                     restPath: restPath,
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -903,6 +775,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -912,7 +785,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error sending the request to the service', function(done) {
+        it('error sending the request to the service', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -922,21 +795,21 @@ describe('Testing Server', function() {
             var unit = 'megabyte';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -946,19 +819,19 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     }
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     }
                 },
@@ -968,12 +841,12 @@ describe('Testing Server', function() {
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback('Error', null, null);
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -988,6 +861,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1004,7 +878,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error making the accounting (invalid unit)', function(done) {
+        it('error making the accounting (invalid unit)', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1014,21 +888,21 @@ describe('Testing Server', function() {
             var unit = 'wrong';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -1038,20 +912,20 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     }
                 },
@@ -1061,12 +935,15 @@ describe('Testing Server', function() {
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, {});
                     }
+                },
+                notifier: {
+                    acc_modules: {}
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1081,6 +958,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1094,8 +972,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
                 assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
                 assert.equal(spies.logger.warn.callCount, 1);
-                assert.equal(spies.logger.warn.getCall(0).args[0], 
-                    '[%s] Error making the accounting: No accounting module for unit "%s": missing file acc_modules/%s.jswrong');
+                assert.equal(spies.logger.warn.getCall(0).args[0], '[%s] Error making the accounting: invalid accounting unit "' + unit + '"');
                 assert.equal(spies.logger.warn.getCall(0).args[1], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
                 assert.equal(spies.res.status.getCall(0).args[0], 500);
@@ -1104,7 +981,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error making the accounting (error in accounting module)', function(done) {
+        it('error making the accounting (error in accounting module)', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1114,21 +991,21 @@ describe('Testing Server', function() {
             var unit = 'megabyte';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -1138,20 +1015,20 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     }
                 },
@@ -1161,17 +1038,21 @@ describe('Testing Server', function() {
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, {});
                     }
                 },
-                acc_modules: {
-                    count: function(body, callback) {
-                        return callback('Error', null);
+                notifier: {
+                    acc_modules: {
+                        megabyte: {
+                            count: function (body, callback) {
+                                return callback('Error', null);
+                            }
+                        }
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1186,6 +1067,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1195,8 +1077,6 @@ describe('Testing Server', function() {
                     headers: {},
                     body: ''
                 });
-                assert.equal(spies.acc_modules.count.callCount, 1);
-                assert.deepEqual(spies.acc_modules.count.getCall(0).args[0], {});
                 assert.equal(spies.res.setHeader.callCount, 1);
                 assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
                 assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
@@ -1210,7 +1090,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error making the accounting (error in database)', function(done) {
+        it('error making the accounting (error in database)', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1221,21 +1101,21 @@ describe('Testing Server', function() {
             var amount = 1.357;
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -1245,23 +1125,23 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     },
-                    makeAccounting: function(apiKey, amount, callback) {
+                    makeAccounting: function (apiKey, amount, callback) {
                         return callback('Error');
                     }
                 },
@@ -1271,17 +1151,21 @@ describe('Testing Server', function() {
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, {});
                     }
                 },
-                acc_modules: {
-                    count: function(body, callback) {
-                        return callback(null, amount);
+                notifier: {
+                    acc_modules: {
+                        megabyte: {
+                            count: function (body, callback) {
+                                return callback(null, amount);
+                            }
+                        }
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1296,6 +1180,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1305,8 +1190,6 @@ describe('Testing Server', function() {
                     headers: {},
                     body: ''
                 });
-                assert.equal(spies.acc_modules.count.callCount, 1);
-                assert.deepEqual(spies.acc_modules.count.getCall(0).args[0], {});
                 assert.equal(spies.db.makeAccounting.callCount, 1);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[0], apiKey);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[1], amount);
@@ -1323,7 +1206,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1334,21 +1217,21 @@ describe('Testing Server', function() {
             var amount = 1.357;
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -1358,23 +1241,23 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function() {},
-                    status: function(code) {
+                    send: function () {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     },
-                    makeAccounting: function(apiKey, amount, callback) {
+                    makeAccounting: function (apiKey, amount, callback) {
                         return callback(null);
                     }
                 },
@@ -1384,17 +1267,21 @@ describe('Testing Server', function() {
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, {});
                     }
                 },
-                acc_modules: {
-                    count: function(body, callback) {
-                        return callback(null, amount);
+                notifier: {
+                    acc_modules: {
+                        megabyte: {
+                            count: function (body, callback) {
+                                return callback(null, amount);
+                            }
+                        }
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1409,6 +1296,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.requester.request.callCount, 1);
@@ -1418,8 +1306,6 @@ describe('Testing Server', function() {
                     headers: {},
                     body: ''
                 });
-                assert.equal(spies.acc_modules.count.callCount, 1);
-                assert.deepEqual(spies.acc_modules.count.getCall(0).args[0], {});
                 assert.equal(spies.db.makeAccounting.callCount, 1);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[0], apiKey);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[1], amount);
@@ -1433,9 +1319,9 @@ describe('Testing Server', function() {
         });
     });
 
-    describe('[No Admin | Context Broker]', function() {
+    describe('[No Admin | Context Broker]', function () {
 
-        it('error, Content-Type is not a JSON', function(done) {
+        it('error, Content-Type is not a JSON', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1445,21 +1331,21 @@ describe('Testing Server', function() {
             var unit = 'megabyte';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return false
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('');
                     },
                     user: {id: userId},
@@ -1469,20 +1355,20 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    json: function(JSON) {},
-                    status: function(code) {
+                    json: function (JSON) {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     }
                 },
@@ -1492,12 +1378,12 @@ describe('Testing Server', function() {
                     }
                 },
                 url: {
-                    parse: function(url) {
+                    parse: function (url) {
                         return { pathname: restPath}
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1512,6 +1398,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.res.status.callCount, 1);
@@ -1522,7 +1409,7 @@ describe('Testing Server', function() {
             });
         });
 
-        it('error handling the subscription/unsubscription', function(done) {
+        it('error handling the subscription/unsubscription', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1533,21 +1420,21 @@ describe('Testing Server', function() {
             var operation = 'subscribe';
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return true;
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('{}');
                     },
                     user: {id: userId},
@@ -1557,20 +1444,20 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    json: function(JSON) {},
-                    status: function(code) {
+                    json: function (JSON) {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     }
                 },
@@ -1580,20 +1467,20 @@ describe('Testing Server', function() {
                     }
                 },
                 url: {
-                    parse: function(url) {
+                    parse: function (url) {
                         return { pathname: restPath}
                     }
                 },
                 contextBroker: {
-                    getOperation: function(path, req, callback) {
+                    getOperation: function (path, req, callback) {
                         return callback(operation);
                     },
-                    subscriptionHandler: function(req, res, url, unit, operation, callback) {
+                    subscriptionHandler: function (req, res, url, operation, callback) {
                         return callback('Error');
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1609,6 +1496,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.contextBroker.getOperation.callCount, 1);
@@ -1617,15 +1505,14 @@ describe('Testing Server', function() {
                 assert.equal(spies.contextBroker.subscriptionHandler.callCount, 1);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[0], implementations.req);
                 assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[2], url + restPath);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], unit);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[4], operation);
+                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], operation);
                 assert.equal(spies.logger.error.callCount, 1);
                 assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
                 done();
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var apiKey = 'apiKey';
             var userId = 'user';
             var publicPath = '/publicPath';
@@ -1637,21 +1524,21 @@ describe('Testing Server', function() {
             var amount = 1.357;
             var implementations = {
                 app: {
-                    use: function(path, middleware1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function() {});
+                            middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
                 },
                 req: {
-                    is: function(type) { 
+                    is: function (type) { 
                         return true;
                     },
-                    get: function(header) {
+                    get: function (header) {
                         return apiKey;
                     },
-                    on: function(event, callback) {
+                    on: function (event, callback) {
                         return callback('{}');
                     },
                     user: {id: userId},
@@ -1661,23 +1548,23 @@ describe('Testing Server', function() {
                     method: method
                 },
                 res:{
-                    send: function(JSON) {},
-                    status: function(code) {
+                    send: function (JSON) {},
+                    status: function (code) {
                         return this;
                     },
-                    setHeader: function(header, value) {}
+                    setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function(userId, publicPath, callback) {
+                    getAdminUrl: function (userId, publicPath, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function(userId, apiKey, callback) {
+                    checkRequest: function (userId, apiKey, publicPath, callback) {
                         return callback(null, true);
                     },
-                    getAccountingInfo: function(apiKey, callback) {
+                    getAccountingInfo: function (apiKey, callback) {
                         return callback(null, {url: url, unit: unit});
                     },
-                    makeAccounting: function(apiKey, amount, callback) {
+                    makeAccounting: function (apiKey, amount, callback) {
                         return callback(null);
                     }
                 },
@@ -1687,30 +1574,34 @@ describe('Testing Server', function() {
                     }
                 },
                 url: {
-                    parse: function(url) {
+                    parse: function (url) {
                         return { pathname: restPath}
                     }
                 },
                 contextBroker: {
-                    getOperation: function(path, req, callback) {
+                    getOperation: function (path, req, callback) {
                         return callback(operation);
                     },
-                    subscriptionHandler: function(req, res, url, unit, operation, callback) {
+                    subscriptionHandler: function (req, res, url, unit, operation, callback) {
                         return callback('Error');
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, {headers: {'header1': 'value1'}}, {});
                     }
                 },
-                acc_modules: {
-                    count: function(body, callback) {
-                        return callback(null, amount);
+                notifier: {
+                    acc_modules: {
+                        megabyte: {
+                            count: function (body, callback) {
+                                return callback(null, amount);
+                            }
+                        }
                     }
                 }
             }
-            mocker(implementations, function(server, spies) {
+            mocker(implementations, function (server, spies) {
                 assert.equal(spies.req.on.callCount, 2);
                 assert.equal(spies.req.on.getCall(0).args[0], 'data');
                 assert.equal(spies.req.on.getCall(1).args[0], 'end');
@@ -1726,6 +1617,7 @@ describe('Testing Server', function() {
                 assert.equal(spies.db.checkRequest.callCount, 1);
                 assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
                 assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
+                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
                 assert.equal(spies.db.getAccountingInfo.callCount, 1);
                 assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
                 assert.equal(spies.contextBroker.getOperation.callCount, 1);
@@ -1744,8 +1636,6 @@ describe('Testing Server', function() {
                 assert.equal(spies.res.setHeader.callCount, 1);
                 assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
                 assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
-                assert.equal(spies.acc_modules.count.callCount, 1);
-                assert.deepEqual(spies.acc_modules.count.getCall(0).args[0], {});
                 assert.equal(spies.db.makeAccounting.callCount, 1);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[0], apiKey);
                 assert.equal(spies.db.makeAccounting.getCall(0).args[1], amount);

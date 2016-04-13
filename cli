@@ -2,14 +2,15 @@
 
 var cli = require('commander'),
     config = require('./config'),
-    async = require('async');
+    async = require('async'),
+    logger = require('./log');
 
 var db = require(config.database.type);
 var admin_paths = config.api.administration_paths;
 
 db.init(function(err) {
     if (err) {
-        console.log(err);
+        logger.error(err);
     }
 });
 
@@ -40,27 +41,27 @@ cli
     .action(function(publicPath, url, appId) {
         administrationPath(publicPath, function(adminPath) {
             if (adminPath) {
-                console.log('[ERROR] Error, ' + publicPath + ' is a reserved path.')
+                logger.error(publicPath + ' is a reserved path.')
             } else {
                 if (/\/((\w+)\/?)+$/.test(publicPath)) {
                     if (/^(http|https):\/\/[^ "]+$/.test(url)) {
                         if (appId !== undefined) {
                             db.newService(publicPath, url, appId, function(err) {
                                 if (err) {
-                                    console.log(err);
+                                    logger.error(err);
                                 } else {
-                                    console.log('[LOG] Service successfully added.');
+                                    logger.info('Service successfully added.');
                                 }
                             });
                         } else {
-                            console.log('[ERROR] Undefined appId');
+                            logger.error('Undefined appId');
                         }
                     } else {
-                        console.log('[ERROR] Invalid url. Format: "http|https://host:port/path"');
+                        logger.error('Invalid url. Format: "http|https://host:port/path"');
                     }
                 }
                 else {
-                    console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+                    logger.error('Invalid public path. Format: "/publicPath"');
                 }
             }
         });
@@ -75,14 +76,16 @@ cli
     .action(function(publicPath) {
         if (/\/((\w+)\/?)+$/.test(publicPath)){
             db.getService(publicPath, function(err, service) {
-                if(err || service === null) {
+                if(err) {
+                    console.log(err);
+                } else if (service === null) {
                     console.log('No service avaliable for path: ' + publicPath);
                 } else {
                     console.log('URL: ' + service.url + ' APP-ID: ' + service.appId);
                 }
             });
         } else {
-            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+            logger.error('Invalid public path. Format: "/publicPath"');
         } 
     });
 
@@ -95,9 +98,9 @@ cli
     .action(function() {
         db.getAllServices(function(err, services) {
             if (err) {
-                console.log(err);
+                logger.error(err);
             } else if (services.length === 0) {
-                console.log('[LOG] No service registered. Use: "addService "publicPath" "URL" to register a new service.')
+                console.log('No service registered. Use: "addService "publicPath" "URL" to register a new service.')
             } else {
                 for (var i = 0; i < services.length; i++) {
                     console.log('PUBLIC PATH: ' + services[i].publicPath + ' URL: ' + services[i].url + ' APP-ID: ' + services[i].appId);
@@ -117,13 +120,13 @@ cli
         if (/\/((\w+)\/?)+$/.test(path)) {
             db.deleteService(path, function(err) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else {
-                    console.log('[LOG] Service ' + path + ' deleted.')
+                    logger.info('Service ' + path + ' deleted.')
                 }
             });
         } else {
-            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+            logger.error('Invalid public path. Format: "/publicPath"');
         }
     });
 
@@ -135,13 +138,13 @@ cli
     .description('Add a new administrator.')
     .action(function(admin) {
         if (admin === undefined) {
-            console.log('[Error] Usage: addAdmin "admin"');
+            logger.error('Usage: addAdmin "admin"');
         } else {
             db.addAdmin(admin, function(err) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else {
-                    console.log('[LOG] Added admin: ' + admin);
+                    logger.info('Added admin: ' + admin);
                 }
             });
         }
@@ -155,13 +158,13 @@ cli
     .description('Delete the specified admin.')
     .action(function(admin) {
         if (admin == undefined) {
-            console.log('[Error] Usage: deleteAdmin "admin"');
+            logger.error('Usage: deleteAdmin "admin"');
         } else {
             db.deleteAdmin(admin, function(err) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else {
-                    console.log('[LOG] Deleted admin: ' + admin);
+                    logger.info('Deleted admin: ' + admin);
                 }
             });
         }
@@ -175,17 +178,17 @@ cli
     .description('Add a new administrator for the service specified by the public path.')
     .action(function(admin, publicPath) {
         if (admin === undefined) {
-            console.log('[Error] Usage: addAdmin "admin" "publicPath"');
+            logger.error('Usage: addAdmin "admin" "publicPath"');
         } else if (/\/((\w+)\/?)+$/.test(publicPath)) {
             db.bindAdmin(admin, publicPath, function(err) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else {
-                    console.log('[LOG] Admin ' + admin + ' added to service ' + publicPath);
+                    logger.info('Admin ' + admin + ' added to service ' + publicPath);
                 }
             });
         } else {
-            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+            logger.error('Invalid public path. Format: "/publicPath"');
         }
     });
 
@@ -197,17 +200,17 @@ cli
     .description('Delete the specified administrator for the specified service by its public path.')
     .action(function(admin, publicPath) {
         if (admin === undefined) {
-            console.log('[Error] Usage: addAdmin "admin" "publicPath"');
+            logger.error('Usage: addAdmin "admin" "publicPath"');
         } else if (/\/((\w+)\/?)+$/.test(publicPath)) {
             db.unbindAdmin(admin, publicPath, function(err) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else {
-                    console.log('[LOG] Administrator ' + admin + ' delete from service ' + publicPath);
+                    logger.info('Administrator ' + admin + ' delete from service ' + publicPath);
                 }
             });
         } else { 
-            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+            logger.error('Invalid public path. Format: "/publicPath"');
         }
     });
 
@@ -221,9 +224,9 @@ cli
         if (/\/((\w+)\/?)+$/.test(publicPath)) {
             db.getAdmins(publicPath, function(err, admins) {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                 } else if (admins.length === 0) {
-                    console.log('[LOG] No administrators available for the service ' + publicPath);
+                    logger.info('No administrators available for the service ' + publicPath);
                 } else {
                     console.log('SERVICE: ' + publicPath + ' ADMINISTRATORS:');
                     for (var i = 0; i < admins.length; i++) {
@@ -232,7 +235,7 @@ cli
                 }
             });
         } else { 
-            console.log('[ERROR] Invalid public path. Format: "/publicPath"');
+            logger.error('Invalid public path. Format: "/publicPath"');
         }
     });
 

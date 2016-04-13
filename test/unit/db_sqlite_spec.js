@@ -4,60 +4,63 @@ var proxyquire = require('proxyquire'),
     async = require('async');
 
 /**
- * Return an object database with the mocked dependencies and object with the neecessary spies specified in implementations. 
- * 
+ * Return an object database with the mocked dependencies and object with the neecessary spies specified in implementations.
+ *
  * @param  {Object}   implementations Dependencies to mock and spy.
  */
-var mocker = function(implementations, callback) {
+var mocker = function (implementations, callback) {
     var db_mock, spies = {};
 
     db_mock = {
-        serialize: function(callback) {
+        serialize: function (callback) {
             return callback();
         },
         run: implementations.run,
         all: implementations.all,
         get: implementations.get,
         beginTransaction: implementations.beginTransaction
-    }
+    };
 
     var sqlite_stub = {
-        verbose: function() {
+        verbose: function () {
             return this;
         },
-        Database: function(name, options) {}
-    }
+        Database: function (name, options) {}
+    };
     var transaction_stub = {
-        TransactionDatabase: function(batabase) {
+        TransactionDatabase: function (batabase) {
             return db_mock;
         }
-    }
+    };
 
     // Create necessary spies
-    async.forEachOf(implementations, function(implementation, method, task_callback) {
+    async.forEachOf(implementations, function (implementation, method, task_callback) {
         spies[method.toString()] = sinon.spy(db_mock, method.toString());
         task_callback();
-    }, function() {
+    }, function () {
         var db = proxyquire('../../db', {
-            'sqlite3': sqlite_stub,
+            sqlite3: sqlite_stub,
             'sqlite3-transactions': transaction_stub
         });
         return callback(db, spies);
     });
-}
+};
 
-describe('Testing SQLITE database', function() {
+describe('Testing SQLITE database', function () {
 
-    describe('Function "init"', function() {
+    describe('Function "init"', function () {
         var sentences = [
             'PRAGMA encoding = "UTF-8";',
             'PRAGMA foreign_keys = 1;',
             'CREATE TABLE IF NOT EXISTS token ( \
                     token               TEXT         )',
+            'CREATE TABLE IF NOT EXISTS units ( \
+                    unit                TEXT, \
+                    href                TEXT         )',
             'CREATE TABLE IF NOT EXISTS services ( \
-                    publicPath      TEXT, \
-                    url             TEXT, \
-                    appId           TEXT, \
+                    publicPath          TEXT, \
+                    url                 TEXT, \
+                    appId               TEXT, \
                     PRIMARY KEY (publicPath)         )',
             'CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
@@ -88,18 +91,18 @@ describe('Testing SQLITE database', function() {
                     FOREIGN KEY (idAdmin) REFERENCES admins (idAdmin) ON DELETE CASCADE        )'
         ];
 
-        it('correct initialization', function(done) {
+        it('correct initialization', function (done) {
             var implementations = {
-                run: function(create) {}
-            }
-            mocker(implementations, function(db, spies) {
-                db.init(function(err) {
+                run: function (create) {}
+            };
+            mocker(implementations, function (db, spies) {
+                db.init(function (err) {
                     assert.equal(err, null);
-                    assert.equal(spies.run.callCount, 8);
-                    async.forEachOf(spies.run.args, function(call, i, task_callback) {
+                    assert.equal(spies.run.callCount, 9);
+                    async.forEachOf(spies.run.args, function (call, i, task_callback) {
                         assert.equal(call[0], sentences[i]);
                         task_callback();
-                    }, function() {
+                    }, function () {
                         done();
                     });
                 });
@@ -107,19 +110,19 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "addToken"', function() {
+    describe('Function "addToken"', function () {
         var sentences = ['DELETE FROM token', 'INSERT OR REPLACE INTO token                 VALUES ($token)'];
         var token = 'token';
         var params = {'$token': 'token'};
 
-        it('error deleting the previous token', function(done) {
+        it('error deleting the previous token', function (done) {
             var implementations = {
-                run: function(sentence, callback) {
+                run: function (sentence, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addToken(token, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addToken(token, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentences[0]);
@@ -128,18 +131,18 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('error inserting the new token', function(done) {
+        it('error inserting the new token', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     if (sentence === sentences[0]) {
                         return params(null);
                     } else {
                         return callback('Error');
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addToken(token, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addToken(token, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 2);
                     assert.equal(spies.run.getCall(0).args[0], sentences[0]);
@@ -150,18 +153,18 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('token added', function(done) {
+        it('token added', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     if (sentence === sentences[0]) {
                         return params(null);
                     } else {
                         return callback(null);
                     }
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addToken(token, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addToken(token, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 2);
                     assert.equal(spies.run.getCall(0).args[0], sentences[0]);
@@ -173,19 +176,20 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getToken"', function() {
+    describe('Function "getToken"', function () {
         var sentence = 'SELECT *             FROM token';
         var token = 'token';
 
-        it('error getting the token', function(done) {
+        it('error getting the token', function (done) {
             var implementations = {
-                get: function(sentence, callback) {
-                    return callback('Error');
+                get: function (sentence, callback) {
+                    return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getToken(function(err, token) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
                     assert.equal(err, 'Error');
+                    assert.equal(token, null);
                     assert.equal(spies.get.callCount, 1);
                     assert.equal(spies.get.getCall(0).args[0], sentence);
                     done();
@@ -193,14 +197,31 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('no available token', function (done) {
             var implementations = {
-                get: function(sentence, callback) {
+                get: function (sentence, callback) {
+                    return callback(null, undefined);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
+                    assert.equal(err, null);
+                    assert.equal(token, undefined);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
+                    done();
+                });
+            });
+        });
+
+        it('correct', function (done) {
+            var implementations = {
+                get: function (sentence, callback) {
                     return callback(null, {token: token});
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getToken(function(err, token) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getToken(function (err, token) {
                     assert.equal(err, null);
                     assert.equal(token, token);
                     assert.equal(spies.get.callCount, 1);
@@ -211,7 +232,109 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "newService"', function() {
+    describe('Function "addSpecificationRef"', function() {
+        var sentence = 'INSERT INTO units             VALUES ($unit, $href)';
+        var unit = 'megabyte';
+        var href = 'http://example:999/api';
+        var params = { '$unit': unit, '$href': href};
+
+        it('error adding the specification reference', function (done) {
+            var implementations = {
+                run: function (sentence, params, callback) {
+                    return callback('Error');
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.addSpecificationRef(unit, href, function (err) {
+                    assert.equal(err, 'Error');
+                    assert.equal(spies.run.callCount, 1);
+                    assert.equal(spies.run.getCall(0).args[0], sentence);
+                    assert.deepEqual(spies.run.getCall(0).args[1], params);
+                    done();
+                });
+            });
+        });
+
+        it('correct', function (done) {
+            var implementations = {
+                run: function (sentence, params, callback) {
+                    return callback(null);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.addSpecificationRef(unit, href, function (err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.run.callCount, 1);
+                    assert.equal(spies.run.getCall(0).args[0], sentence);
+                    assert.deepEqual(spies.run.getCall(0).args[1], params);
+                    done();
+                });
+            });
+        });
+    });
+
+    describe('Function "GEThREF"', function () {
+        var sentence = 'SELECT href             FROM units             WHERE $unit=unit';
+        var unit = 'megabyte';
+        var href = {href: 'http://example:999/api'};
+        var params = {'$unit': unit};
+
+        it('error getting the href', function (done) {
+            var implementations = {
+                get: function (sentence, params, callback) {
+                    return callback('Error', null);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getHref(unit, function (err, res) {
+                    assert.equal(err, 'Error getting the href for unit ' + unit);
+                    assert.equal(res, null);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
+                    assert.deepEqual(spies.get.getCall(0).args[1], params);
+                    done();
+                });
+            });
+        });
+
+        it('undefined href', function (done) {
+            var implementations = {
+                get: function (sentence, params, callback) {
+                    return callback(null, undefined);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getHref(unit, function (err, res) {
+                    assert.equal(err, null);
+                    assert.equal(res, null);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
+                    assert.deepEqual(spies.get.getCall(0).args[1], params);
+                    done();
+                });
+            });
+        });
+
+        it('correct', function (done) {
+            var implementations = {
+                get: function (sentence, params, callback) {
+                    return callback(null, href);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.getHref(unit, function (err, res) {
+                    assert.equal(err, null);
+                    assert.equal(res, href.href);
+                    assert.equal(spies.get.callCount, 1);
+                    assert.equal(spies.get.getCall(0).args[0], sentence);
+                    assert.deepEqual(spies.get.getCall(0).args[1], params);
+                    done();
+                });
+            });
+        });
+    });
+
+    describe('Function "newService"', function () {
         var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId)';
         var publicPath = '/public';
         var url = 'http://example.com/private';
@@ -221,14 +344,14 @@ describe('Testing SQLITE database', function() {
             '$url': url,
             '$appId': appId
         }
-        it('error adding the new service', function(done) {
+        it('error adding the new service', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newService(publicPath, url, appId, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newService(publicPath, url, appId, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -238,14 +361,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('service added', function(done) {
+        it('service added', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newService(publicPath, url, appId, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newService(publicPath, url, appId, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -256,21 +379,21 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "deleteService"', function() {
+    describe('Function "deleteService"', function () {
         var sentence = 'DELETE FROM services             WHERE publicPath=$path';
         var publicPath = '/public';
         var params = {
             '$path': publicPath
         }
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteService(publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteService(publicPath, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -280,14 +403,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteService(publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteService(publicPath, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -298,7 +421,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getService"', function() {
+    describe('Function "getService"', function () {
         var sentence = 'SELECT url, appId \
             FROM services \
             WHERE publicPath=$path';
@@ -307,14 +430,14 @@ describe('Testing SQLITE database', function() {
         var appId = 'appId';
         var params = {'$path': publicPath};
 
-        it('error getting the service', function(done) {
+        it('error getting the service', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getService(publicPath, function(err, service) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getService(publicPath, function (err, service) {
                     assert.equal(err, 'Error');
                     assert.equal(service,  null);
                     assert.equal(spies.all.callCount, 1);
@@ -325,14 +448,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no service available', function(done) {
+        it('no service available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getService(publicPath, function(err, service) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getService(publicPath, function (err, service) {
                     assert.equal(err, null);
                     assert.equal(service,  null);
                     assert.equal(spies.all.callCount, 1);
@@ -343,14 +466,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [{url: url, appId: appId}]);
                 }
             }
-            mocker(implementations, function(db, spies) {
-                db.getService(publicPath, function(err, service) {
+            mocker(implementations, function (db, spies) {
+                db.getService(publicPath, function (err, service) {
                     assert.equal(err, null);
                     assert.deepEqual(service, {url: url, appId: appId});
                     assert.equal(spies.all.callCount, 1);
@@ -362,7 +485,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getAllServices"', function() {
+    describe('Function "getAllServices"', function () {
         var sentence = 'SELECT *             FROM services';
         var services = [
             {
@@ -377,14 +500,14 @@ describe('Testing SQLITE database', function() {
             }
         ]
 
-        it('error getting all services', function(done) {
+        it('error getting all services', function (done) {
             var implementations = {
-                all: function(sentence, callback) {
+                all: function (sentence, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAllServices(function(err, services) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAllServices(function (err, services) {
                     assert.equal(err, 'Error');
                     assert.equal(services, null);
                     assert.equal(spies.all.callCount, 1);
@@ -394,14 +517,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct (get two services)', function(done) {
+        it('correct (get two services)', function (done) {
             var implementations = {
-                all: function(sentence, callback) {
+                all: function (sentence, callback) {
                     return callback(null, services);
                 }
             }
-            mocker(implementations, function(db, spies) {
-                db.getAllServices(function(err, result) {
+            mocker(implementations, function (db, spies) {
+                db.getAllServices(function (err, result) {
                     assert.equal(err, null);
                     assert.deepEqual(result, services);
                     assert.equal(spies.all.callCount, 1);
@@ -412,20 +535,20 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getAppId"', function() {
+    describe('Function "getAppId"', function () {
         var sentence = 'SELECT appId             FROM services             WHERE $publicPath=publicPath';
         var publicPath = '/public';
         var appId = 'appId';
         var params = { '$publicPath': publicPath};
 
-        it('error getting the appId', function(done) {
+        it('error getting the appId', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAppId(publicPath, function(err, appId) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAppId(publicPath, function (err, appId) {
                     assert.equal(err, 'Error');
                     assert.equal(appId, null);
                     assert.equal(spies.all.callCount, 1);
@@ -436,14 +559,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no appId available', function(done) {
+        it('no appId available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAppId(publicPath, function(err, appId) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAppId(publicPath, function (err, appId) {
                     assert.equal(err, null);
                     assert.equal(appId, null);
                     assert.equal(spies.all.callCount, 1);
@@ -454,14 +577,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct, return the appId', function(done) {
+        it('correct, return the appId', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, appId);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAppId(publicPath, function(err, appId) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAppId(publicPath, function (err, appId) {
                     assert.equal(err, null);
                     assert.equal(appId, appId);
                     assert.equal(spies.all.callCount, 1);
@@ -473,19 +596,19 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "addAdmin"', function() {
+    describe('Function "addAdmin"', function () {
         var sentence = 'INSERT OR REPLACE INTO admins             VALUES ($idAdmin)';
         var idAdmin = 'admin';
         var params = {'$idAdmin': idAdmin};
 
-        it('error adding the new administrator', function(done) {
+        it('error adding the new administrator', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
             }
-            mocker(implementations, function(db, spies) {
-                db.addAdmin(idAdmin, function(err) {
+            mocker(implementations, function (db, spies) {
+                db.addAdmin(idAdmin, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -495,14 +618,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct, added new admin', function(done) {
+        it('correct, added new admin', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addAdmin(idAdmin, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -513,19 +636,19 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "deleteAdmin"', function() {
+    describe('Function "deleteAdmin"', function () {
         var sentence = 'DELETE FROM admins             WHERE $idAdmin=idAdmin';
         var idAdmin = 'idAdmin';
         var params = {'$idAdmin': idAdmin};
 
-        it('error deleting the administrator', function(done) {
+        it('error deleting the administrator', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -535,14 +658,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct, deleted administrator', function(done) {
+        it('correct, deleted administrator', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteAdmin(idAdmin, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteAdmin(idAdmin, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -553,7 +676,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "bindAdmin"', function() {
+    describe('Function "bindAdmin"', function () {
         var sentence = 'INSERT OR REPLACE INTO administer             VALUES ($idAdmin, $publicPath)';
         var idAdmin = 'idAdmin';
         var publicPath = 'publicPath';
@@ -562,14 +685,14 @@ describe('Testing SQLITE database', function() {
             '$publicPath': publicPath
         };
 
-        it('error binding the admin with the service', function(done) {
+        it('error binding the admin with the service', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -579,14 +702,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct binding', function(done) {
+        it('correct binding', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -597,7 +720,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "unbindAdmin"', function() {
+    describe('Function "unbindAdmin"', function () {
         var sentence = 'DELETE FROM administer             WHERE idAdmin=$idAdmin AND publicPath=$publicPath';
         var idAdmin = 'idAdmin';
         var publicPath = '/public';
@@ -606,14 +729,14 @@ describe('Testing SQLITE database', function() {
             '$publicPath': publicPath
         };
 
-        it('error unbinding the admin', function(done) {
+        it('error unbinding the admin', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.unbindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -623,14 +746,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct unbinding', function(done) {
+        it('correct unbinding', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.unbindAdmin(idAdmin, publicPath, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -641,7 +764,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getAdmins"', function() {
+    describe('Function "getAdmins"', function () {
         var sentence = 'SELECT idAdmin             FROM administer             WHERE $publicPath=publicPath';
         var publicPath = '/public';
         var params = {'$publicPath': publicPath};
@@ -654,14 +777,14 @@ describe('Testing SQLITE database', function() {
             }
         ];
 
-        it('error getting admins', function(done) {
+        it('error getting admins', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null)
                 }
-            }
-            mocker(implementations, function(db, spies){
-                db.getAdmins(publicPath, function(err, admins) {
+            };
+            mocker(implementations, function (db, spies){
+                db.getAdmins(publicPath, function (err, admins) {
                     assert.equal(err, 'Error');
                     assert.equal(admins, admins);
                     assert.equal(spies.all.callCount, 1);
@@ -672,14 +795,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no admins available', function(done) {
+        it('no admins available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, null)
                 }
-            }
-            mocker(implementations, function(db, spies){
-                db.getAdmins(publicPath, function(err, result) {
+            };
+            mocker(implementations, function (db, spies){
+                db.getAdmins(publicPath, function (err, result) {
                     assert.equal(err, null);
                     assert.deepEqual(result, null);
                     assert.equal(spies.all.callCount, 1);
@@ -690,14 +813,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct, return admins', function(done) {
+        it('correct, return admins', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, admins)
                 }
-            }
-            mocker(implementations, function(db, spies){
-                db.getAdmins(publicPath, function(err, result) {
+            };
+            mocker(implementations, function (db, spies){
+                db.getAdmins(publicPath, function (err, result) {
                     assert.equal(err, null);
                     assert.deepEqual(result, admins);
                     assert.equal(spies.all.callCount, 1);
@@ -709,7 +832,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getAdminUrl"', function() {
+    describe('Function "getAdminUrl"', function () {
         var sentence = 'SELECT services.url \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
@@ -722,14 +845,14 @@ describe('Testing SQLITE database', function() {
             '$publicPath': publicPath
         };
 
-        it('error getting the admin url', function(done) {
+        it('error getting the admin url', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, url) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, url) {
                     assert.equal(err, 'Error');
                     assert.equal(url, null);
                     assert.equal(spies.all.callCount, 1);
@@ -740,14 +863,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('admin not valid for the service (should return null)', function(done) {
+        it('admin not valid for the service (should return null)', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, url) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, url) {
                     assert.equal(err, null);
                     assert.equal(url, null);
                     assert.equal(spies.all.callCount, 1);
@@ -758,14 +881,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct, return the url of the service', function(done) {
+        it('correct, return the url of the service', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [{url: url}]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function(err, result) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAdminUrl(idAdmin, publicPath, function (err, result) {
                     assert.equal(err, null);
                     assert.equal(result, url);
                     assert.equal(spies.all.callCount, 1);
@@ -777,20 +900,20 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "checkPath"', function() {
+    describe('Function "checkPath"', function () {
         var sentence = 'SELECT * \
             FROM services \
             WHERE publicPath=$publicPath';
         var params = {'$publicPath': '/path'}
 
-        it('error checking the url', function(done) {
+        it('error checking the url', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath('/path', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath('/path', function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check,  false);
                     assert.equal(spies.all.callCount, 1);
@@ -801,14 +924,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no services available', function(done) {
+        it('no services available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath('/path', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath('/path', function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check,  false);
                     assert.equal(spies.all.callCount, 1);
@@ -819,14 +942,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [{url: 'url'}]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkPath('/path', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkPath('/path', function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check,  true);
                     assert.equal(spies.all.callCount, 1);
@@ -838,7 +961,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "newBuy"', function() {
+    describe('Function "newBuy"', function () {
         var sentence = 'INSERT OR REPLACE INTO accounting \
                 VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)';
         var buyInformation = {
@@ -861,14 +984,14 @@ describe('Testing SQLITE database', function() {
             "$unit": "call",
             "$value": 0
         }
-        it('error adding the new buy information', function(done) {
+        it('error adding the new buy information', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newBuy(buyInformation, function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newBuy(buyInformation, function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -878,14 +1001,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('new buy information added', function(done) {
+        it('new buy information added', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.newBuy(buyInformation, function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.newBuy(buyInformation, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -896,20 +1019,20 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getApiKeys"', function() {
+    describe('Function "getApiKeys"', function () {
         var sentence = 'SELECT apiKey, productId, orderId \
             FROM accounting \
             WHERE customer=$user';
         var params = {'$user': '0001'};
 
-        it('error getting the api-keys', function(done) {
+        it('error getting the api-keys', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, 'Error');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.all.callCount, 1);
@@ -920,14 +1043,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no api-keys available', function(done) {
+        it('no api-keys available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, null);
                     assert.equal(apiKeys, null);
                     assert.equal(spies.all.callCount, 1);
@@ -938,14 +1061,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, ['apiKey1', 'apiKey2']);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getApiKeys('0001', function(err, apiKeys) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getApiKeys('0001', function (err, apiKeys) {
                     assert.equal(err, null);
                     assert.deepEqual(apiKeys, ['apiKey1', 'apiKey2']);
                     assert.equal(spies.all.callCount, 1);
@@ -957,20 +1080,22 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "checkRequest"', function() {
+    describe('Function "checkRequest"', function () {
         var sentence = 'SELECT customer \
             FROM accounting \
-            WHERE apiKey=$apiKey';
-        var params = {'$apiKey': 'apiKey1'}
+            WHERE apiKey=$apiKey AND publicPath=$publicPath';
+        var publicPath = 'http://localhost/path';
+        var apiKey = 'apiKey1';
+        var params = {'$apiKey': apiKey, '$publicPath': publicPath}
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, 'Error');
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -981,14 +1106,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no information available', function(done) {
+        it('no information available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -999,14 +1124,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('customer not associated with api-key', function(done) {
+        it('customer not associated with api-key', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [{cutomer: '0007'}]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
@@ -1017,14 +1142,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct (customer associated with api-key', function(done) {
+        it('correct (customer associated with api-key', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [{customer: '0001'}]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.checkRequest('0001', 'apiKey1', function(err, check) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.checkRequest('0001', apiKey, publicPath, function (err, check) {
                     assert.equal(err, null);
                     assert.equal(check, true);
                     assert.equal(spies.all.callCount, 1);
@@ -1036,20 +1161,20 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getAccountingInfo"', function() {
+    describe('Function "getAccountingInfo"', function () {
         var sentence = 'SELECT accounting.unit, services.url \
             FROM accounting , services \
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey';
         var params = { '$apiKey': 'apiKey'};
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                all: function(sentences, params, callback) {
+                all: function (sentences, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo('apiKey', function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo('apiKey', function (err, accInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(accInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1060,14 +1185,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no accounting info available', function(done) {
+        it('no accounting info available', function (done) {
             var implementations = {
-                all: function(sentences, params, callback) {
+                all: function (sentences, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo('apiKey', function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo('apiKey', function (err, accInfo) {
                     assert.equal(err, null);
                     assert.equal(accInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1078,19 +1203,19 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var accInfo = {
                 unit: 'call', 
                 url: 'url', 
                 publicPath: '/public'
             }
             var implementations = {
-                all: function(sentences, params, callback) {
+                all: function (sentences, params, callback) {
                     return callback(null, accInfo);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getAccountingInfo('apiKey', function(err, accInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getAccountingInfo('apiKey', function (err, accInfo) {
                     assert.equal(err, null);
                     assert.equal(accInfo, accInfo);
                     assert.equal(spies.all.callCount, 1);
@@ -1102,19 +1227,19 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getNotificationInfo"', function() {
+    describe('Function "getNotificationInfo"', function () {
         var sentence = 'SELECT apiKey, orderId, productId, customer, value, correlationNumber, recordType, unit \
             FROM accounting \
             WHERE value!=0';
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                all: function(sentence, callback) {
+                all: function (sentence, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1124,14 +1249,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no info available', function(done) {
+        it('no info available', function (done) {
             var implementations = {
-                all: function(sentence, callback) {
+                all: function (sentence, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, null);
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1141,7 +1266,7 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var notifInfo = {
                 apiKey: 'apiKey',
                 orderId: 'orderId',
@@ -1153,12 +1278,12 @@ describe('Testing SQLITE database', function() {
                 unit: 'call'
             }
             var implementations = {
-                all: function(sentence, callback) {
+                all: function (sentence, callback) {
                     return callback(null, notifInfo);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getNotificationInfo(function(err, notificationInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getNotificationInfo(function (err, notificationInfo) {
                     assert.equal(err, null);
                     assert.equal(notificationInfo, notifInfo);
                     assert.equal(spies.all.callCount, 1);
@@ -1169,32 +1294,32 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "makeAccounting"', function() {
+    describe('Function "makeAccounting"', function () {
         var sentence = 'UPDATE accounting \
                     SET value=value+$amount \
                     WHERE apiKey=$apiKey';
         var params = {
             '$apiKey': 'apiKey',
             '$amount': '1.5'
-        }
+        };
 
-        it('amount less than 0', function(done) {
-            mocker({}, function(db, spies) {
-                db.makeAccounting('apiKey', - 1.3, function(err) {
+        it('amount less than 0', function (done) {
+            mocker({}, function (db, spies) {
+                db.makeAccounting('apiKey', - 1.3, function (err) {
                     assert.equal(err, '[ERROR] The aomunt must be greater than 0');
                     done();
                 });
             });
         });
 
-        it('error in begin transaction', function(done) {
+        it('error in begin transaction', function (done) {
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.3, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.3, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     done(); 
@@ -1202,22 +1327,22 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 },
-                rollback: function() {}
-            }
+                rollback: function () {}
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var rollbackSpy = sinon.spy(transaction, 'rollback');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.5, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.5, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1229,24 +1354,24 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('commit error', function(done) {
+        it('commit error', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 },
-                commit: function(callback) {
+                commit: function (callback) {
                     return callback('Error');
                 }
-            }
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var commitSpy = sinon.spy(transaction, 'commit');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.5, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.5, function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1258,24 +1383,24 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 },
-                commit: function(callback) {
+                commit: function (callback) {
                     return callback(null);
                 }
-            }
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var commitSpy = sinon.spy(transaction, 'commit');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.makeAccounting('apiKey', 1.5, function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.makeAccounting('apiKey', 1.5, function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1288,22 +1413,22 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "resetAccounting"', function() {
+    describe('Function "resetAccounting"', function () {
         var sentence = 'UPDATE accounting \
                 SET value=0, correlationNumber=correlationNumber+1 \
                 WHERE apiKey=$apiKey';
         var params = {
             '$apiKey': 'apiKey'
-        }
+        };
 
-        it('error begin transaction', function(done) {
+        it('error begin transaction', function (done) {
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     done(); 
@@ -1311,22 +1436,22 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 },
-                rollback: function() {}
-            }
+                rollback: function () {}
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var rollbackSpy = sinon.spy(transaction, 'rollback');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1338,24 +1463,24 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('commit error', function(done) {
+        it('commit error', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 },
-                commit: function(callback) {
+                commit: function (callback) {
                     return callback('Error');
                 }
-            }
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var commitSpy = sinon.spy(transaction, 'commit');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1367,24 +1492,24 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var transaction = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 },
-                commit: function(callback) {
+                commit: function (callback) {
                     return callback(null);
                 }
-            }
+            };
             var runSpy = sinon.spy(transaction, 'run');
             var commitSpy = sinon.spy(transaction, 'commit');
             var implementations = {
-                beginTransaction: function(callback) {
+                beginTransaction: function (callback) {
                     return callback(null, transaction);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.resetAccounting('apiKey', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.resetAccounting('apiKey', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
@@ -1397,23 +1522,23 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "addCBSubscription"', function() {
+    describe('Function "addCBSubscription"', function () {
         var sentence = 'INSERT OR REPLACE INTO subscriptions \
                 VALUES ($subscriptionId, $apiKey, $notificationUrl)';
         var params = {
             '$subscriptionId': 'subscriptionId',
             '$apiKey': 'apiKey',
             '$notificationUrl': 'http://notification/url'
-        }
+        };
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                run: function(sentences, params, callback) {
+                run: function (sentences, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addCBSubscription('apiKey', 'subscriptionId', 'http://notification/url', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addCBSubscription('apiKey', 'subscriptionId', 'http://notification/url', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -1423,14 +1548,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                run: function(sentences, params, callback) {
+                run: function (sentences, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.addCBSubscription('apiKey', 'subscriptionId', 'http://notification/url', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.addCBSubscription('apiKey', 'subscriptionId', 'http://notification/url', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -1441,7 +1566,7 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "getCBSubscription"', function() {
+    describe('Function "getCBSubscription"', function () {
         var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId';
@@ -1449,14 +1574,14 @@ describe('Testing SQLITE database', function() {
             '$subscriptionId': 'subscriptionId'
         }
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback('Error', null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subscriptionId', function(err, subscriptionInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subscriptionId', function (err, subscriptionInfo) {
                     assert.equal(err, 'Error');
                     assert.equal(subscriptionInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1467,14 +1592,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('no subscription available', function(done) {
+        it('no subscription available', function (done) {
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, []);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subscriptionId', function(err, subscriptionInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subscriptionId', function (err, subscriptionInfo) {
                     assert.equal(err, null);
                     assert.equal(subscriptionInfo, null);
                     assert.equal(spies.all.callCount, 1);
@@ -1485,19 +1610,19 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var subsInfo = {
                 apiKey: 'apiKey',
                 notificationUrl: 'http://notification/url',
                 unit: 'call'
-            }
+            };
             var implementations = {
-                all: function(sentence, params, callback) {
+                all: function (sentence, params, callback) {
                     return callback(null, [subsInfo]);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.getCBSubscription('subscriptionId', function(err, subscriptionInfo) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.getCBSubscription('subscriptionId', function (err, subscriptionInfo) {
                     assert.equal(err, null);
                     assert.deepEqual(subscriptionInfo, subsInfo);
                     assert.equal(spies.all.callCount, 1);
@@ -1509,21 +1634,21 @@ describe('Testing SQLITE database', function() {
         });
     });
 
-    describe('Function "deleteCBSubscription"', function() {
+    describe('Function "deleteCBSubscription"', function () {
         var sentence = 'DELETE FROM subscriptions \
             WHERE subscriptionId=$subscriptionId';
         var params = {
             '$subscriptionId': 'subscriptionId'
-        }
+        };
 
-        it('query error', function(done) {
+        it('query error', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback('Error');
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteCBSubscription('subscriptionId', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteCBSubscription('subscriptionId', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
@@ -1533,14 +1658,14 @@ describe('Testing SQLITE database', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('correct', function (done) {
             var implementations = {
-                run: function(sentence, params, callback) {
+                run: function (sentence, params, callback) {
                     return callback(null);
                 }
-            }
-            mocker(implementations, function(db, spies) {
-                db.deleteCBSubscription('subscriptionId', function(err) {
+            };
+            mocker(implementations, function (db, spies) {
+                db.deleteCBSubscription('subscriptionId', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);

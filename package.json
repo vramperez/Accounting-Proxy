@@ -1,8 +1,8 @@
 {
   "name": "accounting-proxy",
-  "version": "0.2.0",
-  "description": "Accounting proxy for FI-ware GE services",
-  "main": "server.js",
+  "version": "1.0.0",
+  "description": "Accounting proxy for FIWARE GE services",
+  "main": "accounting-proxy.js",
   "author": "FI-WARE",
   "keywords": [
     "proxy",
@@ -11,14 +11,26 @@
     "wstore"
   ],
   "dependencies": {
-    "commander": "2.x.x",
-    "express": "4.x",
-    "node-schedule": "0.2.x",
-    "node-redis": "2.8.x"
+    "async": "1.5.2",
+    "body-parser": "1.15.0",
+    "commander": "2.9.0",
+    "express": "4.13.4",
+    "express-winston": "^1.3.0",
+    "joi": "7.3.0",
+    "mkdirp": "0.5.1",
+    "moment": "^2.12.0",
+    "node-schedule": "0.2.9",
+    "passport-fiware-oauth": "0.1.6",
+    "proxyquire": "1.7.4",
+    "redis": "2.4.2",
+    "request": "2.69.0",
+    "sqlite3-transactions": "0.0.5",
+    "supertest": "1.2.0",
+    "winston": "2.1.1"
   },
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/FIWARE-TMForum/Accounting-Proxy"
   },
   "contributors": [
     {
@@ -27,15 +39,19 @@
     },
     {
       "name": "Víctor Rampérez Martín",
-      "email": "vivctor.ramperez.martin@gmail.com"
+      "email": "victor.ramperez.martin@gmail.com"
     }
   ],
   "scripts": {
-    "test": "npm run unit && npm run integration",
+    "test": "npm run unit && npm run usageManagement && npm run accountingGeneric && npm run accountingCB && npm run administration",
     "unit": "istanbul cover _mocha test/unit",
-    "integration": "_mocha test/integration"
+    "usageManagement": "_mocha test/integration/usageManagementAPI_spec",
+    "accountingGeneric": "_mocha test/integration/accounting_spec",
+    "accountingCB": "_mocha test/integration/accounting_CB_spec",
+    "administration": "_mocha test/integration/administration_spec"
   },
   "devDependencies": {
+    "mock-redis-client": "^0.91.13",
     "supertest": "^1.1.0"
   }
 }

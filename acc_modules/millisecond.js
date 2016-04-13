@@ -1,8 +1,9 @@
-/** Accounting module for unit: CALL */
+/** Accounting module for unit: millisecond */
+var moment = require('moment');
 
 var specification = {
-    name: 'call',
-    description: 'Spec for call usage',
+    name: 'millisecond',
+    description: 'Spec for time usage',
     usageSpecCharacteristic: [{
         name: 'orderId',
         description: 'Order identifier',
@@ -43,7 +44,7 @@ var specification = {
         usageSpecCharacteristicValue: [{
             valueType: 'string',
             default: true,
-            value: 'call',
+            value: 'millisecond',
             valueFrom: '',
             valueTo: ''
         }]
@@ -62,7 +63,15 @@ var specification = {
 };
 
 var count = function (countInfo, callback) {
-    return callback(null, 1);
+    if (countInfo.request.time === undefined || countInfo.response.time === undefined) {
+        return callback(null, 0);
+    } else {
+        return callback(null, countInfo.response.time - countInfo.request.time);
+    }
+};
+
+var subscriptionCount = function (countInfo, callback) {
+    return callback(null, moment.duration(countInfo.request.duration).asMilliseconds());
 };
 
 var getSpecification = function (callback) {
@@ -71,3 +80,4 @@ var getSpecification = function (callback) {
 
 exports.count = count;
 exports.getSpecification = getSpecification;
+exports.subscriptionCount = subscriptionCount;

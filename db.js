@@ -11,8 +11,8 @@ var db = new TransactionDatabase (
 /*
 * Initialize the database and creates the necessary tables.
 */
-exports.init = function(callback) {
-    db.serialize(function() {
+exports.init = function (callback) {
+    db.serialize(function () {
         db.run('PRAGMA encoding = "UTF-8";');
         db.run('PRAGMA foreign_keys = 1;');
 
@@ -20,10 +20,15 @@ exports.init = function(callback) {
                     token               TEXT \
         )');
 
+        db.run('CREATE TABLE IF NOT EXISTS units ( \
+                    unit                TEXT, \
+                    href                TEXT \
+        )');
+
         db.run('CREATE TABLE IF NOT EXISTS services ( \
-                    publicPath      TEXT, \
-                    url             TEXT, \
-                    appId           TEXT, \
+                    publicPath          TEXT, \
+                    url                 TEXT, \
+                    appId               TEXT, \
                     PRIMARY KEY (publicPath) \
         )');
 
@@ -69,57 +74,102 @@ exports.init = function(callback) {
 /**
  * Save the token to notify the WStore.
  */
-exports.addToken = function(token, callback) {
-    db.run('DELETE FROM token', function(err) {
+exports.addToken = function (token, callback) {
+    db.run('DELETE FROM token', function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error adding the acces token "' + token + '" .');
         } else {
             db.run('INSERT OR REPLACE INTO token \
                 VALUES ($token)',
                 {
                     $token: token
-                }, function(err) {
+                }, function (err) {
                     if (err) {  
-                        return callback(err);
+                        return callback('Error adding the acces token "' + token + '" .');
                     } else {
                         return callback(null);
                     }
                 });
         }
     });
-}
+};
 
 /**
  * Return the token to notify the WStore.
  */
-exports.getToken = function(callback) {
+exports.getToken = function (callback) {
     db.get('SELECT * \
             FROM token', 
-        function(err, token) {
+        function (err, token) {
             if (err) {
-                return callback(err, null);
+                return callback('Error getting the access token.', null);
+            } else if (token === undefined) {
+                return callback(null, null);
             } else {
                 return callback(null, token.token);
             }
     });
-}
+};
+
+/**
+ * Bind the unit with the usage specification URL.
+ *
+ * @param {string}   unit     Accounting unit.
+ * @param {string}   href     Usage specification URL.
+ */
+exports.addSpecificationRef = function (unit, href, callback) {
+    db.run('INSERT INTO units \
+            VALUES ($unit, $href)', 
+            {
+                $unit: unit,
+                $href: href
+            }, function(err) {
+                if (err) {
+                    return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
+                } else {
+                    return callback(null);
+                }
+    });
+};
+
+/**
+ * Return the href binded to the specified. Otherwise return null.
+ *
+ * @param  {string}   unit     Accounting unit
+ */
+exports.getHref = function (unit, callback) {
+    db.get('SELECT href \
+            FROM units \
+            WHERE $unit=unit' ,
+            {
+                $unit: unit
+            }, function(err, href) {
+                if (err) {
+                    return callback('Error getting the href for unit "' + unit + '" .', null);
+                } else if (href === undefined) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, href.href);
+                }
+    });
+};
 
 /**
  * Map the publicPath with the endpoint url.
- * 
+ *
  * @param  {string} publicPath      Service public path.
  * @param  {string} url             Endpoint url.
  */
-exports.newService = function(publicPath, url, appId, callback) {
+exports.newService = function (publicPath, url, appId, callback) {
     db.run('INSERT OR REPLACE INTO services \
             VALUES ($path, $url, $appId)',
         {
             $path: publicPath,
             $url: url,
             $appId: appId
-        }, function(err) {
+        }, function (err) {
             if (err) {
-                return callback(err);
+                return callback('Error in database adding the new service.');
             } else {
                 return callback(null);
             }
@@ -128,17 +178,17 @@ exports.newService = function(publicPath, url, appId, callback) {
 
 /**
  * Delete the service.
- * 
+ *
  * @param  {string} publicPath      Service public path.
  */
-exports.deleteService = function(publicPath, callback) {
+exports.deleteService = function (publicPath, callback) {
     db.run('DELETE FROM services \
             WHERE publicPath=$path',
         {
             $path: publicPath
-        }, function(err) {
+        }, function (err) {
         if (err) {
-            return callback(err);
+            return callback('Error in database deleting the service.');
         } else {
             return callback(null);
         }
@@ -147,168 +197,168 @@ exports.deleteService = function(publicPath, callback) {
 
 /**
  * Return the service, the public path and the endpoint url associated with the path-
- * 
+ *
  * @param  {string} publicPath      Service public path.
  */
-exports.getService = function(publicPath, callback) {
+exports.getService = function (publicPath, callback) {
     db.all('SELECT url, appId \
             FROM services \
             WHERE publicPath=$path', {
                 $path: publicPath
-            }, function(err, service) {
+            }, function (err, service) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the service.', null);
                 } else if (service.length ===  0) {
                     return callback(null, null);
                 } else {
                     return callback(null, {url: service[0].url, appId: service[0].appId} );
                 }
     });
-}
+};
 
 /**
  * Return all the registered services.
  */
-exports.getAllServices = function(callback) {
+exports.getAllServices = function (callback) {
     db.all('SELECT * \
-            FROM services', function(err, services) {
+            FROM services', function (err, services) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the services.', null);
                 } else {
                     return callback(null, services);
                 }
     });
-}
+};
 
 /**
  * Return the appId associated with the specified service by its public path.
- * 
+ *
  * @param  {string}   publicPath Service public path.
  */
-exports.getAppId = function(publicPath, callback) {
+exports.getAppId = function (publicPath, callback) {
     db.all('SELECT appId \
             FROM services \
             WHERE $publicPath=publicPath',
             {
                 $publicPath: publicPath
-            }, function(err, appId) {
+            }, function (err, appId) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the appId.', null);
                 } else if (appId.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, appId[0].appId);
                 }
     });
-}
+};
 
 /**
  * Add a new administrator.
- * 
+ *
  * @param {string}   idAdmin      Administrator user name.
  */
-exports.addAdmin = function(idAdmin, callback) {
+exports.addAdmin = function (idAdmin, callback) {
     db.run('INSERT OR REPLACE INTO admins \
             VALUES ($idAdmin)',
             {
                 $idAdmin: idAdmin
-            }, function(err) {
+            }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database adding admin: "' + idAdmin + '" .');
                 } else {
                     return callback(null);
                 }
     });
-}
+};
 
 /**
  * Delete the specified administrator.
- * 
+ *
  * @param  {string}   idAdmin  Administrator identifier.
  */
-exports.deleteAdmin = function(idAdmin, callback) {
+exports.deleteAdmin = function (idAdmin, callback) {
     db.run('DELETE FROM admins \
             WHERE $idAdmin=idAdmin',
             {
                 $idAdmin: idAdmin
-            }, function(err) {
+            }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database removing admin: "' + idAdmin + '" .');
                 } else {
                     return callback(null);
                 }
     });
-}
+};
 
 /**
  * Bind the administrator to the service.
- * 
+ *
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Service public path.
  */
-exports.bindAdmin = function(idAdmin, publicPath, callback) {
+exports.bindAdmin = function (idAdmin, publicPath, callback) {
     db.run('INSERT OR REPLACE INTO administer \
             VALUES ($idAdmin, $publicPath)',
             {
                 $idAdmin: idAdmin,
                 $publicPath: publicPath
-            }, function(err) {
+            }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database binding the admin to the service.');
                 } else {
                     return callback(null);
                 }
     });
-}
+};
 
 /**
  * Unbind the specified admin for the specified service by its public path.
- * 
+ *
  * @param  {string}   admin      Administrator user name.
  * @param  {string}   publicPath Public path of the service.
  */
-exports.unbindAdmin = function(idAdmin, publicPath, callback) {
+exports.unbindAdmin = function (idAdmin, publicPath, callback) {
     db.run('DELETE FROM administer \
             WHERE idAdmin=$idAdmin AND publicPath=$publicPath',
             {
                 $idAdmin: idAdmin,
                 $publicPath: publicPath
-            }, function(err) {
+            }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error in database unbinding the administrator.');
                 } else {
                     return callback(null);
                 }
     });
-}
+};
 
 /**
  * Return all the administrators for the service specified by its public path.
- * 
+ *
  * @param  {string}   publicPath Public path of the service.
  */
-exports.getAdmins = function(publicPath, callback) {
+exports.getAdmins = function (publicPath, callback) {
     db.all('SELECT idAdmin \
             FROM administer \
             WHERE $publicPath=publicPath',
             {
                 $publicPath: publicPath
-            }, function(err, admins) {
+            }, function (err, admins) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the administrators.', null);
                 } else {
                     return callback(null, admins);
                 }
     });
-}
+};
 
 /**
  * Return the endpoint url if the user is an administrator of the service; otherwise return null.
- * 
+ *
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
  */
-exports.getAdminUrl = function(idAdmin, publicPath, callback) {
+exports.getAdminUrl = function (idAdmin, publicPath, callback) {
     db.all('SELECT services.url \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
@@ -316,45 +366,45 @@ exports.getAdminUrl = function(idAdmin, publicPath, callback) {
             {
                 $idAdmin: idAdmin,
                 $publicPath: publicPath
-            }, function(err, result) {
+            }, function (err, result) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the admin url.', null);
                 } else if (result.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, result[0].url);
                 }
     });
-}
+};
 
 /**
  * Check if the publicPath passed as argument is associated with a service (return true) or not (return false).
- * 
+ *
  * @param  {string} publicPath         Path to check.
  */
-exports.checkPath = function(publicPath, callback) {
+exports.checkPath = function (publicPath, callback) {
     db.all('SELECT * \
             FROM services \
             WHERE publicPath=$publicPath', {
                 $publicPath: publicPath
-            }, function(err, services) {
+            }, function (err, services) {
                 if (err) {
-                    return callback(err, false);
+                    return callback('Error checking the path.', false);
                 } else if (services.length === 0) {
                     return callback(null, false);
                 } else {
                     return callback(null, true);
                 }
     });
-}
+};
 
 /**
  * Add the new buy information to the database.
- * 
+ *
  * @param  {object} buyInformation      Information received from the WStore.  
  */
-exports.newBuy = function(buyInformation, callback) {
-    db.serialize(function() {
+exports.newBuy = function (buyInformation, callback) {
+    db.serialize(function () {
         db.run('INSERT OR REPLACE INTO accounting \
                 VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)',
                 {
@@ -367,53 +417,54 @@ exports.newBuy = function(buyInformation, callback) {
                     $value: 0,
                     $recordType: buyInformation.recordType,
                     $correlationNumber: 0
-                }, function(err) {
+                }, function (err) {
                     if (err) {
-                        return callback(err);
+                        return callback('Error in database adding the new buy.');
                     } else {
                         return callback(null);
                     }
         });
     });
-}
+};
 
 /**
  * Return the api-keys, productId and orderId associated with the user passed as argument.
- * 
+ *
  * @param  {string}   user     Customer identifier.
  */
-exports.getApiKeys = function(user, callback) {
+exports.getApiKeys = function (user, callback) {
     db.all('SELECT apiKey, productId, orderId \
             FROM accounting \
             WHERE customer=$user',
             {
                 $user: user
-            }, function(err, apiKeys) {
+            }, function (err, apiKeys) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in databse getting api-keys.', null);
                 } else if (apiKeys.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, apiKeys);
                 }
     });
-}
+};
 
 /**
  * Check if the user is associated with the apiKey (return true) or not (return false).
- * 
+ *
  * @param  {string} customer    User identifier.
  * @param  {string} apiKey      Identifies the product.
  */
-exports.checkRequest = function(customer, apiKey, callback) {
+exports.checkRequest = function (customer, apiKey, publicPath, callback) {
     db.all('SELECT customer \
             FROM accounting \
-            WHERE apiKey=$apiKey',
+            WHERE apiKey=$apiKey AND publicPath=$publicPath',
             {
-                $apiKey: apiKey
-            }, function(err, user) {
+                $apiKey: apiKey,
+                $publicPath: publicPath
+            }, function (err, user) {
                 if (err) {
-                    return callback(err, false);
+                    return callback('Error in database checking the request.', false);
                 } else if (user.length === 0) {
                     return callback(null, false);
                 } else if (user[0].customer !== customer) {
@@ -422,62 +473,62 @@ exports.checkRequest = function(customer, apiKey, callback) {
                     return callback(null, true);
                 }
     });
-}
+};
 
 /**
  * Return the url, unit and publicPath associated with the apiKey passed as argument.
- * 
+ *
  * @param  {string}   apiKey   Product identifier.
  */
-exports.getAccountingInfo = function(apiKey, callback) {
+exports.getAccountingInfo = function (apiKey, callback) {
     db.all('SELECT accounting.unit, services.url \
             FROM accounting , services \
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey', 
             {
                 $apiKey: apiKey
-            }, function(err, accountingInfo) {
+            }, function (err, accountingInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the accounting info.', null);
                 } else if (accountingInfo.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, accountingInfo[0]);
                 }
     });
-}
+};
 
 /**
  * Return the necessary information to notify the WStore (accounting value).
- * 
+ *
  */
-exports.getNotificationInfo = function(callback) {
+exports.getNotificationInfo = function (callback) {
     db.all('SELECT apiKey, orderId, productId, customer, value, correlationNumber, recordType, unit \
             FROM accounting \
             WHERE value!=0', 
-            function(err, notificationInfo) {
+            function (err, notificationInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error in database getting the notification information.', null);
                 } else if (notificationInfo.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, notificationInfo);
                 }
     });
-}
+};
 
 /**
  * Add the amount passed as argument to the actual amount of the user
- * 
+ *
  * @param  {string} apiKey      Idenfies the product.
  * @param  {float} amount       Amount to account.
  */
-exports.makeAccounting = function(apiKey, amount, callback) {
+exports.makeAccounting = function (apiKey, amount, callback) {
     if (amount < 0) {
-        return callback('[ERROR] The aomunt must be greater than 0');
+        return callback('The aomunt must be greater than 0.');
     } else {
-        db.beginTransaction(function(err, transaction) {
+        db.beginTransaction(function (err, transaction) {
             if (err) {
-                return callback(err);
+                return callback('Error making the accounting.');
             } else {
                 transaction.run(
                     'UPDATE accounting \
@@ -486,30 +537,35 @@ exports.makeAccounting = function(apiKey, amount, callback) {
                     {
                         $apiKey: apiKey,
                         $amount: amount
-                    }, function(err) {
+                    }, function (err) {
                         if (err) {
                             transaction.rollback();
-                            return callback(err);
+                            return callback('Error making the accounting.');
                         } else {
-                            transaction.commit(function (error) {
-                                return callback(error);
+                            transaction.commit(function (err) {
+                                if (err) {
+                                    return callback('Error making the accounting.');    
+                                } else {
+                                    return callback(null);
+                                }
+                                
                             });
                         }
                 });
             }
         });
     }
-}
+};
 
 /**
  * Reset the accounting for the product identifies by the apiKey and increment the correlation number.
- * 
+ *
  * @param  {string} apiKey      Idenfies the product.
  */
-exports.resetAccounting = function(apiKey, callback) {
-    db.beginTransaction(function(err, transaction) {
+exports.resetAccounting = function (apiKey, callback) {
+    db.beginTransaction(function (err, transaction) {
         if (err) {
-            return callback(err);
+            return callback('Error reseting the accounting.');
         } else {
             transaction.run(
                 'UPDATE accounting \
@@ -517,82 +573,86 @@ exports.resetAccounting = function(apiKey, callback) {
                 WHERE apiKey=$apiKey',
                 {
                     $apiKey: apiKey
-                }, function(err) {
+                }, function (err) {
                     if (err) {
                         transaction.rollback();
-                        return callback(err);
+                        return callback('Error reseting the accounting.');
                     } else {
-                        transaction.commit(function (error) {
-                            return callback(error);
+                        transaction.commit(function (err) {
+                            if (err) {
+                                return callback('Error reseting the accounting.');
+                            } else {
+                                return callback(null);
+                            }
                         });
                     }
             });
         }
     });
-}
+};
 
 /**
  * Add new Context Broker subscription (apiKey and notificationUrl associated).
- * 
+ *
  * @param {string} apiKey           Identifies the product.
  * @param {string} subscriptionId   Identifies the subscription.
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  */
-exports.addCBSubscription = function(apiKey, subscriptionId, notificationUrl, callback) {
-    db.serialize(function() {
+exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, callback) {
+    db.serialize(function () {
         db.run('INSERT OR REPLACE INTO subscriptions \
                 VALUES ($subscriptionId, $apiKey, $notificationUrl)',
                 {
                     $subscriptionId: subscriptionId,
                     $apiKey: apiKey,
                     $notificationUrl: notificationUrl
-                }, function(err) {
+                }, function (err) {
                     if (err) {
-                        return callback(err);
+                        return callback('Error in database adding the subscription "' + subscriptionId + '" .');
                     } else {
                         return callback(null);
                     }
         });
     });
-}
+};
 
 /**
  * Return the apiKey and notification url associated with the subscriptionId.
- * 
+ *
  * @param  {string} subscriptionId      Identifies the subscription.
  */
-exports.getCBSubscription = function(subscriptionId, callback) {
+exports.getCBSubscription = function (subscriptionId, callback) {
     db.all('SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId',
             {
                 $subscriptionId: subscriptionId
-            }, function(err, subscriptionInfo) {
+            }, function (err, subscriptionInfo) {
                 if (err) {
-                    return callback(err, null);
+                    return callback('Error getting the subscription.', null);
                 } else if (subscriptionInfo.length === 0) {
                     return callback(null, null);
                 } else {
                     return callback(null, subscriptionInfo[0]);
                 }
     });
-}
+};
 
 /**
  * Delete the subscription identified by the subscriptionId. 
- * 
+ *
  * @param  {string} subscriptionId      Identifies the subscription.
  */
-exports.deleteCBSubscription = function(subscriptionId, callback) {
+exports.deleteCBSubscription = function (subscriptionId, callback) {
     db.run('DELETE FROM subscriptions \
             WHERE subscriptionId=$subscriptionId',
             {
                 $subscriptionId: subscriptionId
-            }, function(err) {
+            }, function (err) {
                 if (err) {
-                    return callback(err);
+                    return callback('Error deleting the subscription "' + subscriptionId + '" .');
                 } else {
                     return callback(null);
                 }
     });
-}
+};

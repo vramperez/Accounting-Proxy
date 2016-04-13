@@ -3,18 +3,18 @@ var proxyquire = require('proxyquire').noCallThru(),
     sinon = require('sinon'),
     async = require('async');
 
-var mocker = function(implementations, callback) {
+var mocker = function (implementations, callback) {
     var mocks, spies, cb_handler;
 
     // Create mocks and spies
     var logger = {
-        error: function(msg) {}
-    }
+        error: function (msg) {}
+    };
     mocks = {
         app: {
-            use: function(middleware) {},
-            set: function(key, value) {},
-            post: function(path, handler) {}
+            use: function (middleware) {},
+            set: function (key, value) {},
+            post: function (path, handler) {}
         },
         config: {
             database: {
@@ -31,12 +31,12 @@ var mocker = function(implementations, callback) {
         req: {},
         res: {},
         requester: {
-            request: function(options, callback) {}
+            request: function (options, callback) {}
         },
         url: {},
         server: {},
         subsUrls: {}
-    }
+    };
     spies = {
         logger: {
             error: sinon.spy(logger, 'error')
@@ -53,11 +53,11 @@ var mocker = function(implementations, callback) {
         url: {},
         server: {},
         subsUrls: {}
-    }
+    };
 
     // Complete app_mock implementation and add spies
-    async.each(Object.keys(implementations), function(obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
+    async.each(Object.keys(implementations), function (obj, task_callback1) {
+        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
             mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
             if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
                 if (obj == 'req' || obj == 'res') {
@@ -69,44 +69,44 @@ var mocker = function(implementations, callback) {
             } else {
                 task_callback2();
             }
-        }, function() {
+        }, function () {
             return task_callback1();
         });
-    }, function() {
+    }, function () {
         // Mocking dependencies
         mocks.server.logger = logger;
         cb_handler = proxyquire('../../orion_context_broker/cb_handler', {
-            express: function() {
+            express: function () {
                 return mocks.app;
             },
             '../config': mocks.config,
             '.././db': mocks.db,
-            'async': mocks.async,
+            async: mocks.async,
             request: mocks.requester.request,
-            'url': mocks.url,
+            url: mocks.url,
             '../server': mocks.server,
             './subsUrls': mocks.subsUrls,
-            'winston': logger
+            winston: logger
         });
         return callback(cb_handler, spies);
     });
-}
+};
 
-describe('Testing ContextBroker Handler', function() {
+describe('Testing ContextBroker Handler', function () {
 
-    describe('Function "init"', function() {
+    describe('Function "init"', function () {
 
-        it('correct initialization', function() {
+        it('correct initialization', function () {
             var port = 9002;
             var implementations = {
                 app: {
-                    listen: function(port) {},
-                    get: function(prop) {
+                    listen: function (port) {},
+                    get: function (prop) {
                         return port;
                     },
-                    use: function(middleware) {},
-                    set: function(prop, value) {},
-                    post: function(path, handler) {}
+                    use: function (middleware) {},
+                    set: function (prop, value) {},
+                    post: function (path, handler) {}
                 },
                 config: {
                     database: {
@@ -116,8 +116,8 @@ describe('Testing ContextBroker Handler', function() {
                         notification_port: port
                     }
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
                 cb_handler.run();
                 assert.equal(spies.app.use.callCount, 1);
                 assert.equal(spies.app.set.callCount, 1);
@@ -133,49 +133,49 @@ describe('Testing ContextBroker Handler', function() {
         });
     });
 
-    describe('Function "getOperation"', function() {
+    describe('Function "getOperation"', function () {
 
-        it('correct, subscription operation', function(done) {
+        it('correct, subscription operation', function (done) {
             var path = '/subs_path';
             var subsUrls = [
                 ['DELETE', '/unsubs_path', 'unsubscribe'],
                 ['POST', path, 'subscribe']
-            ]
+            ];
             var implementations = {
                 subsUrls: subsUrls,
                 req: {
                     method: 'POST'
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function(operation) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.getOperation(path, implementations.req, function (operation) {
                     assert.equal(operation, 'subscribe');
                     assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0],  { 
-                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe' ],
-                          '1': [ 'POST', '/subs_path', 'subscribe' ] });
+                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
+                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe'],
+                          '1': [ 'POST', '/subs_path', 'subscribe']});
                     done();
                 });
             });
         });
 
-        it('correct, unsubscription operation', function(done) {
+        it('correct, unsubscription operation', function (done) {
             var path = '/unsubs_path';
             var subsUrls = [
                 ['DELETE', path, 'unsubscribe'],
                 ['POST', '/subs_path', 'subscribe']
-            ]
+            ];
             var implementations = {
                 subsUrls: subsUrls,
                 req: {
                     method: 'DELETE'
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function(operation) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.getOperation(path, implementations.req, function (operation) {
                     assert.equal(operation, 'unsubscribe');
                     assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0],  { 
+                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
                         '0': [ 'DELETE', '/unsubs_path', 'unsubscribe' ],
                           '1': [ 'POST', '/subs_path', 'subscribe' ] });
                     done();
@@ -183,38 +183,38 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('correct, administration operation', function(done) {
+        it('correct, administration operation', function (done) {
             var path = '/administration';
             var subsUrls = [
                 ['DELETE', '/unsubs_path', 'unsubscribe'],
                 ['POST', '/subs_path', 'subscribe']
-            ]
+            ];
             var implementations = {
                 subsUrls: subsUrls,
                 req: {
                     method: 'DELETE'
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function(operation) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.getOperation(path, implementations.req, function (operation) {
                     assert.equal(operation, null);
                     assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0],  { 
-                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe' ],
-                          '1': [ 'POST', '/subs_path', 'subscribe' ] });
+                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
+                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe'],
+                          '1': [ 'POST', '/subs_path', 'subscribe'] });
                     done();
                 });
             });
         });
     });
 
-    describe('Function "notificationHandler"', function(done) {
+    describe('Function "notificationHandler"', function (done) {
 
-        it('error getting subscription information from databse', function(done) {
+        it('error getting subscription information from databse', function (done) {
             var subscriptionId = 'subscriptionId';
             var implementations = {
                 db: {
-                    getCBSubscription: function(subscriptionId, callback) {
+                    getCBSubscription: function (subscriptionId, callback) {
                         return callback('Error', null);
                     }
                 },
@@ -227,12 +227,12 @@ describe('Testing ContextBroker Handler', function() {
 
                 },
                 app: {
-                    post: function(path, handler) {
+                    post: function (path, handler) {
                         return handler(implementations.req, implementations.res);
                     }
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
                 assert.equal(spies.db.getCBSubscription.callCount, 1);
                 assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
                 assert.equal(spies.logger.error.callCount, 1);
@@ -241,19 +241,19 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('error making the accounting', function(done) {
+        it('error making the accounting', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 subscriptionId: subscriptionId
-            }
+            };
             var subscriptionInfo = {
                 apiKey: 'apiKey',
                 unit: 'megabyte',
                 notificationUrl: 'http://example.com/path'
-            }
+            };
             var implementations = {
                 db: {
-                    getCBSubscription: function(subscriptionId, callback) {
+                    getCBSubscription: function (subscriptionId, callback) {
                         return callback(null, subscriptionInfo);
                     }
                 },
@@ -264,17 +264,17 @@ describe('Testing ContextBroker Handler', function() {
 
                 },
                 app: {
-                    post: function(path, handler) {
+                    post: function (path, handler) {
                         return handler(implementations.req, implementations.res);
                     }
                 },
                 server: {
-                    count: function(apiKey, unit, body, callback) {
+                    count: function (apiKey, unit, body, callback) {
                         return callback('Error');
                     }
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
                 assert.equal(spies.db.getCBSubscription.callCount, 1);
                 assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
                 assert.equal(spies.server.count.callCount, 1);
@@ -287,26 +287,25 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('error notifying the user', function(done) {
+        it('error notifying the user', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 subscriptionId: subscriptionId
-            }
+            };
             var subscriptionInfo = {
                 apiKey: 'apiKey',
                 unit: 'megabyte',
                 notificationUrl: 'http://example.com/path'
-            }
+            };
             var options = {
                 url: subscriptionInfo.notificationUrl,
                 method: 'POST',
-                headers: {},
                 json: true,
                 body: body
-            }
+            };
             var implementations = {
                 db: {
-                    getCBSubscription: function(subscriptionId, callback) {
+                    getCBSubscription: function (subscriptionId, callback) {
                         return callback(null, subscriptionInfo);
                     }
                 },
@@ -315,24 +314,29 @@ describe('Testing ContextBroker Handler', function() {
                     method: options.method,
                     headers: options.headers
                 },
-                res: {},
+                res: {
+                    status: function (code) {
+                        return this;
+                    },
+                    send: function () {}
+                },
                 app: {
-                    post: function(path, handler) {
+                    post: function (path, handler) {
                         return handler(implementations.req, implementations.res);
                     }
                 },
                 server: {
-                    count: function(apiKey, unit, body, callback) {
+                    count: function (apiKey, unit, body, callback) {
                         return callback(null);
                     }
                 },
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback('Error', null, null);
                     }
                 }
-            }
-            mocker(implementations, function(cb_handler, spies) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
                 assert.equal(spies.db.getCBSubscription.callCount, 1);
                 assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
                 assert.equal(spies.server.count.callCount, 1);
@@ -343,50 +347,117 @@ describe('Testing ContextBroker Handler', function() {
                 assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
                 assert.equal(spies.logger.error.callCount, 1);
                 assert.equal(spies.logger.error.getCall(0).args[0], 'An error ocurred notifying the user, url: ' + options.url);
+                assert.equal(spies.res.status.callCount, 1);
+                assert.equal(spies.res.status.getCall(0).args[0], 504);
+                assert.equal(spies.res.send.callCount, 1);
+                done();
+            });
+        });
+
+        it('correct notification', function (done) {
+            var subscriptionId = 'subscriptionId';
+            var body = {
+                subscriptionId: subscriptionId
+            };
+            var subscriptionInfo = {
+                apiKey: 'apiKey',
+                unit: 'megabyte',
+                notificationUrl: 'http://example.com/path'
+            };
+            var options = {
+                url: subscriptionInfo.notificationUrl,
+                method: 'POST',
+                json: true,
+                body: body
+            };
+            var implementations = {
+                db: {
+                    getCBSubscription: function (subscriptionId, callback) {
+                        return callback(null, subscriptionInfo);
+                    }
+                },
+                req: {
+                    body: body,
+                    method: options.method,
+                    headers: options.headers
+                },
+                res: {
+                    status: function (code) {
+                        return this;
+                    },
+                    send: function () {}
+                },
+                app: {
+                    post: function (path, handler) {
+                        return handler(implementations.req, implementations.res);
+                    }
+                },
+                server: {
+                    count: function (apiKey, unit, body, callback) {
+                        return callback(null);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(null, {statusCode: 200}, null);
+                    }
+                }
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                assert.equal(spies.db.getCBSubscription.callCount, 1);
+                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
+                assert.equal(spies.server.count.callCount, 1);
+                assert.equal(spies.server.count.getCall(0).args[0], subscriptionInfo.apiKey);
+                assert.equal(spies.server.count.getCall(0).args[1], subscriptionInfo.unit);
+                assert.equal(spies.server.count.getCall(0).args[2], body);
+                assert.equal(spies.requester.request.callCount, 1);
+                assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
+                assert.equal(spies.res.status.callCount, 1);
+                assert.equal(spies.res.status.getCall(0).args[0], 200);
+                assert.equal(spies.res.send.callCount, 1);
                 done();
             });
         });
     });
 
-    describe('Function "subscriptionHandler"', function() {
+    describe('Function "subscriptionHandler"', function () {
 
-        it('[subscription] error sending request to CB', function(done) {
+        it('[subscription] error sending request to CB', function (done) {
             var body = {
                 reference: 'http://reference/path'
-            }
-            var unit = 'megabyte';
+            };
             var req = {
                 method: 'POST',
                 body: body,
                 headers: {
                     'content-type': 'application/json',
-                    'accept': 'application/json'
+                    accept: 'application/json'
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                send: function() {}
+                send: function () {}
             };
             var implementations = {
                 req: req,
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback('Error', null, null);
-                    }    
+                    }
                 },
                 res: res
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', function (err) {
                     assert.equal(spies.res.status.callCount, 1);
                     assert.equal(spies.res.status.getCall(0).args[0], 504);
                     assert.equal(spies.res.send.callCount, 1);
@@ -398,12 +469,11 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[subscription] contextBroker response no OK (no add subscription)', function(done) {
+        it('[subscription] contextBroker response no OK (no add subscription)', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 reference: 'http://reference/path',
-            }
-            var unit = 'megabyte';
+            };
             var req = {
                 method: 'POST',
                 body: body,
@@ -411,41 +481,41 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
+                setHeader: function (header, value) {},
+                send: function (body) {}
             };
-            var resp =  { 
-                statusCode: 400, 
+            var resp =  {
+                statusCode: 400,
                 headers: {header1: 'header1'}
-            }
+            };
             var body_CB = {
                 subscribeResponse: {
                     subscriptionId: subscriptionId
                 }
-            }
+            };
             var implementations = {
                 req: req,
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, body_CB);
-                    }    
+                    }
                 },
                 res: res
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -463,13 +533,12 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[subscription] error adding the subscription to database', function(done) {
+        it('[subscription] error adding the subscription to database', function (done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
             var body = {
                 reference: 'http://reference/path',
-            }
-            var unit = 'megabyte';
+            };
             var req = {
                 method: 'POST',
                 body: body,
@@ -477,49 +546,49 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 },
-                get: function(header) {
+                get: function (header) {
                     return apiKey;
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
+                setHeader: function (header, value) {},
+                send: function (body) {}
             };
-            var resp =  { 
-                statusCode: 200, 
+            var resp =  {
+                statusCode: 200,
                 headers: {header1: 'header1'}
-            }
+            };
             var body_CB = {
                 subscribeResponse: {
                     subscriptionId: subscriptionId
                 }
-            }
+            };
             var implementations = {
                 req: req,
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, body_CB);
-                    }    
+                    }
                 },
                 res: res,
                 db: {
-                    addCBSubscription: function(apiKey, subscriptionId, reference_url, callback) {
+                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
                         return callback('Error');
                     }
                 }
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -541,13 +610,12 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[subscription] incorrect subscription', function(done) {
+        it('[subscription] incorrect subscription', function (done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
             var body = {
                 reference: 'http://reference/path',
-            }
-            var unit = 'megabyte';
+            };
             var req = {
                 method: 'POST',
                 body: body,
@@ -555,39 +623,39 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 },
-                get: function(header) {
+                get: function (header) {
                     return apiKey;
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                send: function(body) {}
+                send: function (body) {}
             };
-            var resp =  { 
-                statusCode: 200, 
+            var resp =  {
+                statusCode: 200,
                 headers: {header1: 'header1'}
-            }
+            };
             var body_CB = {}
             var implementations = {
                 req: req,
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, body_CB);
-                    }    
+                    }
                 },
                 res: res
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -600,13 +668,12 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[subscription] correct subscription', function(done) {
+        it('[subscription] correct subscription', function (done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
             var body = {
                 reference: 'http://reference/path',
-            }
-            var unit = 'megabyte';
+            };
             var req = {
                 method: 'POST',
                 body: body,
@@ -614,49 +681,49 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 },
-                get: function(header) {
+                get: function (header) {
                     return apiKey;
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
+                setHeader: function (header, value) {},
+                send: function (body) {}
             };
-            var resp =  { 
-                statusCode: 200, 
+            var resp =  {
+                statusCode: 200,
                 headers: {header1: 'header1'}
-            }
+            };
             var body_CB = {
                 subscribeResponse: {
                     subscriptionId: subscriptionId
                 }
-            }
+            };
             var implementations = {
                 req: req,
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, body_CB);
-                    }    
+                    }
                 },
                 res: res,
                 db: {
-                    addCBSubscription: function(apiKey, subscriptionId, reference_url, callback) {
+                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
                         return callback(null);
                     }
                 }
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, unit, 'subscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -678,7 +745,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] error sending the request ti the CB', function(done) {
+        it('[unsubscribe] error sending the request ti the CB', function (done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
@@ -689,31 +756,31 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 }
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                send: function() {}
-            }
+                send: function () {}
+            };
             var implementations = {
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback('Error', null, null);
                     }
                 },
                 req: req,
                 res: res
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: req.body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', function (err) {
                     assert.equal(spies.res.status.callCount, 1);
                     assert.equal(spies.res.status.getCall(0).args[0], 504);
                     assert.equal(spies.res.send.callCount, 1);
@@ -725,7 +792,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] error, context broker response no OK', function(done) {
+        it('[unsubscribe] error, context broker response no OK', function (done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
@@ -736,36 +803,36 @@ describe('Testing ContextBroker Handler', function() {
                     'accept': 'application/json'
                 },
                 method: 'POST'
-            }
+            };
             var resp = {
                 headers: { header1: 'header1'},
                 statusCode: 400
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
-            }
+                setHeader: function (header, value) {},
+                send: function (body) {}
+            };
             var implementations = {
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, {});
                     }
                 },
                 req: req,
                 res: res,
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: req.body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -783,7 +850,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] error deleting the subscription from database', function(done) {
+        it('[unsubscribe] error deleting the subscription from database', function (done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
@@ -794,41 +861,41 @@ describe('Testing ContextBroker Handler', function() {
                     'accept': 'application/json'
                 },
                 method: 'POST'
-            }
+            };
             var resp = {
                 headers: { header1: 'header1'},
                 statusCode: 200
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
-            }
+                setHeader: function (header, value) {},
+                send: function (body) {}
+            };
             var implementations = {
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, {});
                     }
                 },
                 req: req,
                 res: res,
                 db: {
-                    deleteCBSubscription: function(subscriptionId, callback) {
+                    deleteCBSubscription: function (subscriptionId, callback) {
                         return callback('Error');
                     }
                 }
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: req.body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -848,7 +915,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] correct unsubscription', function(done) {
+        it('[unsubscribe] correct unsubscription', function (done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
@@ -860,41 +927,41 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 }
-            }
+            };
             var resp = {
                 headers: { header1: 'header1'},
                 statusCode: 200
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
-            }
+                setHeader: function (header, value) {},
+                send: function (body) {}
+            };
             var implementations = {
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, {});
                     }
                 },
                 req: req,
                 res: res,
                 db: {
-                    deleteCBSubscription: function(subscriptionId, callback) {
+                    deleteCBSubscription: function (subscriptionId, callback) {
                         return callback(null);
                     }
                 }
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: req.body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
@@ -914,7 +981,7 @@ describe('Testing ContextBroker Handler', function() {
             });
         });
 
-        it('[unsubscribe] correct unsubscription', function(done) {
+        it('[unsubscribe] correct unsubscription', function (done) {
             var subscriptionId = 'subscriptionId';
             var req = {
                 body: {
@@ -926,36 +993,36 @@ describe('Testing ContextBroker Handler', function() {
                     'content-type': 'application/json',
                     'accept': 'application/json'
                 }
-            }
+            };
             var resp = {
                 headers: { header1: 'header1'},
                 statusCode: 400
-            }
+            };
             var res = {
-                status: function(statusCode) {
+                status: function (statusCode) {
                     return this;
                 },
-                setHeader: function(header, value) {},
-                send: function(body) {}
-            }
+                setHeader: function (header, value) {},
+                send: function (body) {}
+            };
             var implementations = {
                 requester: {
-                    request: function(options, callback) {
+                    request: function (options, callback) {
                         return callback(null, resp, {});
                     }
                 },
                 req: req,
                 res: res
-            }
+            };
             var options = {
                 url: 'http://contextBroker/path',
                 method: req.method,
                 json: true,
                 headers: implementations.req.headers,
                 body: req.body
-            }
-            mocker(implementations, function(cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'megabyte', 'unsubscribe', function(err) {
+            };
+            mocker(implementations, function (cb_handler, spies) {
+                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.requester.request.callCount, 1);
                     assert.deepEqual(spies.requester.request.getCall(0).args[0], options);

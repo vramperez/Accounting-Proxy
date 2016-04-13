@@ -2,28 +2,28 @@ var FIWAREStrategy = require('passport-fiware-oauth').OAuth2Strategy,
     config = require('./config'),
     logger = require('winston');
 
-var db = require(config.database.type); 
+var db = require(config.database.type);
 var FIWARE_STRATEGY = new FIWAREStrategy({
         clientID: ' ',
         clientSecret: ' ',
         callbackURL: ' '
     },
 
-    function(accessToken, refreshToken, profile, done) {
-        profile['accessToken'] = accessToken;
+    function (accessToken, refreshToken, profile, done) {
+        profile.accessToken = accessToken;
         done(null, profile);
     }
 );
 
 /**
  * Return the authorization token ['x-auth-token'] or ['authorization']
- * 
+ *
  * @param  {Object} headers Request headers.
  */
-var getAuthToken = function(headers) {
+var getAuthToken = function (headers) {
 
     var authToken = headers['x-auth-token'];
-    
+
     // Get access token
     if (authToken === undefined) {
 
@@ -59,29 +59,30 @@ var getAuthToken = function(headers) {
 
 /**
  * Return true if the appId of the service is the same that the request appId.
- * 
+ *
  * @param  {string}   reqAppId Request appId.
  * @param  {Object}   req      Incoming request.
  */
-var verifyAppId = function(reqAppId, req, callback) {
-    db.getAppId(req.path, function(err, appId) { // Check with the whole path
+var verifyAppId = function (reqAppId, req, callback) {
+    db.getAppId(req.path, function (err, appId) { // Check with the whole path
         if (err) {
             return callback(err, false);
         } else if (appId === reqAppId) {
+            req.restPath = '';
             // Public path is the whole path
-            req.publicPath = req.path; 
+            req.publicPath = req.path;
             return callback(null, true);
         } else {
 
             var splitPath = req.path.split('/');
-            db.getAppId('/' + splitPath[1], function(err, appId) { // Check with the first path of the path
+            db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first part of the path
                 if (err) {
                     return callback(err, false);
                 } else if (appId === reqAppId) {
                     // Save the path to the endpoint
                     req.restPath = '/' + req.path.substring(splitPath[1].length + 2);
                     // Public path is only the first part of the request path
-                    req.publicPath =  '/' + splitPath[1]; 
+                    req.publicPath =  '/' + splitPath[1];
                     return callback(null, true);
                 } else {
                     return callback(null, false);
@@ -89,16 +90,16 @@ var verifyAppId = function(reqAppId, req, callback) {
             });
         }
     });
-}
+};
 
 /**
  * Attach the headers with the user information.
- * 
+ *
  * @param  {Object} headers  Request headers.
  * @param  {Object} userInfo User information from the IdM.
  */
-var attachUserHeaders = function(headers, userInfo) {
-    headers['Authorization'] = 'Bearer ' + userInfo.accessToken;
+var attachUserHeaders = function (headers, userInfo) {
+    headers.Authorization = 'Bearer ' + userInfo.accessToken;
     headers['X-Nick-Name'] = userInfo.id;
     headers['X-Email'] = userInfo.emails[0].value;
     headers['X-Display-Name'] = userInfo.displayName;
@@ -107,7 +108,7 @@ var attachUserHeaders = function(headers, userInfo) {
     var roles = [
         config.oauth2.roles.admin,
         config.oauth2.roles.seller,
-        config.oauth2.roles.customer,
+        config.oauth2.roles.customer
     ];
 
     for (var i = 0; i < userInfo.roles.length; i++) {
@@ -116,16 +117,16 @@ var attachUserHeaders = function(headers, userInfo) {
             headers['X-Roles'] += role + ',';
         }
     }
-}
+};
 
 /**
  * Middleware that makes the OAuth2 authentication.
- * 
+ *
  * @param  {Object}   req  Incoming request.
  * @param  {Object}   res  Outgoing response.
  * @param  {Function} next Next middleware.
  */
-exports.headerAuthentication = function(req, res, next) {
+exports.headerAuthentication = function (req, res, next) {
     try {
         var authToken = getAuthToken(req.headers);
         FIWARE_STRATEGY.userProfile(authToken, function (err, userProfile) {
@@ -134,10 +135,10 @@ exports.headerAuthentication = function(req, res, next) {
                 logger.warn('Token ' + authToken + ' invalid');
             } else {
                 // Check that the provided access token is valid for the given service
-                verifyAppId(userProfile.appId, req, function(err, valid) {
+                verifyAppId(userProfile.appId, req, function (err, valid) {
                     if (err) {
                         res.status(500).send();
-                        logger.error('Error in database getting the appId');
+                        logger.error(err);
                     } else if (valid) {
                         req.user = userProfile;
                         req.user.accessToken = authToken;

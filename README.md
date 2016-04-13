@@ -23,7 +23,6 @@
     + Redis for NodeJs: [GitHub](https://github.com/NodeRedis/node_redis)
     + Node Schedule: [GitHub](https://github.com/node-schedule/node-schedule).
     + Commander: [GitHub](https://github.com/tj/commander.js).
-    + Fiware PEP-Proxy: [GitHub](https://github.com/telefonicaid/fiware-pep-steelskin).
     + Orion Context Broker: [Homepage](http://fiware-orion.readthedocs.org/en/develop/index.html).
 
 ### <a name="installation"/> Installation:
@@ -70,21 +69,21 @@ In order to have the accounting proxy running there are some information to fill
 Other accounting modules can be implemented and added here (see  [Accounting module](#accountingmodule) ).
 
 
-* `config.WStore`: the information of the WStore server.
-	- `accounting_host`: WStore host.
-	- `accounting_path`: WStore path for accounting notifications.
-	- `accounting_port`: WStore port.
+* `config.usageAPI`: the information of the usage management API where the usage specifications and the accounting information will be snet.
+	- `host`: API host.
+	- `port`: API port.
+	- `path`: path for the usage management API.
 ```
 {
-        accounting_host: 'localhost',
-        accounting_path: '/api/contracting/',
-        accounting_port: 9010
+        host: 'localhost',
+        port: 8080,
+        path: '/DSUsageManagement/api/usageManagement/v2'
 }
 ```
 
 * `config.resources`: configuration of the resources accounted by the proxy.
 	- `contextBroker`: set this option to `true` if the resource accounted is an Orion Context Broker. Otherwise set this option to `false` (default value).
-	- `notification_port`: port qhere the accounting proxy is listening to subscription notifications from the Orion Context Broker (port 9002 by default).
+	- `notification_port`: port where the accounting proxy is listening to subscription notifications from the Orion Context Broker (port 9002 by default).
 ```
 {
         contextBroker: false,
@@ -126,19 +125,17 @@ The authentication process is based on OAuth2 v2 tokens. The Accounting-Proxy ex
 If the authentication process success, the Accounting-Proxy check the authorization. The Accounting-Proxy expects that all the requests have a header `X-API-KEY` containing a valid API-KEY corresponding to the requested service.
 
 ### <a name="administrators"/> Administrators
-If the user is an administrator of the service, the administrator request must omit the "X-API-KEY" header. After the administrator request is authenticated, the request will be directly redirect to the service and no accounting will be make.
+If the user is an administrator of the service, the administrator request must omit the "X-API-KEY" header. After the administrator request is authenticated, the request will be redirected to the service and no accounting will be made.
 
 ## <a name="running"/> Running
-Before run the Accounting Proxy you must have the PEP-Proxy and the Orion Context Broker running.
-
-Then, execute:
+Just execute:
 ```
 node accounting-proxy
 ```
 
 ## <a name="cli"/> CLI
 
-In order to manage servicies, use 'cli' tool. There are four commands available:
+In order to manage servicies, use 'cli' tool. The available commands are:
 * `./cli addService <publicPath> <url> <appId>`: binds the public path with the url specified.
 * `./cli getService <publicPath>`: returns the url and appID associated with the public path.
 * `./cli getAllServices`: display all the registered services (public path, URL and appId).
@@ -154,9 +151,9 @@ To display brief information: `./cli -h` or `./cli --help`.
 
 ## <a name="proxyapi"/> Proxy API
 
-Proxy's api is in port **9000** by default and root path **/api/..**.
+Proxy's api is in port **9000** by default and root path **/accounting_proxy/..**.
 
-### POST ../accounting_proxy/buys
+### POST ../buys
 
 Use by the store to notify a new buy:
 ```json
@@ -173,7 +170,7 @@ Use by the store to notify a new buy:
 ```
 * `unit`: accounting unit (`megabyte`, `call`, ...).
 
-### POST ../accounting_proxy/urls
+### POST ../urls
 
 Use by the store to check an URL:
 ```json
@@ -182,7 +179,7 @@ Use by the store to check an URL:
 }
 ```
 
-### GET ../accounting_proxy/keys
+### GET ../keys
 
 Retrieve the user's API_KEYs in a json:
 
@@ -196,7 +193,7 @@ Retrieve the user's API_KEYs in a json:
 ]
 ```
 
-### GET /accounting_proxy/units
+### GET /units
 
 Retrieve the supported accounting units by the accounting proxy in a JSON:
 ```json
@@ -209,24 +206,30 @@ Retrieve the supported accounting units by the accounting proxy in a JSON:
 
 ### <a name="accountingmodule"/> Accounting module
 
-Accounting modules should be implemented following the next code:
+Accounting modules in the *acc_modules* folder should be implemented following the next code:
 
 ```javascript
 /** Accounting module for unit: XXXXXX */
 
-exports.count = function(response, callback) {
+var count = function (response, callback) {
     // Code to do the accounting goes here
     // .....
 
-    callback(error, amount);
+    return callback(error, amount);
+}
+
+var getSpecification = function (callback) {
+	return callback(specification);
 }
 ```
 
-The function *count* receives three parameters:
+The function `count` receives three parameters:
 - `response` object.
 - `callback` function, which is use to retrieve the amount to count or the error. The function has 2 parameters:
   + `error` string, with a description of the error if there is one. Otherwise, `undefined`.
   + `ammount` number, with the amount to add to the accounting.
+
+The function `getSpecification` should return a javascript object with the usage specification for the accounting unit according to the TMF635 usage management API ([TMF635 usage Management API](https://www.tmforum.org/resources/standard/tmf635-usage-management-api-rest-specification-r14-5-0/)).
 
 ### <a name="tests"/> Testing
 To run tests type:
@@ -236,4 +239,4 @@ npm test
 Test reporter generates a directory `./coverage` with all the coverage information (coverage reporter is generated by Istanbul).
 
 ---
-Last updated: _18/03/2016
+Last updated: _01/04/2016

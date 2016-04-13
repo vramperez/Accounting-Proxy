@@ -111,7 +111,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addToken(token, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error adding the acces token "' + token + '" .');
                     assert.equal(spies.del.callCount, 1);
                     assert.equal(spies.del.getCall(0).args[0], token);
                     assert.equal(spies.sadd.callCount, 1);
@@ -155,7 +155,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getToken(function (err, token) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the access token.');
                     assert.equal(token, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'token');
@@ -213,7 +213,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addSpecificationRef(unit, href, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
                     assert.equal(spies.hmset.callCount, 1);
                     assert.equal(spies.hmset.getCall(0).args[0], 'units');
                     assert.deepEqual(spies.hmset.getCall(0).args[1], entry);
@@ -252,7 +252,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getHref(unit, function (err, href) {
-                    assert.equal(err, 'Error getting the href for unit ' + unit);
+                    assert.equal(err, 'Error getting the href for unit "' + unit + '" .');
                     assert.equal(href, null);
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0], 'units');
@@ -298,7 +298,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.newService(publicPath, url, appId, function (err) {
-                    assert.equal(err, '[ERROR] Error in database adding the new service.');
+                    assert.equal(err, 'Error in database adding the new service.');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], saddParams);
                     assert.equal(spies.hmset.callCount, 1);
@@ -346,7 +346,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database deleting the service.');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
                     assert.equal(spies.del.callCount, 3);
@@ -375,7 +375,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database deleting the service.');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
                     assert.equal(spies.del.callCount, 3);
@@ -413,7 +413,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database deleting the service.');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], 'services');
                     assert.equal(spies.del.callCount, 3);
@@ -459,7 +459,7 @@ describe('Testing REDIS database', function () {
             var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys', '0001', 'apiKeys'];
             mocker(implementations, function (db, spies) {
                 db.deleteService('/public', function (err) {
-                    assert.equal(err, '[ERROR] Error in datbase deleting the service.');
+                    assert.equal(err, 'Error in database deleting the service.');
                     assert.equal(spies.del.callCount, 9);
                     assert.equal(spies.del.getCall(0).args[0] , '/public');
                     async.forEachOf(del_args, function (arg, i, task_callback) {
@@ -551,7 +551,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getService('/public', function (err, service) {
-                    assert.equal(err, '[ERROR] Error in database getting the service.');
+                    assert.equal(err, 'Error in database getting the service.');
                     assert.equal(service, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], hgetallArgs[0]);
@@ -618,7 +618,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAllServices(function (err, services) {
-                    assert.equal(err, '[ERROR] Error in database getting the services.');
+                    assert.equal(err, 'Error in database getting the services.');
                     assert.equal(services, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -638,7 +638,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAllServices(function (err, services) {
-                    assert.equal(err, '[ERROR] Error in database getting the services.');
+                    assert.equal(err, 'Error in database getting the services.');
                     assert.deepEqual(services, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -693,7 +693,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAppId(publicPath, function (err, appId) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the appId.');
                     assert.equal(appId, null);
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0], publicPath);
@@ -733,7 +733,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addAdmin(idAdmin, function (err) {
-                    assert.equal(err, '[ERROR] Error in database adding admin: ' + idAdmin + '.');
+                    assert.equal(err, 'Error in database adding admin: "' + idAdmin + '" .');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['admins', idAdmin]);
                     done();
@@ -771,7 +771,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, '[ERROR] Error in database removing admin ' + idAdmin);
+                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
                     done();
@@ -793,7 +793,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, '[ERROR] Error in database removing admin ' + idAdmin);
+                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
                     assert.equal(spies.hgetall.callCount, 1);
@@ -826,7 +826,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, '[ERROR] Error in database removing admin: ' + idAdmin + '.');
+                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
                     assert.equal(spies.hgetall.callCount, 1);
@@ -881,7 +881,7 @@ describe('Testing REDIS database', function () {
         var idAdmin = 'idAdmin';
         var publicPath = 'publicPath';
 
-        it('error, invalid public path', function (done) {
+        it('error getting the service', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -889,7 +889,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, '[ERROR] Invalid public path.');
+                    assert.equal(err, 'Error in database binding the admin to the service.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
                     done();
@@ -897,18 +897,55 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error, invalid admin', function (done) {
+        it('error, invalid public path', function (done) {
+            var implementations = {
+                hgetall: function (hash, callback) {
+                    return callback(null, null);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
+                    assert.equal(err, 'Invalid public path.');
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
+                    done();
+                });
+            });
+        });
+
+        it('error getting admins', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
                 },
                 smembers: function (hash, callback) {
-                    return callback('Error');
+                    return callback('Error', null);
                 }
             };
             mocker(implementations, function (db, spies) {
                 db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, '[ERROR] Invalid admin.');
+                    assert.equal(err, 'Error in database binding the admin to the service.');
+                    assert.equal(spies.hgetall.callCount, 1);
+                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
+                    assert.equal(spies.smembers.callCount, 1);
+                    assert.equal(spies.smembers.getCall(0).args[0], 'admins');
+                    done();
+                });
+            });
+        });
+
+        it('error, admin not exists', function (done) {
+            var implementations = {
+                hgetall: function (hash, callback) {
+                    return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
+                },
+                smembers: function (hash, callback) {
+                    return callback(null, ['other']);
+                }
+            };
+            mocker(implementations, function (db, spies) {
+                db.bindAdmin(idAdmin, publicPath, function (err) {
+                    assert.equal(err, 'Admin: "' + idAdmin + '" not exists. Admin must be added before binding it.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
                     assert.equal(spies.smembers.callCount, 1);
@@ -932,7 +969,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, '[ERROR] Error adding the administrator.');
+                    assert.equal(err, 'Error in database binding the admin to the service.');
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
                     assert.equal(spies.smembers.callCount, 1);
@@ -985,7 +1022,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.unbindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, '[ERROR] Error in database deleting the administrator.');
+                    assert.equal(err, 'Error in database unbinding the administrator.');
                     assert.equal(spies.srem.callCount, 1);
                     assert.equal(spies.srem.getCall(0).args[0], publicPath + 'admins');
                     assert.equal(spies.srem.getCall(0).args[1], idAdmin);
@@ -1024,7 +1061,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAdmins(publicPath, function (err, admins) {
-                    assert.equal(err, '[ERROR] Error in database getting the administrators.');
+                    assert.equal(err, 'Error in database getting the administrators.');
                     assert.equal(admins, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
@@ -1066,7 +1103,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the admin url.');
                     assert.equal(adminUrl, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
@@ -1103,7 +1140,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the admin url.');
                     assert.equal(adminUrl, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
@@ -1151,7 +1188,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.checkPath(publicPath, function (err, check) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error checking the path.');
                     assert.equal(check, false);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], 'services');
@@ -1231,7 +1268,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.newBuy(buyInfo, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding the new buy.');
                     assert.equal(spies.sadd.callCount, 3);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], args.sadd[0]);
                     assert.deepEqual(spies.sadd.getCall(1).args[0], args.sadd[1]);
@@ -1281,7 +1318,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in databse getting api-keys.');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.smembers.callCount, 1);
                     done();
@@ -1317,7 +1354,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in databse getting api-keys.');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0], '0001');
@@ -1388,7 +1425,7 @@ describe('Testing REDIS database', function () {
             var apiKey = 'apiKey1';
             mocker(implementations, function (db, spies) {
                 db.checkRequest('0001', apiKey, 'http://localhost/path', function (err, check) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database checking the request.');
                     assert.equal(check, false);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
@@ -1472,7 +1509,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the accounting info.');
                     assert.equal(accInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
@@ -1509,7 +1546,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the accounting info.');
                     assert.equal(accInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
@@ -1558,7 +1595,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the notification information.');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
@@ -1578,7 +1615,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the notification information.');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.smembers.callCount, 1);
                     assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
@@ -1652,7 +1689,7 @@ describe('Testing REDIS database', function () {
         it('amount less than 0', function (done) {
             mocker({}, function (db, spies) {
                 db.makeAccounting('apikey', -1.3, function (err) {
-                    assert.equal(err, '[ERROR] The aomunt must be greater than 0');
+                    assert.equal(err, 'The aomunt must be greater than 0.');
                     done();
                 });
             });
@@ -1666,7 +1703,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error making the accounting.');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
                     assert.equal(spies.hget.getCall(0).args[1] , 'value');
@@ -1687,7 +1724,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error making the accounting.');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
                     assert.equal(spies.hget.getCall(0).args[1] , 'value');
@@ -1740,7 +1777,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error reseting the accounting.');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
                     assert.equal(spies.hget.getCall(0).args[1] , 'correlationNumber');
@@ -1761,7 +1798,7 @@ describe('Testing REDIS database', function () {
             }
             mocker(implementations, function (db, spies) {
                 db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error reseting the accounting.');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
                     assert.equal(spies.hget.getCall(0).args[1] , 'correlationNumber');
@@ -1818,7 +1855,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding the subscription "subsId" .');
                     assert.equal(spies.sadd.callCount, 1);
                     assert.deepEqual(spies.sadd.getCall(0).args[0], ['apiKeysubs', 'subsId']);
                     assert.equal(spies.hmset.callCount, 1);
@@ -1863,7 +1900,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getCBSubscription('subsId', function (err, subsInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the subscription.');
                     assert.equal(subsInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
@@ -1903,7 +1940,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getCBSubscription('subsId', function (err, subsInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the subscription.');
                     assert.equal(subsInfo, null);
                     assert.equal(spies.hgetall.callCount, 1);
                     assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
@@ -1956,7 +1993,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteCBSubscription('subsId', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error deleting the subscription "subsId" .');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
                     assert.equal(spies.hget.getCall(0).args[1] , 'apiKey');
@@ -1978,7 +2015,7 @@ describe('Testing REDIS database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteCBSubscription('subsId', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error deleting the subscription "subsId" .');
                     assert.equal(spies.hget.callCount, 1);
                     assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
                     assert.equal(spies.hget.getCall(0).args[1] , 'apiKey');

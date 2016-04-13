@@ -32,6 +32,9 @@ var mock_config = {
             'customer': '',
             'seller': ''
         }
+    },
+    log: {
+        file: 'file'
     }
 };
 
@@ -51,7 +54,9 @@ var notifier_mock = {
         return cllback(null);
     },
     acc_modules: {
-        megabyte: require('../../acc_modules/megabyte')
+        megabyte: require('../../acc_modules/megabyte'),
+        call: require('../../acc_modules/call'),
+        millisecond: require('../../acc_modules/millisecond')
     }
 }
 
@@ -59,7 +64,10 @@ var log_mock = {
     log: function (level, msg) {},
     info: function (msg) {},
     warn: function (msg) {},
-    error: function (msg) {}
+    error: function (msg) {},
+    transports: {
+        File: function (options) {}
+    }
 }
 
 var userProfile = {
@@ -81,6 +89,14 @@ var FIWAREStrategy_mock = {
     }
 }
 
+var expressWinston_mock = {
+    logger: function (options) {
+        return function (req, res, next) {
+            next();
+        };
+    }
+};
+
 var mocker = function (database) {
     switch (database) {
         case 'sql':
@@ -101,6 +117,7 @@ var mocker = function (database) {
                 './APIServer': api_mock,
                 './notifier': notifier_mock,
                 'winston': log_mock, // Not display logger messages while testing,
+                'express-winston': expressWinston_mock,
                 './orion_context_broker/cb_handler': {},
                 'OAuth2_authentication': authentication_mock
             });
@@ -123,6 +140,7 @@ var mocker = function (database) {
                 './APIServer': api_mock,
                 './notifier': notifier_mock,
                 'winston': log_mock, // Not display logger messages while testing,
+                'express-winston': expressWinston_mock,
                 './orion_context_broker/cb_handler': {},
                 'OAuth2_authentication': authentication_mock
             });
@@ -176,13 +194,13 @@ async.each(test_config.databases, function (database, task_callback) {
 
             describe('ADMINISTRATOR', function () {
 
-                it('undefined authotization header (401)', function (done) {
+                it('should fail (401) when the header "authorization" is undefined', function (done) {
                     request(server.app)
                     .get('/public/resource')
                     .expect(401, { error: 'Auth-token not found in request headers'}, done);
                 });
 
-                it('invalid authorization token (401)', function (done) {
+                it('should fail (401) when the authorization token is invalid', function (done) {
                     var type = 'wrong';
                     request(server.app)
                     .get('/public/resource')
@@ -190,14 +208,14 @@ async.each(test_config.databases, function (database, task_callback) {
                     .expect(401, { error: 'Invalid Auth-Token type (' + type + ')' }, done);
                 });
 
-                it('token from other application, wrong appId (401)', function (done) {
+                it('should fail (401) when the token is from other application (wrong appId)', function (done) {
                     request(server.app)
                     .get('/public/resource')
                     .set('x-auth-token', userProfile.accessToken)
                     .expect(401, {error: 'The auth-token scope is not valid for the current application'}, done);
                 });
 
-                it('error sending request to the endpoint (504)', function (done) {
+                it('should fail (504) when an error occur sending request to the endpoint', function (done) {
                     var publicPath = '/public1';
                     var services = [{publicPath: publicPath, url: 'wrong_url', appId: userProfile.appId}];
                     var admins = [{idAdmin: userProfile.id, publicPath: publicPath}];
@@ -214,7 +232,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('correct', function (done) {
+                it('should succes when the request is correct', function (done) {
                     var publicPath = '/public2';
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
@@ -235,7 +253,7 @@ async.each(test_config.databases, function (database, task_callback) {
 
             describe('USER', function () {
 
-                it('undefined "X-API-KEY" header', function (done) {
+                it('should fail (401) when the "X-API-KEY" header is undefined', function (done) {
                     var publicPath = '/public3';
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
@@ -252,7 +270,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('invalid api-key or user', function (done) {
+                it('should fail (401) when api-key or user is invalid', function (done) {
                     var publicPath = '/public4';
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
@@ -279,7 +297,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('error sending request to the endpoint (504)', function (done) {
+                it('should fail (504) when an error occur sending the request to the endpoint', function (done) {
                     var publicPath = '/public5';
                     var apiKey = 'apiKey2';
                     var url = 'wring_url';
@@ -307,7 +325,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('error making th accounting, wrong unit (500)', function (done) {
+                it('should fail (401) when an error occur making the accounting (wrong unit)', function (done) {
                     var publicPath = '/public6';
                     var apiKey = 'apiKey3';
                     var url = 'http://localhost:' + test_config.accounting_port;
@@ -335,7 +353,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('correct (200) response and accounting (call unit)', function (done) {
+                it('should get the correct information and make the accounting using call unit', function (done) {
                     var publicPath = '/public7';
                     var apiKey = 'apiKey3';
                     var url = 'http://localhost:' + test_config.accounting_port;
@@ -386,7 +404,7 @@ async.each(test_config.databases, function (database, task_callback) {
                     });
                 });
 
-                it('correct (200) response and accounting (megabyte unit)', function (done) {
+                it('should get the correct information and make the accounting using megabyte unit', function (done) {
                     var publicPath = '/public8';
                     var apiKey = 'apiKey4';
                     var url = 'http://localhost:' + test_config.accounting_port;
@@ -422,8 +440,57 @@ async.each(test_config.databases, function (database, task_callback) {
                                                 productId: buys[0].productId,
                                                 recordType: buys[0].recordType,
                                                 unit: buys[0].unit,
-                                                value: '0.00000858306884765625'
+                                                value: '0.16722679138183594'
                                             });
+                                            task_callback();
+                                        } else {
+                                            task_callback();
+                                        }
+                                    }, function () {
+                                        done();
+                                    });
+                                });
+                            });
+                        }
+                    });
+                });
+
+                it('should get the correct information and make the accounting using millisecond unit', function (done) {
+                    var publicPath = '/public9';
+                    var apiKey = 'apiKey5';
+                    var url = 'http://localhost:' + test_config.accounting_port;
+                    var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
+                    var buys = [{
+                        apiKey: apiKey,
+                        publicPath: publicPath,
+                        orderId: 'orderId5',
+                        productId: 'productId5',
+                        customer: userProfile.id,
+                        unit: 'millisecond',
+                        recordType: 'timeUsage'
+                    }];
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                        if (err) {
+                            console.log('Error preparing the database');
+                            process.exit(1);
+                        } else {
+                            request(server.app)
+                            .get(publicPath + '/rest/megabyte')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200, function () {
+                                db_mock.getNotificationInfo(function (err, accInfo) {
+                                    async.each(accInfo, function (acc, task_callback) {
+                                        if (acc.apiKey === apiKey) {
+                                            assert.equal(err, null);
+                                            assert.equal(acc.apiKey, apiKey);
+                                            assert.equal(acc.correlationNumber, '0');
+                                            assert.equal(acc.customer, buys[0].customer);
+                                            assert.equal(acc.orderId, buys[0].orderId);
+                                            assert.equal(acc.productId, buys[0].productId);
+                                            assert.equal(acc.recordType, buys[0].recordType);
+                                            assert.equal(acc.unit, buys[0].unit);
+                                            assert.notEqual(acc.value, 0);
                                             task_callback();
                                         } else {
                                             task_callback();

@@ -22,6 +22,9 @@ var mock_config = {
             newBuy: '/accounting_proxy/buys',
             checkUrl: '/accounting_proxy/urls',
         }
+    },
+    log: {
+        file: 'file'
     }
 };
 
@@ -29,8 +32,19 @@ var log_mock = {
     log: function (level, msg) {},
     info: function (msg) {},
     warn: function (msg) {},
-    error: function (msg) {}
-}
+    error: function (msg) {},
+    transports: {
+        File: function (options) {}
+    }
+};
+
+var expressWinston_mock = {
+    logger: function (options) {
+        return function (req, res, next) {
+            next();
+        };
+    }
+};
 
 var prepare_tests = function (database) {
     switch (database) {
@@ -50,6 +64,7 @@ var prepare_tests = function (database) {
                 './APIServer': api_server,
                 './notifier': {},
                 'winston': log_mock, // Not display logger messages while testing
+                'express-winston': expressWinston_mock,
                 './orion_context_broker/db_handler': {}
             });
             break;
@@ -69,6 +84,7 @@ var prepare_tests = function (database) {
                 './APIServer': api_server,
                 './notifier': {},
                 'winston': log_mock, // Not display logger messages while testing
+                'express-winston': expressWinston_mock,
                 './orion_context_broker/db_handler': {}
             });
             break;
@@ -118,7 +134,7 @@ async.each(test_config.databases, function (database, task_callback) {
 
             describe('[GET:' + mock_config.api.administration_paths.units + '] accounting units request', function () {
 
-                it('correct (200) return all the accounting units', function (done) {
+                it('should return all the accounting units (200) when the request is correct', function (done) {
                     request(server.app)
                         .get(mock_config.api.administration_paths.units)
                         .expect(200, {units: mock_config.modules.accounting}, done);
@@ -127,13 +143,13 @@ async.each(test_config.databases, function (database, task_callback) {
 
             describe('[GET:' +  mock_config.api.administration_paths.keys + '] user api-keys request', function () {
 
-                it('no "X-Actor-ID header" (400)', function (done) {
+                it('should fail (400) when "X-Actor-ID" header is not defined', function (done) {
                     request(server.app)
                         .get(mock_config.api.administration_paths.keys)
                         .expect(400, {error: 'Undefined "X-Actor-ID" header'}, done);
                 });
 
-                it('no valid user (400)', function (done) {
+                it('should fail (400) when the user is not valid', function (done) {
                     var user = 'wrong';
                     request(server.app)
                         .get('/accounting_proxy/keys')
@@ -141,7 +157,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         .expect(404, {error: 'No api-keys available for the user ' + user}, done);
                 });
 
-                it('correct (200) return api-keys', function (done) {
+                it('should return the api-keys when the request is correct', function (done) {
                     var buyInfo1 = {
                         apiKey: 'apiKey1',
                         publicPath: '/public1',
@@ -174,14 +190,14 @@ async.each(test_config.databases, function (database, task_callback) {
 
             describe('[POST:' + mock_config.api.administration_paths.checkUrl +'] checkUrl request', function () {
 
-                it('invalid content-type (415)', function (done) {
+                it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
                         .post(mock_config.api.administration_paths.checkUrl)
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
-                it('incorrect body (400)', function (done) {
+                it('should fail (400) when the body body is not correct', function (done) {
                     var url = 'http://localhost:9000/path';
                     request(server.app)
                         .post(mock_config.api.administration_paths.checkUrl)
@@ -189,7 +205,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         .expect(400, {error: 'Invalid body, url undefined'}, done);
                 });
 
-                it('invalid url (400)', function (done) {
+                it('should fail (400) when the body url is not valid', function (done) {
                     var url = 'http://localhost:9000/wrong_path';
                     request(server.app)
                         .post(mock_config.api.administration_paths.checkUrl)
@@ -198,7 +214,7 @@ async.each(test_config.databases, function (database, task_callback) {
                         .expect(400, {error: 'Incorrect url ' + url}, done);
                 });
 
-                it('correct url and update the token (200)', function (done) {
+                it('should update the token (200) when the request is correct', function (done) {
                     var url = 'http://localhost:9000/path';
                     var newToken = 'token2';
                     db_mock.addToken('token1', function (err) {
@@ -230,16 +246,16 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            describe('[POST: ' + mock_config.api.administration_paths.newBuy +'] new buy request', function () {
+            describe('[POST:' + mock_config.api.administration_paths.newBuy +'] new buy request', function () {
 
-                it('invalid content-type (415)', function (done) {
+                it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
                         .post(mock_config.api.administration_paths.newBuy)
                         .set('content-type', 'text/html')
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
-                it('invalid json (400)', function (done) {
+                it('should fail (400) when the json is not valid', function (done) {
                     request(server.app)
                             .post(mock_config.api.administration_paths.newBuy)
                             .set('content-type', 'application/json')
@@ -247,7 +263,7 @@ async.each(test_config.databases, function (database, task_callback) {
                             .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
                 });
 
-                it('correct buy request (200)', function (done) {
+                it('should save the buy information when the request is correct', function (done) {
                     var url = 'http://example.com/path';
                     var buy = {
                         orderId: 'orderId3',

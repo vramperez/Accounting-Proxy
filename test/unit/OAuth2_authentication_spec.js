@@ -194,7 +194,7 @@ describe('Testing "OAuth2_authentication"', function () {
                 assert.equal(spies.res.status.getCall(0).args[0], 500);
                 assert.equal(spies.res.send.callCount, 1);
                 assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error in database getting the appId');
+                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
                 done();
             });
         });
@@ -241,7 +241,7 @@ describe('Testing "OAuth2_authentication"', function () {
                 assert.equal(spies.res.status.getCall(0).args[0], 500);
                 assert.equal(spies.res.send.callCount, 1);
                 assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error in database getting the appId');
+                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
                 done();
             });
         });

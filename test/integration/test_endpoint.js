@@ -15,7 +15,7 @@ var call_handler = function (req, res) {
 };
 
 var megabyte_handler =  function (req, res) {
-    fs.readFile('./ejemplo.html', function (err, html) {
+    fs.readFile('./test/integration/ejemplo.html', function (err, html) {
         res.writeHeader(200,  {"Content-Type": "text/html"});
         res.write("" + html);
         res.end();
@@ -53,6 +53,17 @@ var unsubscribeContextDelete = function (req, res) {
             reasonPhrase: "OK"
         },
         subscriptionId: subscriptionId
+    }));
+    res.end();
+};
+
+var updateContextSubscription = function (req, res) {
+    res.writeHeader(200, {'Content-Type': 'application/json'});
+    res.write(JSON.stringify({
+        subscribeResponse: {
+            subscriptionId: subscriptionId,
+            duration: req.body.duration
+        }
     }));
     res.end();
 };
@@ -177,4 +188,5 @@ app.get('/v1/contextEntities', contextEntities);
 app.get('/v1/contextTypes', contextTypes);
 app.post('/v1/subscribeContext', subscribeContext);
 app.post('/v1/unsubscribeContext', unsubscribeContext);
+app.post('/v1/updatecontextsubscription', updateContextSubscription);
 app.delete('/v1/contextSubscriptions/' + subscriptionId, unsubscribeContextDelete);

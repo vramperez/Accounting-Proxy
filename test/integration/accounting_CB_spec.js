@@ -8,7 +8,7 @@ var request = require('supertest'),
     prepare_test = require('./prepareDatabase'),
     redis = require('redis');
 
-var server, db_mock, cb_handler_mock, authentication_mock;
+var db_mock, cb_handler_mock, authentication_mock, accounter_mock;
 var mock_config = {};
 
 var logger_mock = { // Avoid display server information while running the tests
@@ -39,7 +39,8 @@ var notifier_mock = {
     },
     acc_modules: {
         megabyte: require('../../acc_modules/megabyte'),
-        call: require('../../acc_modules/call')
+        call: require('../../acc_modules/call'),
+        millisecond: require('../../acc_modules/millisecond')
     }
 };
 
@@ -47,7 +48,10 @@ var log_mock = {
     log: function (level, msg) {},
     info: function (msg) {},
     warn: function (msg) {},
-    error: function (msg) {}
+    error: function (msg) {},
+    transports: {
+        File: function (options) {}
+    }
 };
 
 var mock_config = {
@@ -72,6 +76,17 @@ var mock_config = {
             'customer': '',
             'seller': ''
         }
+    },
+    log: {
+        file: 'file'
+    }
+};
+
+var expressWinston_mock = {
+    logger: function (options) {
+        return function (req, res, next) {
+            next();
+        };
     }
 };
 
@@ -114,21 +129,31 @@ var mocker = function (database, done) {
                         './db': db_mock
                     });
                     callback(null);
+                }, function (callback) {
+                    accounter_mock = proxyquire('../../accounter', {
+                        './config': mock_config,
+                        './notifier': notifier_mock
+                    });
+                    callback(null);
                 },
                 function (callback) {
                     cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                         '../config': mock_config,
                         'winston': log_mock,
-                        '.././db': db_mock
+                        '../notifier': notifier_mock,
+                        '../accounter': accounter_mock,
+                        '../db': db_mock
                     });
                     callback(null);
-                }, function (callback) {
+                }, 
+                function (callback) {
                     server = proxyquire('../../server', {
                         './config': mock_config,
                         './db': db_mock,
                         './APIServer': api_mock,
-                        './notifier': notifier_mock,
+                        './accounter': accounter_mock,
                         'winston': log_mock, // Not display logger messages while testing
+                        'express-winston': expressWinston_mock,
                         './orion_context_broker/cb_handler': cb_handler_mock,
                         'OAuth2_authentication': authentication_mock
                     });
@@ -165,10 +190,19 @@ var mocker = function (database, done) {
                     callback(null);
                 },
                 function (callback) {
+                    accounter_mock = proxyquire('../../accounter', {
+                        './config': mock_config,
+                        './notifier': notifier_mock
+                    });
+                    callback(null);
+                },
+                function (callback) {
                    cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
                         '../config': mock_config,
                         'winston': log_mock,
-                        '.././db_Redis': db_mock
+                        '../notifier': notifier_mock,
+                        '../accounter': accounter_mock,
+                        '../db_Redis': db_mock
                     });
                     callback(null);
                 }, function (callback) {
@@ -176,9 +210,10 @@ var mocker = function (database, done) {
                         './config': mock_config,
                         './db_Redis': db_mock,
                         './APIServer': api_mock,
-                        './notifier': notifier_mock,
+                        './accounter': accounter_mock,
                         'winston': log_mock, // Not display logger messages while testing
                         './orion_context_broker/cb_handler': cb_handler_mock,
+                        'express-winston': expressWinston_mock,
                         'OAuth2_authentication': authentication_mock
                     });
                     callback(null);
@@ -250,7 +285,7 @@ async.each(test_config.databases, function (database, task_callback) {
 
         describe('with database ' + database, function () {
 
-            it('undefined "X-API-KEY" header', function (done) {
+            it('should fail (401) when the "X-API-KEY" header is not defined', function (done) {
                 var publicPath = '/public1';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
@@ -267,7 +302,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('invalid api-key or user', function (done) {
+            it('should fail (401) when the api-key or user is not valid', function (done) {
                 var publicPath = '/public2';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url , appId: userProfile.appId}];
@@ -294,7 +329,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('error sending the request to endpoint (504)', function (done) {
+            it('should fail (504) when an error occur sending the request to the endpoint', function (done) {
                 var publicPath = '/public3';
                 var url = 'wrong';
                 var apiKey = 'apiKey2';
@@ -322,7 +357,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('error making th accounting, wrong unit (500)', function (done) {
+            it('should fail (500) when an error occur making the accounting (wrong unit)', function (done) {
                 var publicPath = '/public4';
                 var apiKey = 'apiKey3';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -350,7 +385,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Get entity (200), correct accounting (megabyte unit)', function (done) {
+            it('should return the entity (200) and make correct accounting usgin megabyte unit', function (done) {
                 var publicPath = '/public5';
                 var apiKey = 'apiKey4';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -382,7 +417,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Get entity (200), correct accounting (call unit)', function (done) {
+            it('should return the entity (200) and make correct accounting usgin megabyte unit', function (done) {
                 var publicPath = '/public6';
                 var apiKey = 'apiKey5';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -414,7 +449,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Get all entities (200), correct accounting (megabyte unit)', function (done) {
+            it('should return the entity (200) and make correct accounting usgin millisecond unit', function (done) {
                 var publicPath = '/public7';
                 var apiKey = 'apiKey6';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -446,7 +481,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Get all entities (200), correct accounting (call unit)', function (done) {
+            it('should return all entities (200) and make correct accounting usgin call unit', function (done) {
                 var publicPath = '/public8';
                 var apiKey = 'apiKey7';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -478,7 +513,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Browse all types and detailed information (200), correct accounting (megabyte unit)', function (done) {
+            it('should return all types and detailed information (200) and make correct accounting using megabyte unit', function (done) {
                 var publicPath = '/public9';
                 var apiKey = 'apiKey8';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -510,7 +545,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('Browse all types and detailed information (200), correct accounting (call unit)', function (done) {
+            it('should return all types and detailed information (200) and make correct accounting using call unit', function (done) {
                 var publicPath = '/public9';
                 var apiKey = 'apiKey8';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -542,7 +577,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Error, "content-type" different from "application/json"', function (done) {
+            it('[Subscribe] shoudl fail (415) when "content-type" is different from "application/json"', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
                 var url = 'http://localhost';
@@ -595,7 +630,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Error sending the request to Context-Broker (504)', function (done) {
+            it('[Subscribe] should fail (504) when an error occur sending the request to Context-Broker', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
                 var url = 'http://localhost';
@@ -649,7 +684,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[Subscribe] Correct subscription (200)', function (done) {
+            it('[Subscribe] should save the subscription', function (done) {
                 var publicPath = '/public11';
                 var apiKey = 'apiKey10';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -714,7 +749,74 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[ubscribe] Error sending the request to Context-Broker (504)', function (done) {
+            it('[Subscribe] should save the subscription and make the duration accounting using millisecond unit', function (done) {
+                var publicPath = '/public15';
+                var apiKey = 'apiKey14';
+                var url = 'http://localhost:' + test_config.accounting_CB_port;
+                var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
+                var buys = [{
+                    apiKey: apiKey,
+                    publicPath: publicPath,
+                    orderId: 'orderId14',
+                    productId: 'productId14',
+                    customer: userProfile.id,
+                    unit: 'millisecond',
+                    recordType: 'timeUsage'
+                }];
+                var payload = {
+                    "entities": [
+                        {
+                            "type": "Room",
+                            "isPattern": "false",
+                            "id": "Room1"
+                        }
+                    ],
+                    "attributes": [
+                        "temperature"
+                    ],
+                    "reference": "http://localhost:1028/accumulate",
+                    "duration": "P1M",
+                    "notifyConditions": [
+                        {
+                            "type": "ONCHANGE",
+                            "condValues": [
+                                "pressure"
+                            ]
+                        }
+                    ],
+                    "throttling": "PT5S"
+                }
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    if (err) {
+                        console.log('Error preparing the database');
+                        process.exit(1);
+                    } else {
+                        request(server.app)
+                        .post(publicPath + '/v1/subscribeContext')
+                        .set('x-auth-token', userProfile.accessToken)
+                        .set('X-API-KEY', apiKey)
+                        .set('content-type', 'application/json')
+                        .type('json')
+                        .send(JSON.stringify(payload))
+                        .expect(200)
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                assert.equal(err, null);
+                                assert.deepEqual(subsInfo, {
+                                    apiKey: apiKey,
+                                    notificationUrl: payload["reference"],
+                                    unit: buys[0].unit
+                                });
+                                checkAccounting(apiKey, 30*24*60*60*1000, function () {
+                                    done();
+                                });
+                            });
+                        });
+                    }
+                });
+            });
+
+            it('[Unsubscribe] should fail (504) when an error occur sending the request to Context-Broker', function (done) {
                 var publicPath = '/public12';
                 var apiKey = 'apiKey11';
                 var url = 'http://localhost';
@@ -746,7 +848,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[Unubscribe (POST)] Correct subscription (200)', function (done) {
+            it('[Unsubscribe (POST)] should unsubscribe the user and delete the subscription information', function (done) {
                 var publicPath = '/public13';
                 var apiKey = 'apiKey12';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -823,7 +925,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 });
             });
 
-            it('[Unubscribe (DELETE)] Correct subscription (200)', function (done) {
+            it('[Unsubscribe (DELETE)] should unsubscribe the user and delete the subscription information', function (done) {
                 var publicPath = '/public14';
                 var apiKey = 'apiKey13';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -891,6 +993,238 @@ async.each(test_config.databases, function (database, task_callback) {
                                     db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
                                         assert.equal(subsInfo, null);
+                                        done();
+                                    });
+                                });
+                            });
+                        });
+                    }
+                });
+            });
+
+            it('[UpdateSubscription] should not make accounting when unit is call', function (done) {
+                var publicPath = '/public15';
+                var apiKey = 'apiKey14';
+                var url = 'http://localhost:' + test_config.accounting_CB_port;
+                var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
+                var buys = [{
+                    apiKey: apiKey,
+                    publicPath: publicPath,
+                    orderId: 'orderId14',
+                    productId: 'productId14',
+                    customer: userProfile.id,
+                    unit: 'call',
+                    recordType: 'callusage'
+                }];
+                var payloadSubscription = {
+                    "entities": [
+                        {
+                            "type": "Room",
+                            "isPattern": "false",
+                            "id": "Room1"
+                        }
+                    ],
+                    "attributes": [
+                        "temperature"
+                    ],
+                    "reference": "http://localhost:1028/accumulate",
+                    "duration": "P1M",
+                    "notifyConditions": [
+                        {
+                            "type": "ONCHANGE",
+                            "condValues": [
+                                "pressure"
+                            ]
+                        }
+                    ],
+                    "throttling": "PT5S"
+                };
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    if (err) {
+                        console.log('Error preparing the database');
+                        process.exit(1);
+                    } else {
+                        request(server.app)
+                        .post(publicPath + '/v1/subscribeContext')
+                        .set('x-auth-token', userProfile.accessToken)
+                        .set('X-API-KEY', apiKey)
+                        .set('content-type', 'application/json')
+                        .type('json')
+                        .send(JSON.stringify(payloadSubscription))
+                        .expect(200)
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                assert.equal(err, null);
+                                assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                    notificationUrl: payloadSubscription["reference"],
+                                    unit: buys[0].unit
+                                });
+                                request(server.app)
+                                .post(publicPath + '/v1/updateContextSubscription')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('content-type', 'application/json')
+                                .set('X-API-KEY', apiKey)
+                                .type('json')
+                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                .expect(200)
+                                .end(function (err, res) {
+                                    db_mock.getNotificationInfo( function (err, info) {
+                                        assert.equal(err, null);
+                                        assert.equal(err, null);
+                                        done();
+                                    });
+                                });
+                            });
+                        });
+                    }
+                });
+            });
+
+            it('[UpdateSubscription] should not make accounting when unit is megabyte', function (done) {
+                var publicPath = '/public16';
+                var apiKey = 'apiKey15';
+                var url = 'http://localhost:' + test_config.accounting_CB_port;
+                var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
+                var buys = [{
+                    apiKey: apiKey,
+                    publicPath: publicPath,
+                    orderId: 'orderId15',
+                    productId: 'productId15',
+                    customer: userProfile.id,
+                    unit: 'megabyte',
+                    recordType: 'data'
+                }];
+                var payloadSubscription = {
+                    "entities": [
+                        {
+                            "type": "Room",
+                            "isPattern": "false",
+                            "id": "Room1"
+                        }
+                    ],
+                    "attributes": [
+                        "temperature"
+                    ],
+                    "reference": "http://localhost:1028/accumulate",
+                    "duration": "P1M",
+                    "notifyConditions": [
+                        {
+                            "type": "ONCHANGE",
+                            "condValues": [
+                                "pressure"
+                            ]
+                        }
+                    ],
+                    "throttling": "PT5S"
+                };
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    if (err) {
+                        console.log('Error preparing the database');
+                        process.exit(1);
+                    } else {
+                        request(server.app)
+                        .post(publicPath + '/v1/subscribeContext')
+                        .set('x-auth-token', userProfile.accessToken)
+                        .set('X-API-KEY', apiKey)
+                        .set('content-type', 'application/json')
+                        .type('json')
+                        .send(JSON.stringify(payloadSubscription))
+                        .expect(200)
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                assert.equal(err, null);
+                                assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                    notificationUrl: payloadSubscription["reference"],
+                                    unit: buys[0].unit
+                                });
+                                request(server.app)
+                                .post(publicPath + '/v1/updateContextSubscription')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('content-type', 'application/json')
+                                .set('X-API-KEY', apiKey)
+                                .type('json')
+                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                .expect(200)
+                                .end(function (err, res) {
+                                    db_mock.getNotificationInfo( function (err, info) {
+                                        assert.equal(err, null);
+                                        assert.equal(err, null);
+                                        done();
+                                    });
+                                });
+                            });
+                        });
+                    }
+                });
+            });
+
+            it('[UpdateSubscription] should make accounting when unit is millisecond', function (done) {
+                var publicPath = '/public17';
+                var apiKey = 'apiKey16';
+                var url = 'http://localhost:' + test_config.accounting_CB_port;
+                var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
+                var buys = [{
+                    apiKey: apiKey,
+                    publicPath: publicPath,
+                    orderId: 'orderId16',
+                    productId: 'productId16',
+                    customer: userProfile.id,
+                    unit: 'millisecond',
+                    recordType: 'timeUsage'
+                }];
+                var payloadSubscription = {
+                    "entities": [
+                        {
+                            "type": "Room",
+                            "isPattern": "false",
+                            "id": "Room1"
+                        }
+                    ],
+                    "attributes": [
+                        "temperature"
+                    ],
+                    "reference": "http://localhost:1028/accumulate",
+                    "duration": "P1M",
+                    "notifyConditions": [
+                        {
+                            "type": "ONCHANGE",
+                            "condValues": [
+                                "pressure"
+                            ]
+                        }
+                    ],
+                    "throttling": "PT5S"
+                };
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    if (err) {
+                        console.log('Error preparing the database');
+                        process.exit(1);
+                    } else {
+                        request(server.app)
+                        .post(publicPath + '/v1/subscribeContext')
+                        .set('x-auth-token', userProfile.accessToken)
+                        .set('X-API-KEY', apiKey)
+                        .set('content-type', 'application/json')
+                        .type('json')
+                        .send(JSON.stringify(payloadSubscription))
+                        .expect(200)
+                        .end(function (err, res) {
+                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                assert.equal(err, null);
+                                assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                    notificationUrl: payloadSubscription["reference"],
+                                    unit: buys[0].unit
+                                });
+                                request(server.app)
+                                .post(publicPath + '/v1/updateContextSubscription')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('content-type', 'application/json')
+                                .set('X-API-KEY', apiKey)
+                                .type('json')
+                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                .expect(200)
+                                .end(function (err, res) {
+                                    checkAccounting(apiKey, 2*(30*24*60*60*1000)+(31*24*60*60*1000), function () {
                                         done();
                                     });
                                 });

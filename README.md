@@ -17,13 +17,6 @@
 	* [Testing](#tests)
 
 ## <a name="deployment"/> Deployment
-### <a name="softwarerequirements"/> Software Requirements:
-- NodeJS: [Homepage](http://nodejs.org/).
-    + Express Framework: [Homepage](http://expressjs.com/).
-    + Redis for NodeJs: [GitHub](https://github.com/NodeRedis/node_redis)
-    + Node Schedule: [GitHub](https://github.com/node-schedule/node-schedule).
-    + Commander: [GitHub](https://github.com/tj/commander.js).
-    + Orion Context Broker: [Homepage](http://fiware-orion.readthedocs.org/en/develop/index.html).
 
 ### <a name="installation"/> Installation:
 
@@ -44,26 +37,27 @@ In order to have the accounting proxy running there are some information to fill
  - `port`: port where the accounting proxy server is listening.
 ```
 {
-		port: 9000
+	port: 9000
 }
 ```
 
-* `config.database`: database configuration used by the proxy. Possible options:
- - `type`: database type. Two possible options: `./db` (slite database) or `./db_Redis` (redis database).
+* `config.database`: database configuration used by the proxy.
+ - `type`: database type. Two possible options: `./db` (sqlite database) or `./db_Redis` (redis database).
  - `name`: database name. If the database type select is redis, then this field select the database (0 to 14; 15 is reserved for testing).
 ```
 {
-		type: './db',
-    	name: 'accountingDB.sqlite'
+	type: './db',
+    name: 'accountingDB.sqlite'
 }
 ```
 
 * `config.modules`:  an array of supported accounting modules for accounting in different ways. Possible options are:
 	- `call`: accounting incremented in one unit each time the user send a request.
 	- `megabyte`: count the response amount of data  (in megabytes) and add to the actual accounting.
-```
+	- `millisecond`: count the request duration (in milliseconds) between the request sending and the response receiving from the service.
+`
 {
-		accounting: [ 'call', 'megabyte']
+	accounting: [ 'call', 'megabyte', 'millisecond']
 }
 ```
 Other accounting modules can be implemented and added here (see  [Accounting module](#accountingmodule) ).
@@ -75,9 +69,9 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
 	- `path`: path for the usage management API.
 ```
 {
-        host: 'localhost',
-        port: 8080,
-        path: '/DSUsageManagement/api/usageManagement/v2'
+	host: 'localhost',
+    port: 8080,
+    path: '/DSUsageManagement/api/usageManagement/v2'
 }
 ```
 
@@ -86,22 +80,47 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
 	- `notification_port`: port where the accounting proxy is listening to subscription notifications from the Orion Context Broker (port 9002 by default).
 ```
 {
-        contextBroker: false,
-        notification_port: 9002
+	contextBroker: false,
+	notification_port: 9002
 }
 ```
 
-* `config.api.administration_paths`: configuration of the administration paths.
-* `config.oauth2.roles`: configuration of the OAuth2 roles.
+* `config.api.administration_paths`: configuration of the administration paths. Default accounting paths are:
+```
+{
+	api: {
+    	administration_paths: {
+            keys: '/accounting_proxy/keys',
+            units: '/accounting_proxy/units',
+            newBuy: '/accounting_proxy/buys',
+            checkUrl: '/accounting_proxy/urls'
+    	}
+    }
+}
+```
+* `config.oauth2.roles`: configuration of the OAuth2 roles. Default roles are:
+```
+{
+	oauth2: {
+    	roles: {
+            admin: '106',
+            customer: '',
+            seller: ''
+        }
+    }
+}
+```
 
 ### <a name="componentsconfiguration"/> Components configuration
 -------------------------------
  The Accounting Proxy can proxied Orion Context Broker and other components by changing some configuration parameters.
+ 
 #### <a name="orionconfiguration"/> Orion Context Broker configuration
-In order to configure the Accounting Proxy working with Orion Context Broker there are some steps to follow:
-* First, configure the `config.resources` section of `config.js` file in the root of the project folder.
-	- `contextBroker`: set `true` this parameter.
-	- `notification_port`: port where the accounting proxy server is listening to subscription notifications.
+
+In order to configure the Accounting Proxy working with Orion Context Broker, configure the `resources` section of `config.js` file in the root of the project folder.
+
+* `contextBroker`: set `true` this parameter.
+* `notification_port`: port where the accounting proxy server is listening to subscription notifications.
 ```
 {
 		contextBroker: true,
@@ -111,11 +130,10 @@ In order to configure the Accounting Proxy working with Orion Context Broker the
 
 #### <a name="customizeconfiguration"/> Customizing Accounting Proxy for other components
 
-In order to configure the Accounting Proxy working with other components follow this two steps:
+In order to configure the Accounting Proxy working with other components just set to `false` the contextBroker option in the`config.js`:
 
-* First, configure the `config.resources` section of `config.js` file in the root of the project folder.
-	- `contextBroker`: set `false` this parameter to disable the Context Broker accounting.
-	- The rest of information in `config.resources` is unnecessary in this case.
+* `contextBroker`: set `false` this parameter to disable the Context Broker accounting.
+* The rest of information in `config.resources` is unnecessary in this case.
 
 
 ## <a name="authentication"/> Authentication
@@ -128,7 +146,7 @@ If the authentication process success, the Accounting-Proxy check the authorizat
 If the user is an administrator of the service, the administrator request must omit the "X-API-KEY" header. After the administrator request is authenticated, the request will be redirected to the service and no accounting will be made.
 
 ## <a name="running"/> Running
-Just execute:
+After [installation](#installation), just execute:
 ```
 node accounting-proxy
 ```
@@ -136,11 +154,15 @@ node accounting-proxy
 ## <a name="cli"/> CLI
 
 In order to manage servicies, use 'cli' tool. The available commands are:
-* `./cli addService <publicPath> <url> <appId>`: binds the public path with the url specified.
+
+* `./cli addService <publicPath> <url> <appId>`: binds the public path with the url specified and the application ID. All request with an access token from a different application will be rejected. The public path valid patterns are the following:
+	-	`/publicPath`: only the first part of the path.
+	-	`/this/is/the/final/resource/path`: the complete resource path. In this case, the proxy will use this path to make the request.
+For instance, a public path such as `/public/path` is not valid.
 * `./cli getService <publicPath>`: returns the url and appID associated with the public path.
 * `./cli getAllServices`: display all the registered services (public path, URL and appId).
 * `./cli deleteService <publicPath>`: delete the service associated with the public path.
-* `./cli addAdmin <userId>: add a new administrator.
+* `./cli addAdmin <userId>`: add a new administrator.
 * `./cli deleteAdmin <userId>`: delete the specified admin.
 * `./bindAdmin <userId> <publicPath>`: add the specified administrator to the service specified by the public path.
 * `./cli unbindAdmin <userId> <publicPath>`: delete the specified administrator for the specified service by its public path.
@@ -168,11 +190,16 @@ Use by the store to notify a new buy:
  }
 }
 ```
+* `orderId`: order identifier.
+* `productId`: product identifier.
+* `customer`: the userId os the customer.
+* `url`: base url of the service.
 * `unit`: accounting unit (`megabyte`, `call`, ...).
+* `recordType`: type of accounting.
 
 ### POST ../urls
 
-Use by the store to check an URL:
+Use by the store to check if an URL is valid:
 ```json
 {
  "url": "..."
@@ -181,11 +208,16 @@ Use by the store to check an URL:
 
 ### GET ../keys
 
-Retrieve the user's API_KEYs in a json:
+Retrieve the user's API_KEYs in a json. The user is specified in the `X-ACTOR-ID` request header.
 
 ```json
 [
 	{
+    	"apiKey": "...",
+        "productId": "...",
+        "orderId": "..."
+    },
+    {
     	"apiKey": "...",
         "productId": "...",
         "orderId": "..."
@@ -211,11 +243,17 @@ Accounting modules in the *acc_modules* folder should be implemented following t
 ```javascript
 /** Accounting module for unit: XXXXXX */
 
-var count = function (response, callback) {
+var count = function (countInfo, callback) {
     // Code to do the accounting goes here
     // .....
 
     return callback(error, amount);
+}
+
+var subscriptionCount = function (countInfo, callback) {
+	// Code to do the Context Broker subscription accounting
+
+	return callback(error, amount);
 }
 
 var getSpecification = function (callback) {
@@ -223,11 +261,38 @@ var getSpecification = function (callback) {
 }
 ```
 
-The function `count` receives three parameters:
-- `response` object.
-- `callback` function, which is use to retrieve the amount to count or the error. The function has 2 parameters:
-  + `error` string, with a description of the error if there is one. Otherwise, `undefined`.
-  + `ammount` number, with the amount to add to the accounting.
+The function `count` receives two parameters:
+- `countInfo`object with the following information:
+```
+{
+	request: { // Request object used by the proxy to make the request to the service.
+    	headers: {
+        
+        },
+        body: {
+        
+        },
+        time: ,
+        ...
+    
+    },
+    response: { // Response object received from the service.
+    	headers: {
+        
+        },
+        body: {
+        
+        },
+        time: ,
+        ...
+    }
+}
+```
+- `callback` function, which is use to retrieve the accounting value or the error message. The function has 2 parameters:
+  + `error`: string with a description of the error if there is one. Otherwise, `null`.
+  + `ammount`: number with the amount to add to the accounting.
+
+The function `subscriptionCount` is an optional count function that only will be called when the proxy receives a valid Context Broker subscription. The arguments are the same as in the `count` function, but in this case the field `time` will be `undefined` in the `countInfo` argument.
 
 The function `getSpecification` should return a javascript object with the usage specification for the accounting unit according to the TMF635 usage management API ([TMF635 usage Management API](https://www.tmforum.org/resources/standard/tmf635-usage-management-api-rest-specification-r14-5-0/)).
 
@@ -239,4 +304,4 @@ npm test
 Test reporter generates a directory `./coverage` with all the coverage information (coverage reporter is generated by Istanbul).
 
 ---
-Last updated: _01/04/2016
+Last updated: _13/04/2016

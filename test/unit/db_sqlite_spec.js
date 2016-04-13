@@ -123,7 +123,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addToken(token, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error adding the acces token "' + token + '" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentences[0]);
                     done();
@@ -143,7 +143,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addToken(token, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error adding the acces token "' + token + '" .');
                     assert.equal(spies.run.callCount, 2);
                     assert.equal(spies.run.getCall(0).args[0], sentences[0]);
                     assert.deepEqual(spies.run.getCall(1).args[1], params);
@@ -188,7 +188,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getToken(function (err, token) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the access token.');
                     assert.equal(token, null);
                     assert.equal(spies.get.callCount, 1);
                     assert.equal(spies.get.getCall(0).args[0], sentence);
@@ -246,7 +246,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addSpecificationRef(unit, href, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -273,7 +273,7 @@ describe('Testing SQLITE database', function () {
         });
     });
 
-    describe('Function "GEThREF"', function () {
+    describe('Function "getHref"', function () {
         var sentence = 'SELECT href             FROM units             WHERE $unit=unit';
         var unit = 'megabyte';
         var href = {href: 'http://example:999/api'};
@@ -287,7 +287,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getHref(unit, function (err, res) {
-                    assert.equal(err, 'Error getting the href for unit ' + unit);
+                    assert.equal(err, 'Error getting the href for unit "' + unit + '" .');
                     assert.equal(res, null);
                     assert.equal(spies.get.callCount, 1);
                     assert.equal(spies.get.getCall(0).args[0], sentence);
@@ -352,7 +352,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.newService(publicPath, url, appId, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding the new service.');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -394,7 +394,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteService(publicPath, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database deleting the service.');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -438,7 +438,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getService(publicPath, function (err, service) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the service.');
                     assert.equal(service,  null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -508,7 +508,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAllServices(function (err, services) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the services.');
                     assert.equal(services, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -549,7 +549,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAppId(publicPath, function (err, appId) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the appId.');
                     assert.equal(appId, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -609,7 +609,7 @@ describe('Testing SQLITE database', function () {
             }
             mocker(implementations, function (db, spies) {
                 db.addAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding admin: "' + idAdmin + '" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -649,7 +649,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -693,7 +693,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database binding the admin to the service.');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -737,7 +737,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.unbindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database unbinding the administrator.');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -785,7 +785,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies){
                 db.getAdmins(publicPath, function (err, admins) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the administrators.');
                     assert.equal(admins, admins);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -853,7 +853,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAdminUrl(idAdmin, publicPath, function (err, url) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the admin url.');
                     assert.equal(url, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -914,7 +914,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.checkPath('/path', function (err, check) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error checking the path.');
                     assert.equal(check,  false);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -992,7 +992,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.newBuy(buyInformation, function (err, check) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding the new buy.');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -1033,7 +1033,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in databse getting api-keys.');
                     assert.equal(apiKeys, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -1096,7 +1096,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.checkRequest('0001', apiKey, publicPath, function (err, check) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database checking the request.');
                     assert.equal(check, false);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -1175,7 +1175,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getAccountingInfo('apiKey', function (err, accInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the accounting info.');
                     assert.equal(accInfo, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -1240,7 +1240,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database getting the notification information.');
                     assert.equal(notificationInfo, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -1306,7 +1306,7 @@ describe('Testing SQLITE database', function () {
         it('amount less than 0', function (done) {
             mocker({}, function (db, spies) {
                 db.makeAccounting('apiKey', - 1.3, function (err) {
-                    assert.equal(err, '[ERROR] The aomunt must be greater than 0');
+                    assert.equal(err, 'The aomunt must be greater than 0.');
                     done();
                 });
             });
@@ -1320,7 +1320,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error making the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     done(); 
                 });
@@ -1343,7 +1343,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.makeAccounting('apiKey', 1.5, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error making the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
                     assert.deepEqual(runSpy.getCall(0).args[0], sentence);
@@ -1372,7 +1372,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.makeAccounting('apiKey', 1.5, function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error making the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
                     assert.deepEqual(runSpy.getCall(0).args[0], sentence);
@@ -1429,7 +1429,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error reseting the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     done(); 
                 });
@@ -1452,7 +1452,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error reseting the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
                     assert.deepEqual(runSpy.getCall(0).args[0], sentence);
@@ -1481,7 +1481,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error reseting the accounting.');
                     assert.equal(spies.beginTransaction.callCount, 1);
                     assert.equal(runSpy.callCount, 1);
                     assert.deepEqual(runSpy.getCall(0).args[0], sentence);
@@ -1539,7 +1539,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.addCBSubscription('apiKey', 'subscriptionId', 'http://notification/url', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error in database adding the subscription "subscriptionId" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);
@@ -1582,7 +1582,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.getCBSubscription('subscriptionId', function (err, subscriptionInfo) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error getting the subscription.');
                     assert.equal(subscriptionInfo, null);
                     assert.equal(spies.all.callCount, 1);
                     assert.equal(spies.all.getCall(0).args[0], sentence);
@@ -1649,7 +1649,7 @@ describe('Testing SQLITE database', function () {
             };
             mocker(implementations, function (db, spies) {
                 db.deleteCBSubscription('subscriptionId', function (err) {
-                    assert.equal(err, 'Error');
+                    assert.equal(err, 'Error deleting the subscription "subscriptionId" .');
                     assert.equal(spies.run.callCount, 1);
                     assert.equal(spies.run.getCall(0).args[0], sentence);
                     assert.deepEqual(spies.run.getCall(0).args[1], params);

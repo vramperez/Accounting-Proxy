@@ -374,7 +374,7 @@ describe('Testing APIServer', function() {
                 assert.equal(spies.db.addToken.callCount, 1);
                 assert.equal(spies.db.addToken.getCall(0).args[0], token);
                 assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error saving the token in database');
+                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
                 assert.equal(spies.url.parse.callCount, 1);
                 assert.equal(spies.url.parse.getCall(0).args[0], url);
                 assert.equal(spies.db.checkPath.callCount, 1);

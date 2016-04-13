@@ -229,7 +229,7 @@ describe('Testing Notifier', function () {
             };
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
-                    assert.equal(err, 'Error getting the access token from db');
+                    assert.equal(err, 'Error');
                     assert.equal(spies.async.each.callCount, 1);
                     assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
                     assert.equal(spies.db.getHref.callCount, 1);
@@ -294,7 +294,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: token
+                            authorization: 'Bearer ' + token
                         },
                         body: specification
                     });
@@ -356,7 +356,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: token
+                            authorization: 'Bearer ' + token
                         },
                         body: specification
                     });
@@ -422,7 +422,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: token
+                            authorization: 'Bearer ' + token
                         },
                         body: specification
                     });
@@ -491,7 +491,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: token
+                            authorization: 'Bearer ' + token
                         },
                         body: specification
                     });
@@ -603,7 +603,7 @@ describe('Testing Notifier', function () {
             };
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
-                    assert.equal(err, 'Error obteining the token');
+                    assert.equal(err, 'Error');
                     assert.equal(spies.db.getNotificationInfo.callCount, 1);
                     assert.equal(spies.db.getHref.callCount, 1);
                     assert.equal(spies.logger.info.callCount, 1);
@@ -676,7 +676,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: token
+                        authorization: 'Bearer ' + token
                     });
                     done();
                 });
@@ -742,7 +742,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: token
+                        authorization: 'Bearer ' + token
                     });
                     done();
                 });
@@ -810,7 +810,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: token
+                        authorization: 'Bearer ' + token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);
                     assert.equal(spies.db.resetAccounting.getCall(0).args[0], notificationInfo.apiKey);
@@ -880,7 +880,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: token
+                        authorization: 'Bearer ' + token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);
                     assert.equal(spies.db.resetAccounting.getCall(0).args[0], notificationInfo.apiKey);

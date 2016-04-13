@@ -32,6 +32,17 @@ var mock_config = {
             newBuy: '/accounting_proxy/buys',
             checkUrl: '/accounting_proxy/urls',
         }
+    },
+    log: {
+        file: 'file'
+    }
+};
+
+var expressWinston_mock = {
+    logger: function (options) {
+        return function (req, res, next) {
+            next();
+        };
     }
 };
 
@@ -78,7 +89,10 @@ var mocker = function (database) {
                 './db': db_mock,
                 './notifier': notifier_mock,
                 './APIServer': api_mock,
-                'winston': {},
+                'express-winston': expressWinston_mock,
+                'winston': {transports: {
+                    File: function (options) {}
+                }},
                 './OAuth2_authentication': OAuth2authentication_mock
             });
             break;
@@ -103,7 +117,12 @@ var mocker = function (database) {
                 '.db_Redis': db_mock,
                 './notifier': notifier_mock,
                 './APIServer': api_mock,
-                'winston': {},
+                'express-winston': expressWinston_mock,
+                'winston': {
+                    transports: {
+                        File: function (options) {}
+                    }
+                },
                 './OAuth2_authentication': OAuth2authentication_mock
             });
             db_mock.init(function (err) {

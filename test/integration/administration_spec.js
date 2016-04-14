@@ -46,31 +46,38 @@ var expressWinston_mock = {
     }
 };
 
-var prepare_tests = function (database) {
-    switch (database) {
-        case 'sql':
-            mock_config.database.type = './db';
-            mock_config.database.name = 'testDB_administration.sqlite1';
-            db_mock = proxyquire('../../db', {
-                './config': mock_config
-            });
-            api_server = proxyquire('../../APIServer', {
-                './config': mock_config,
-                './db': db_mock
-            });
-            server = proxyquire('../../server', {
-                './config': mock_config,
-                './db': db_mock,
-                './APIServer': api_server,
-                './notifier': {},
-                'winston': log_mock, // Not display logger messages while testing
-                'express-winston': expressWinston_mock,
-                './orion_context_broker/db_handler': {}
-            });
-            break;
-        case 'redis':
+var mocker = function (database) {
+    if (database === 'sql') {
+        mock_config.database.type = './db';
+        mock_config.database.name = 'testDB_administration.sqlite1';
+        db_mock = proxyquire('../../db', {
+            './config': mock_config
+        });
+        api_server = proxyquire('../../APIServer', {
+            './config': mock_config,
+            './db': db_mock
+        });
+        server = proxyquire('../../server', {
+            './config': mock_config,
+            './db': db_mock,
+            './APIServer': api_server,
+            './notifier': {},
+            'winston': log_mock, // Not display logger messages while testing
+            'express-winston': expressWinston_mock,
+            './orion_context_broker/db_handler': {}
+        });
+    } else { 
+        var redis_host = test_config.redis_host;
+        var redis_port = test_config.redis_port;
+
+        if (! redis_host || ! redis_port) {
+            console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+            process.exit(1);
+        } else {
             mock_config.database.type = './db_Redis';
-            mock_config.database.name = test_config.database_redis;
+            mock_config.database.name = test_config.redis_database;
+            mock_config.database.redis_host = redis_host;
+            mock_config.database.redis_port = redis_port;
             db_mock = proxyquire('../../db_Redis', {
                 './config': mock_config
             });
@@ -87,7 +94,7 @@ var prepare_tests = function (database) {
                 'express-winston': expressWinston_mock,
                 './orion_context_broker/db_handler': {}
             });
-            break;
+        }
     }
     db_mock.init(function (err) {
         if (err) {
@@ -102,7 +109,7 @@ async.each(test_config.databases, function (database, task_callback) {
     describe('Testing the administration API', function (done) {
 
         before(function () { // Mock the database
-            prepare_tests(database);
+            mocker(database);
         });
 
         /**
@@ -118,9 +125,9 @@ async.each(test_config.databases, function (database, task_callback) {
                 task_callback();
             } else {
                 var client = redis.createClient();
-                client.select(test_config.database_redis, function (err) {
+                client.select(test_config.redis_database, function (err) {
                     if (err) {
-                        console.log('Error deleting redis database: ' + test_config.database_redis);
+                        console.log('Error deleting redis database: ' + test_config.redis_database);
                         task_callback();
                     } else {
                         client.flushdb();

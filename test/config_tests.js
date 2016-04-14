@@ -6,10 +6,13 @@ var config_tests = {};
 config_tests.integration = {
 	
 	// Databases used by integration tests. Possible values: 'sqlite', 'redis'
-	databases: ['sql', 'redis'],
+	databases: ['redis', 'sql'],
 
     // Database used by redis to test.
-    database_redis: 15,
+    redis_database: 15,
+
+    redis_host: 'localhost',
+    redis_port: 6379,
 
     accounting_CB_port: 9020,
 	accounting_port: 9030,

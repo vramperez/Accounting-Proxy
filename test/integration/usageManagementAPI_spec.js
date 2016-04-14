@@ -1,6 +1,6 @@
 var assert = require('assert'),
     proxyquire = require('proxyquire').noCallThru(),
-    usageAPI_mock = require('./usageManagementAPI_mock'),
+    usageAPI_mock = require('./test_endpoint'),
     async = require('async'),
     test_config = require('../config_tests').integration,
     redis = require('redis'),
@@ -67,38 +67,46 @@ var app_mock = {
 };
 
 var mocker = function (database) {
-    switch (database) {
-        case 'sql':
-            mock_config.database.type = './db';
-            mock_config.database.name = 'testDB_usageAPI.sqlite';
-            db_mock = proxyquire('../../db', {
-                './config': mock_config
-            });
-            notifier_mock = proxyquire('../../notifier', {
-                './config': mock_config,
-                'winston': {
-                    info: function (msg) {}
-                },
-                './db': db_mock
-            });
-            server = proxyquire('../../server', {
-                express: function () {
-                    return app_mock;
-                },
-                './config': mock_config,
-                './db': db_mock,
-                './notifier': notifier_mock,
-                './APIServer': api_mock,
-                'express-winston': expressWinston_mock,
-                'winston': {transports: {
-                    File: function (options) {}
-                }},
-                './OAuth2_authentication': OAuth2authentication_mock
-            });
-            break;
-        case 'redis':
+    if (database === 'sql') {
+        mock_config.database.type = './db';
+        mock_config.database.name = 'testDB_usageAPI.sqlite';
+        db_mock = proxyquire('../../db', {
+            './config': mock_config
+        });
+        notifier_mock = proxyquire('../../notifier', {
+            './config': mock_config,
+            'winston': {
+                info: function (msg) {}
+            },
+            './db': db_mock
+        });
+        server = proxyquire('../../server', {
+            express: function () {
+                return app_mock;
+            },
+            './config': mock_config,
+            './db': db_mock,
+            './notifier': notifier_mock,
+            './APIServer': api_mock,
+            'express-winston': expressWinston_mock,
+            'winston': {transports: {
+                File: function (options) {}
+            }},
+            'orion_context_broker/cb_handler': {},
+            './OAuth2_authentication': OAuth2authentication_mock
+        });
+    } else {
+        var redis_host = test_config.redis_host;
+        var redis_port = test_config.redis_port;
+
+        if (! redis_host || ! redis_port) {
+            console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+            process.exit(1);
+        } else {
             mock_config.database.type = './db_Redis';
-            mock_config.database.name = test_config.database_redis;
+            mock_config.database.name = test_config.redis_database;
+            mock_config.database.redis_host = redis_host;
+            mock_config.database.redis_port = redis_port;
             db_mock = proxyquire('../../db_Redis', {
                 './config': mock_config
             });
@@ -123,14 +131,10 @@ var mocker = function (database) {
                         File: function (options) {}
                     }
                 },
+                'orion_context_broker/cb_handler': {},
                 './OAuth2_authentication': OAuth2authentication_mock
             });
-            db_mock.init(function (err) {
-                if (err) {
-                    console.log('Error initializing the database');
-                    process.exit(1);
-                }
-            });
+        }
     }
 };
 
@@ -186,7 +190,7 @@ async.each(test_config.databases, function (database, task_callback) {
                 task_callback();
             } else {
                 var client = redis.createClient();
-                client.select(test_config.database_redis, function (err) {
+                client.select(test_config.redis_database, function (err) {
                     if (err) {
                         console.log('Error deleting redis database');
                         task_callback();

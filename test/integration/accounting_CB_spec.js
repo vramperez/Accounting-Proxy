@@ -109,127 +109,96 @@ var FIWAREStrategy_mock = {
     }
 };
 
-var mocker = function (database, done) {
-    switch (database) {
-        case 'sql':
-            async.series([
-                function (callback) {
-                    mock_config.database.type = './db';
-                    mock_config.database.name = 'testDB_accounting.sqlite';
-                    db_mock = proxyquire('../../db', {
-                        './config': mock_config
-                    });
-                    callback(null);
-                },
-                function (callback) {
-                    authentication_mock = proxyquire('../../OAuth2_authentication', {
-                        'passport-fiware-oauth': FIWAREStrategy_mock,
-                        './config': mock_config,
-                        'winston': log_mock,
-                        './db': db_mock
-                    });
-                    callback(null);
-                }, function (callback) {
-                    accounter_mock = proxyquire('../../accounter', {
-                        './config': mock_config,
-                        './notifier': notifier_mock
-                    });
-                    callback(null);
-                },
-                function (callback) {
-                    cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
-                        '../config': mock_config,
-                        'winston': log_mock,
-                        '../notifier': notifier_mock,
-                        '../accounter': accounter_mock,
-                        '../db': db_mock
-                    });
-                    callback(null);
-                }, 
-                function (callback) {
-                    server = proxyquire('../../server', {
-                        './config': mock_config,
-                        './db': db_mock,
-                        './APIServer': api_mock,
-                        './accounter': accounter_mock,
-                        'winston': log_mock, // Not display logger messages while testing
-                        'express-winston': expressWinston_mock,
-                        './orion_context_broker/cb_handler': cb_handler_mock,
-                        'OAuth2_authentication': authentication_mock
-                    });
-                    callback(null);
-                }
-            ], function () {
-                db_mock.init(function (err) {
-                    if (err) {
-                        console.log('Error initializing the database');
-                        process.exit(1);
-                    } else {
-                        return done();
-                    }
-                });
-            })
-            break;
-        case 'redis':
-            async.series([
-                function (callback) {
-                    mock_config.database.type = './db_Redis';
-                    mock_config.database.name = test_config.database_redis;
-                    db_mock = proxyquire('../../db_Redis', {
-                        './config': mock_config
-                    });
-                    callback(null);
-                },
-                function (callback) {
-                    authentication_mock = proxyquire('../../OAuth2_authentication', {
-                        'passport-fiware-oauth': FIWAREStrategy_mock,
-                        './config': mock_config,
-                        'winston': log_mock,
-                        './db_Redis': db_mock
-                    });
-                    callback(null);
-                },
-                function (callback) {
-                    accounter_mock = proxyquire('../../accounter', {
-                        './config': mock_config,
-                        './notifier': notifier_mock
-                    });
-                    callback(null);
-                },
-                function (callback) {
-                   cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
-                        '../config': mock_config,
-                        'winston': log_mock,
-                        '../notifier': notifier_mock,
-                        '../accounter': accounter_mock,
-                        '../db_Redis': db_mock
-                    });
-                    callback(null);
-                }, function (callback) {
-                    server = proxyquire('../../server', {
-                        './config': mock_config,
-                        './db_Redis': db_mock,
-                        './APIServer': api_mock,
-                        './accounter': accounter_mock,
-                        'winston': log_mock, // Not display logger messages while testing
-                        './orion_context_broker/cb_handler': cb_handler_mock,
-                        'express-winston': expressWinston_mock,
-                        'OAuth2_authentication': authentication_mock
-                    });
-                    callback(null);
-                }
-            ], function () {
-                db_mock.init(function (err) {
-                    if (err) {
-                        console.log('Error initializing the database');
-                        process.exit(1);
-                    } else {
-                        return done();
-                    }
-                });
-            })
-            break;
+var mocker = function (database) {
+    if (database === 'sql') {
+        mock_config.database.type = './db';
+        mock_config.database.name = 'testDB_accounting.sqlite';
+        db_mock = proxyquire('../../db', {
+            './config': mock_config
+        });
+        authentication_mock = proxyquire('../../OAuth2_authentication', {
+            'passport-fiware-oauth': FIWAREStrategy_mock,
+            './config': mock_config,
+            'winston': log_mock,
+            './db': db_mock
+        });
+        accounter_mock = proxyquire('../../accounter', {
+            './config': mock_config,
+            './notifier': notifier_mock,
+            './db': db_mock
+        });
+        cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
+            '../config': mock_config,
+            'winston': log_mock,
+            '../notifier': notifier_mock,
+            '../accounter': accounter_mock,
+            '../db': db_mock
+        });
+        server = proxyquire('../../server', {
+            './config': mock_config,
+            './db': db_mock,
+            './APIServer': api_mock,
+            './accounter': accounter_mock,
+            'winston': log_mock, // Not display logger messages while testing
+            'express-winston': expressWinston_mock,
+            './orion_context_broker/cb_handler': cb_handler_mock,
+            'OAuth2_authentication': authentication_mock,
+            './accounter': accounter_mock,
+            './notifier': {}
+        });
+    } else {
+        var redis_host = test_config.redis_host;
+        var redis_port = test_config.redis_port;
+
+        if (! redis_host || ! redis_port) {
+            console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+            process.exit(1);
+        } else {
+            mock_config.database.type = './db_Redis';
+            mock_config.database.name = test_config.redis_database;
+            mock_config.database.redis_host = redis_host;
+            mock_config.database.redis_port = redis_port;
+            db_mock = proxyquire('../../db_Redis', {
+                './config': mock_config
+            });
+            authentication_mock = proxyquire('../../OAuth2_authentication', {
+                'passport-fiware-oauth': FIWAREStrategy_mock,
+                './config': mock_config,
+                'winston': log_mock,
+                './db_Redis': db_mock
+            });
+            accounter_mock = proxyquire('../../accounter', {
+                './config': mock_config,
+                './notifier': notifier_mock,
+                './db_Redis': db_mock
+            });
+            cb_handler_mock = proxyquire('../../orion_context_broker/cb_handler', {
+                '../config': mock_config,
+                'winston': log_mock,
+                '../notifier': notifier_mock,
+                '../accounter': accounter_mock,
+                '../db_Redis': db_mock
+            });
+            server = proxyquire('../../server', {
+                './config': mock_config,
+                './db_Redis': db_mock,
+                './APIServer': api_mock,
+                './accounter': accounter_mock,
+                'winston': log_mock, // Not display logger messages while testing
+                './orion_context_broker/cb_handler': cb_handler_mock,
+                'express-winston': expressWinston_mock,
+                'OAuth2_authentication': authentication_mock,
+                './accounter': accounter_mock,
+                './notifier': {}
+            });
+        }
     }
+    db_mock.init(function (err) {
+        if (err) {
+            console.log('Error initializing the database');
+            process.exit(1);
+        }
+    });
 };
 
 var checkAccounting = function (apiKey, value, callback) {
@@ -255,32 +224,32 @@ test_endpoint.run(test_config.accounting_CB_port);
 
 async.each(test_config.databases, function (database, task_callback) {
 
+    after(function (task_callback) {
+        if (database === 'sql') {
+            fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
+                if (!err) {
+                    fs.unlinkSync('./testDB_accounting.sqlite');
+                }
+                task_callback();
+            });
+        } else {
+            var client = redis.createClient();
+            client.select(test_config.redis_database, function (err) {
+                if (err) {
+                    console.log('Error deleting redis database');
+                    task_callback();
+                } else {
+                    client.flushdb();
+                    task_callback();
+                }
+            });
+        }
+    });
+
     describe('Testing the accounting API. Orion Context-Broker requests', function () {
 
-        before(function (done) {
-            mocker(database, done);
-        });
-
-        after(function (task_callback) {
-            if (database === 'sql') {
-                fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
-                    if (!err) {
-                        fs.unlinkSync('./testDB_accounting.sqlite');
-                    }
-                });
-                task_callback();
-            } else {
-                var client = redis.createClient();
-                client.select(test_config.database_redis, function (err) {
-                    if (err) {
-                        console.log('Error deleting redis database');
-                        task_callback();
-                    } else {
-                        client.flushdb();
-                        task_callback();
-                    }
-                });
-            }
+        before(function () {
+            mocker(database);
         });
 
         describe('with database ' + database, function () {

@@ -8,7 +8,7 @@ var request = require('supertest'),
     prepare_test = require('./prepareDatabase'),
     redis = require('redis');
 
-var server, db_mock;
+var server, db_mock, accounter_mock;
 
 var mock_config = {
     accounting_proxy: {
@@ -98,33 +98,46 @@ var expressWinston_mock = {
 };
 
 var mocker = function (database) {
-    switch (database) {
-        case 'sql':
-            mock_config.database.type = './db';
-            mock_config.database.name = 'testDB_accounting.sqlite';
-            db_mock = proxyquire('../../db', {
-                './config': mock_config
-            });
-            authentication_mock = proxyquire('../../OAuth2_authentication', {
-                'passport-fiware-oauth': FIWAREStrategy_mock,
-                './config': mock_config,
-                'winston': log_mock,
-                './db': db_mock
-            });
-            server = proxyquire('../../server', {
-                './config': mock_config,
-                './db': db_mock,
-                './APIServer': api_mock,
-                './notifier': notifier_mock,
-                'winston': log_mock, // Not display logger messages while testing,
-                'express-winston': expressWinston_mock,
-                './orion_context_broker/cb_handler': {},
-                'OAuth2_authentication': authentication_mock
-            });
-            break;
-        case 'redis':
+    if (database === 'sql') {
+        mock_config.database.type = './db';
+        mock_config.database.name = 'testDB_accounting.sqlite';
+        db_mock = proxyquire('../../db', {
+            './config': mock_config
+        });
+        authentication_mock = proxyquire('../../OAuth2_authentication', {
+            'passport-fiware-oauth': FIWAREStrategy_mock,
+            './config': mock_config,
+            'winston': log_mock,
+            './db': db_mock
+        });
+        accounter_mock = proxyquire('../../accounter', {
+            './config': mock_config,
+            './notifier': notifier_mock,
+            './db': db_mock
+        });
+        server = proxyquire('../../server', {
+            './config': mock_config,
+            './db': db_mock,
+            './APIServer': api_mock,
+            './notifier': {},
+            'winston': log_mock, // Not display logger messages while testing,
+            'express-winston': expressWinston_mock,
+            './orion_context_broker/cb_handler': {},
+            'OAuth2_authentication': authentication_mock,
+            './accounter': accounter_mock
+        });
+    } else {
+        var redis_host = test_config.redis_host;
+        var redis_port = test_config.redis_port;
+
+        if (! redis_host || ! redis_port) {
+            console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+            process.exit(1);
+        } else {
             mock_config.database.type = './db_Redis';
-            mock_config.database.name = test_config.database_redis;
+            mock_config.database.name = test_config.redis_database;
+            mock_config.database.redis_host = redis_host;
+            mock_config.database.redis_port = redis_port;
             db_mock = proxyquire('../../db_Redis', {
                 './config': mock_config
             });
@@ -132,19 +145,26 @@ var mocker = function (database) {
                 'passport-fiware-oauth': FIWAREStrategy_mock,
                 './config': mock_config,
                 'winston': log_mock,
+                './db_Redis': db_mock,
+                './db_Redis': db_mock
+            });
+            accounter_mock = proxyquire('../../accounter', {
+                './config': mock_config,
+                './notifier': notifier_mock,
                 './db_Redis': db_mock
             });
             server = proxyquire('../../server', {
                 './config': mock_config,
                 './db_Redis': db_mock,
                 './APIServer': api_mock,
-                './notifier': notifier_mock,
+                './notifier': {},
                 'winston': log_mock, // Not display logger messages while testing,
                 'express-winston': expressWinston_mock,
                 './orion_context_broker/cb_handler': {},
-                'OAuth2_authentication': authentication_mock
+                'OAuth2_authentication': authentication_mock,
+                './accounter': accounter_mock
             });
-            break;
+        }
     }
     db_mock.init(function (err) {
         if (err) {
@@ -159,35 +179,35 @@ test_endpoint.run(test_config.accounting_port);
 
 async.each(test_config.databases, function (database, task_callback) {
 
+    /**
+     * Remove the database used for testing.
+     */
+    after(function (task_callback) {
+        if (database === 'sql') {
+            fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
+               if (!err) {
+                fs.unlinkSync('./testDB_accounting.sqlite');
+            }
+            task_callback();
+        });
+        } else {
+            var client = redis.createClient();
+            client.select(test_config.redis_database, function (err) {
+                if (err) {
+                    console.log('Error deleting redis database');
+                    task_callback();
+                } else {
+                    client.flushdb();
+                    task_callback();
+                }
+            });
+        }
+    });
+
     describe('Testing the accounting API. Generic REST use', function () {
 
         before(function () {
             mocker(database);
-        });
-
-        /**
-         * Remove the database used for testing.
-         */
-        after(function (task_callback) {
-            if (database === 'sql') {
-               fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
-                   if (!err) {
-                       fs.unlinkSync('./testDB_accounting.sqlite');
-                   }
-               });
-               task_callback();
-           } else {
-               var client = redis.createClient();
-               client.select(test_config.database_redis, function (err) {
-                   if (err) {
-                       console.log('Error deleting redis database');
-                       task_callback();
-                   } else {
-                       client.flushdb();
-                       task_callback();
-                   }
-               });
-           }
         });
 
         describe('with database ' + database, function () {
@@ -361,8 +381,8 @@ async.each(test_config.databases, function (database, task_callback) {
                     var buys = [{
                         apiKey: apiKey,
                         publicPath: publicPath,
-                        orderId: 'orderId3',
-                        productId: 'productId3',
+                        orderId: 'orderId4',
+                        productId: 'productId4',
                         customer: userProfile.id,
                         unit: 'call',
                         recordType: 'callusage'
@@ -412,8 +432,8 @@ async.each(test_config.databases, function (database, task_callback) {
                     var buys = [{
                         apiKey: apiKey,
                         publicPath: publicPath,
-                        orderId: 'orderId4',
-                        productId: 'productId4',
+                        orderId: 'orderId5',
+                        productId: 'productId5',
                         customer: userProfile.id,
                         unit: 'megabyte',
                         recordType: 'amountData'
@@ -463,8 +483,8 @@ async.each(test_config.databases, function (database, task_callback) {
                     var buys = [{
                         apiKey: apiKey,
                         publicPath: publicPath,
-                        orderId: 'orderId5',
-                        productId: 'productId5',
+                        orderId: 'orderId6',
+                        productId: 'productId6',
                         customer: userProfile.id,
                         unit: 'millisecond',
                         recordType: 'timeUsage'

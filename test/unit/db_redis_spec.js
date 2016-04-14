@@ -28,7 +28,8 @@ var mocker = function (implementations, callback) {
         hdel: implementations.hdel,
         del: implementations.del,
         exec: implementations.exec,
-        select: implementations.select
+        select: function (database) {},
+
     };
     var redis_stub = {
         createClient: function () {
@@ -65,33 +66,10 @@ describe('Testing REDIS database', function () {
 
     describe('Function "init"', function () {
 
-        it('initialization', function (done) {
-            var implementations = {
-                select: function (db, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.init(function (err) {
-                    assert.equal(err, 'Error selecting datbase 15: Error. Database name must be a number between 0 and 14.');
-                    assert.equal(spies.select.callCount, 1);
-                    assert.equal(spies.select.getCall(0).args[0], 15);
-                    done();
-                });
-            });
-        });
-
         it('correct intialization', function (done) {
-            var implementations = {
-                select: function (db, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
+            mocker({}, function (db, spies) {
                 db.init(function (err) {
                     assert.equal(err, null);
-                    assert.equal(spies.select.callCount, 1);
-                    assert.equal(spies.select.getCall(0).args[0], 15);
                     done();
                 });
             });

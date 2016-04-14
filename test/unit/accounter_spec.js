@@ -1,4 +1,4 @@
-var proxyquire = require('proxyquire'),
+var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     async = require('async'),
     sinon = require('sinon');
@@ -52,12 +52,17 @@ describe('Testing "Accounter"', function () {
             var unit = 'unit1';
             var countFunction = 'count';
             var amount = 3.26;
-            var dbStub = {
+            var configMock = { 
+                database: { 
+                    type: './db'
+                } 
+            };
+            var dbMock = {
                 makeAccounting: function (apiKey, amount, callback) {
                     return callback('Error', null);
                 }
             };
-            var notifierStub = {
+            var notifierMock = {
                 acc_modules: {
                     unit1: {
                         count: function (countInfo, callback) {
@@ -66,11 +71,12 @@ describe('Testing "Accounter"', function () {
                     }
                 }
             };
-            var countSpy = sinon.spy(notifierStub.acc_modules[unit], countFunction);
-            var makeAccountingSpy = sinon.spy(dbStub, 'makeAccounting');
+            var countSpy = sinon.spy(notifierMock.acc_modules[unit], countFunction);
+            var makeAccountingSpy = sinon.spy(dbMock, 'makeAccounting');
             var accounter = proxyquire('../../accounter', {
-                './notifier': notifierStub,
-                './db': dbStub
+                './db': dbMock,
+                './notifier': notifierMock,
+                './config': configMock
             });
             accounter.count(apiKey, unit, {}, countFunction, function (err) {
                 assert.equal(err, 'Error');
@@ -87,12 +93,17 @@ describe('Testing "Accounter"', function () {
             var unit = 'unit1';
             var countFunction = 'count';
             var amount = 3.26;
-            var dbStub = {
+            var configMock = { 
+                database: { 
+                    type: './db'
+                } 
+            };
+            var dbMock = {
                 makeAccounting: function (apiKey, amount, callback) {
                     return callback(null, amount);
                 }
             };
-            var notifierStub = {
+            var notifierMock = {
                 acc_modules: {
                     unit1: {
                         count: function (countInfo, callback) {
@@ -101,11 +112,12 @@ describe('Testing "Accounter"', function () {
                     }
                 }
             };
-            var countSpy = sinon.spy(notifierStub.acc_modules[unit], countFunction);
-            var makeAccountingSpy = sinon.spy(dbStub, 'makeAccounting');
+            var countSpy = sinon.spy(notifierMock.acc_modules[unit], countFunction);
+            var makeAccountingSpy = sinon.spy(dbMock, 'makeAccounting');
             var accounter = proxyquire('../../accounter', {
-                './notifier': notifierStub,
-                './db': dbStub
+                './db': dbMock,
+                './notifier': notifierMock,
+                './config': configMock
             });
             accounter.count(apiKey, unit, {}, countFunction, function (err) {
                 assert.equal(err, null);

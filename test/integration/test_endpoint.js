@@ -180,6 +180,20 @@ var contextTypes = function (req, res) {
     res.end();
 };
 
+var usageSpecificationHandler = function (req, res) {
+    if (req.body.name === 'call') {
+        req.body['href'] = 'http://localhost:9040/usageSpecification/1';
+        res.status(201).json(req.body);
+    } else {
+        req.body['href'] = 'http://localhost:9040/usageSpecification/2';
+        res.status(201).json(req.body);
+    }
+};
+
+var usageHandler = function (req, res) {
+    res.status(201).send();
+};
+
 app.use(bodyParser.json());
 app.get('/rest/call*', call_handler);
 app.get('/rest/megabyte*', megabyte_handler);
@@ -190,3 +204,5 @@ app.post('/v1/subscribeContext', subscribeContext);
 app.post('/v1/unsubscribeContext', unsubscribeContext);
 app.post('/v1/updatecontextsubscription', updateContextSubscription);
 app.delete('/v1/contextSubscriptions/' + subscriptionId, unsubscribeContextDelete);
+app.post('/usageSpecification', usageSpecificationHandler);
+app.post('/usage', usageHandler);

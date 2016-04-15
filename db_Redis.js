@@ -2,19 +2,22 @@ var redis = require('redis'),
     config = require('./config'),
     async = require('async');
 
-var db = redis.createClient();
+var db;
+var redis_host = config.database.redis_host;
+var redis_port = config.database.redis_port;
+
+db = redis.createClient({
+    host: redis_host,
+    port: redis_port
+});
+
+db.select(config.database.name);
 
 /*
 * Initialize the database and creates the necessary tables.
 */
 exports.init = function (callback) {
-    db.select(config.database.name, function (err) {
-        if (err) {
-            return callback('Error selecting datbase ' + config.database.name + ': ' + err + '. Database name must be a number between 0 and 14.');
-        } else {
-            return callback(null);
-        }
-    });
+    return callback(null);
 };
 
 /**

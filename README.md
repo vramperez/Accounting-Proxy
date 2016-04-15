@@ -55,7 +55,7 @@ In order to have the accounting proxy running there are some information to fill
 	type: './db',
     name: 'accountingDB.sqlite',
     redis_host: 'localhost',
-    redis_name: 6379
+    redis_port: 6379
 }
 ```
 

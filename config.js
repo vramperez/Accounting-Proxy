@@ -20,17 +20,17 @@ config.database = {
      *     './db_Redis': redis database.
      *     './db': sqlite database.
      */
-    type: "./db_Redis",
+    type: "./db",
 
     /**
      * Database name. If the database type selected is './db_Redis',
      *  then name must be a number (0 by default, and 15 is reserved to test by default).
      */
-    name: 0,//'accountingDB.sqlite',
+    name: 'accountingDB.sqlite',
 
     redis_host: 'localhost',
 
-    redis_name: 6379
+    redis_port: 6379
 
 };
 

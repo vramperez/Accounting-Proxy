@@ -2,10 +2,13 @@ var request = require('supertest'),
     assert = require('assert'),
     proxyquire = require('proxyquire').noCallThru(),
     test_config = require('../config_tests').integration,
+    prepare_test = require('./prepareDatabase'),
     async = require('async'),
     redis = require('redis'),
     server,
     db_mock;
+
+var databaseName = 'testDB_administration.sqlite1';
 
 var mock_config = {
     modules: {
@@ -49,7 +52,7 @@ var expressWinston_mock = {
 var mocker = function (database) {
     if (database === 'sql') {
         mock_config.database.type = './db';
-        mock_config.database.name = 'testDB_administration.sqlite1';
+        mock_config.database.name = databaseName;
         db_mock = proxyquire('../../db', {
             './config': mock_config
         });
@@ -109,32 +112,16 @@ async.each(test_config.databases, function (database, task_callback) {
     describe('Testing the administration API', function (done) {
 
         before(function () { // Mock the database
-            mocker(database);
+            prepare_test.clearDatabase(database, databaseName, function () {
+                mocker(database);
+            });
         });
 
         /**
          * Remove the database used for testing.
          */
         after(function (task_callback) {
-            if (database === 'sql') {
-                fs.access('testDB_administration.sqlite1', fs.F_OK, function (err) {
-                    if (!err) {
-                        fs.unlinkSync('testDB_administration.sqlite1');
-                    }
-                });
-                task_callback();
-            } else {
-                var client = redis.createClient();
-                client.select(test_config.redis_database, function (err) {
-                    if (err) {
-                        console.log('Error deleting redis database: ' + test_config.redis_database);
-                        task_callback();
-                    } else {
-                        client.flushdb();
-                        task_callback();
-                    }
-                });
-            }
+            prepare_test.clearDatabase(database, databaseName, task_callback);
         });
 
         describe('with database: ' + database, function () {

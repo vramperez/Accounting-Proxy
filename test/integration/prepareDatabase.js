@@ -1,4 +1,7 @@
-var async = require('async');
+var async = require('async'),
+    redis = require('redis'),
+    test_config = require('../config_tests').integration,
+    fs = require('fs');
 
 var db_mock;
 
@@ -134,4 +137,31 @@ exports.addToDatabase = function (db, services, buys, subscriptions, admins, acc
             return callback(null);
         }
     });
+};
+
+// Flush the database specified.
+exports.clearDatabase = function (database, name, callback) {
+    if (database === 'sql') {
+        fs.access('./' + name, fs.F_OK, function (err) {
+            if (!err) {
+                fs.unlinkSync('./' + name);
+                return callback(null);
+            } else {
+                return callback(null);
+            }
+        });
+    } else {
+        var client = redis.createClient({
+            host: test_config.redis_host,
+            port: test_config.redis_port
+        });
+        client.select(test_config.redis_database, function (err) {
+            if (err) {
+                return callback('Errro cleaning redis database');
+            } else {
+                client.flushdb();
+                return callback(null);
+            }
+        });
+    }
 };

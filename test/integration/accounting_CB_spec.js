@@ -10,6 +10,7 @@ var request = require('supertest'),
 
 var db_mock, cb_handler_mock, authentication_mock, accounter_mock;
 var mock_config = {};
+var databaseName = 'testDB_accounting.sqlite';
 
 var logger_mock = { // Avoid display server information while running the tests
     Logger: function (transports) {
@@ -112,7 +113,7 @@ var FIWAREStrategy_mock = {
 var mocker = function (database) {
     if (database === 'sql') {
         mock_config.database.type = './db';
-        mock_config.database.name = 'testDB_accounting.sqlite';
+        mock_config.database.name = databaseName;
         db_mock = proxyquire('../../db', {
             './config': mock_config
         });
@@ -225,31 +226,15 @@ test_endpoint.run(test_config.accounting_CB_port);
 async.each(test_config.databases, function (database, task_callback) {
 
     after(function (task_callback) {
-        if (database === 'sql') {
-            fs.access('./testDB_accounting.sqlite', fs.F_OK, function (err) {
-                if (!err) {
-                    fs.unlinkSync('./testDB_accounting.sqlite');
-                }
-                task_callback();
-            });
-        } else {
-            var client = redis.createClient();
-            client.select(test_config.redis_database, function (err) {
-                if (err) {
-                    console.log('Error deleting redis database');
-                    task_callback();
-                } else {
-                    client.flushdb();
-                    task_callback();
-                }
-            });
-        }
+        prepare_test.clearDatabase(database, databaseName, task_callback);
     });
 
     describe('Testing the accounting API. Orion Context-Broker requests', function () {
 
         before(function () {
-            mocker(database);
+            prepare_test.clearDatabase(database, databaseName, function () {
+                mocker(database);
+            });
         });
 
         describe('with database ' + database, function () {

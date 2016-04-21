@@ -165,3 +165,9 @@ exports.clearDatabase = function (database, name, callback) {
         });
     }
 };
+
+exports.removeDatabase = function (databaseName, callback) {
+    async.eachSeries(test_config.databases, function (database, task_callback) {
+        exports.clearDatabase(database, databaseName, task_callback);
+    }, callback);
+};

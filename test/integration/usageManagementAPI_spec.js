@@ -189,15 +189,7 @@ console.log('[LOG]: starting an endpoint for testing...');
 usageAPI_mock.run(test_config.usageAPI_port);
 
 after(function (done) {
-    async.eachSeries(test_config.databases, function (database, task_callback) {
-        prepare_test.clearDatabase(database, databaseName, task_callback);
-    }, function (err) {
-        if (err) {
-            return done();
-        } else {
-            return done();
-        }
-    });
+    prepare_test.removeDatabase(databaseName, done);
 });
 
 describe('Testing the usage specification and usage notifications', function () {

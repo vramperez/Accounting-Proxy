@@ -110,16 +110,7 @@ var mocker = function (database, done) {
 }
 
 after(function (done) {
-    async.eachSeries(test_config.databases, function (database, task_callback) {
-        prepare_test.clearDatabase(database, databaseName, task_callback);
-    }, function (err) {
-        if (err) {
-            console.log(err);
-            return done();
-        } else {
-            return done();
-        }
-    });
+    prepare_test.removeDatabase(databaseName, done);
 });
 
 describe('Testing the administration API', function (done) {

@@ -65,75 +65,101 @@ var app_mock = {
     post: function (path, middleware, handler) {}
 };
 
-var mocker = function (database) {
+var mocker = function (database, done) {
     if (database === 'sql') {
-        mock_config.database.type = './db';
-        mock_config.database.name = databaseName;
-        db_mock = proxyquire('../../db', {
-            './config': mock_config
-        });
-        notifier_mock = proxyquire('../../notifier', {
-            './config': mock_config,
-            'winston': {
-                info: function (msg) {}
+        async.series([
+            function (callback) {
+                mock_config.database.type = './db';
+                mock_config.database.name = databaseName;
+                db_mock = proxyquire('../../db', {
+                    './config': mock_config
+                });
+                callback(null);
             },
-            './db': db_mock
-        });
-        server = proxyquire('../../server', {
-            express: function () {
-                return app_mock;
+            function (callback) {
+                notifier_mock = proxyquire('../../notifier', {
+                    './config': mock_config,
+                    'winston': {
+                        info: function (msg) {}
+                    },
+                    './db': db_mock
+                });
+                callback(null);
             },
-            './config': mock_config,
-            './db': db_mock,
-            './notifier': notifier_mock,
-            './APIServer': api_mock,
-            'express-winston': expressWinston_mock,
-            'winston': {transports: {
-                File: function (options) {}
-            }},
-            'orion_context_broker/cb_handler': {},
-            './OAuth2_authentication': OAuth2authentication_mock
+            function (callback) {
+                server = proxyquire('../../server', {
+                    express: function () {
+                        return app_mock;
+                    },
+                    './config': mock_config,
+                    './db': db_mock,
+                    './notifier': notifier_mock,
+                    './APIServer': api_mock,
+                    'express-winston': expressWinston_mock,
+                    'winston': {transports: {
+                        File: function (options) {}
+                    }},
+                    'orion_context_broker/cb_handler': {},
+                    './OAuth2_authentication': OAuth2authentication_mock
+                });
+                callback(null);
+            }
+        ], function () {
+            return done();
         });
     } else {
-        var redis_host = test_config.redis_host;
-        var redis_port = test_config.redis_port;
+        async.series([
+            function (callback) {
+                var redis_host = test_config.redis_host;
+                var redis_port = test_config.redis_port;
 
-        if (! redis_host || ! redis_port) {
-            console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
-            process.exit(1);
-        } else {
-            mock_config.database.type = './db_Redis';
-            mock_config.database.name = test_config.redis_database;
-            mock_config.database.redis_host = redis_host;
-            mock_config.database.redis_port = redis_port;
-            db_mock = proxyquire('../../db_Redis', {
-                './config': mock_config
-            });
-            notifier_mock = proxyquire('../../notifier', {
-                './config': mock_config,
-                'winston': {
-                    info: function (msg) {}
-                },
-                './db_Redis': db_mock
-            });
-            server = proxyquire('../../server', {
-                express: function () {
-                    return app_mock;
-                },
-                './config': mock_config,
-                '.db_Redis': db_mock,
-                './notifier': notifier_mock,
-                './APIServer': api_mock,
-                'express-winston': expressWinston_mock,
-                'winston': {
-                    transports: {
-                        File: function (options) {}
-                    }
-                },
-                'orion_context_broker/cb_handler': {},
-                './OAuth2_authentication': OAuth2authentication_mock
-            });
-        }
+                if (! redis_host || ! redis_port) {
+                    console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+                    process.exit(1);
+                } else {
+                    mock_config.database.type = './db_Redis';
+                    mock_config.database.name = test_config.redis_database;
+                    mock_config.database.redis_host = redis_host;
+                    mock_config.database.redis_port = redis_port;
+                    db_mock = proxyquire('../../db_Redis', {
+                        './config': mock_config
+                    });
+                    callback();
+                }
+            },
+            function (callback) {
+                notifier_mock = proxyquire('../../notifier', {
+                    './config': mock_config,
+                    'winston': {
+                        info: function (msg) {}
+                    },
+                    './db_Redis': db_mock
+                });
+                callback();
+            },
+            function (callback) {
+                server = proxyquire('../../server', {
+                    express: function () {
+                        return app_mock;
+                    },
+                    './config': mock_config,
+                    '.db_Redis': db_mock,
+                    './notifier': notifier_mock,
+                    './APIServer': api_mock,
+                    'express-winston': expressWinston_mock,
+                    'winston': {
+                        transports: {
+                            File: function (options) {}
+                        }
+                    },
+                    'orion_context_broker/cb_handler': {},
+                    './OAuth2_authentication': OAuth2authentication_mock
+                });
+                callback();
+            }
+        ], function () {
+            return done();
+        });
     }
 };
 
@@ -162,30 +188,42 @@ var checkUsageNotifications = function (apiKey, value, correlationNumber, callba
 console.log('[LOG]: starting an endpoint for testing...');
 usageAPI_mock.run(test_config.usageAPI_port);
 
-async.each(test_config.databases, function (database, task_callback) {
+after(function (done) {
+    async.eachSeries(test_config.databases, function (database, task_callback) {
+        prepare_test.clearDatabase(database, databaseName, task_callback);
+    }, function (err) {
+        if (err) {
+            return done();
+        } else {
+            return done();
+        }
+    });
+});
 
-    describe('Testing the usage specification and usage notifications', function () {
+describe('Testing the usage specification and usage notifications', function () {
 
-        before(function () {
-            prepare_test.clearDatabase(database, databaseName, function () {
-                mocker(database);
-            });
-        });
-
-        // Restore the default mock_config values.
-        afterEach(function () {
-            mock_config.usageAPI = {
-                host: 'localhost',
-                port: test_config.usageAPI_port,
-                path: ''
-            };
-        });
-
-        after(function (task_callback) {
-            prepare_test.clearDatabase(database, databaseName, task_callback);
-        });
+    async.eachSeries(test_config.databases, function (database, task_callback) {
 
         describe('with database ' + database, function () {
+
+            before(function (done) {
+                prepare_test.clearDatabase(database, databaseName, function () {
+                    mocker(database, done);
+                });
+            });
+
+            // Restore the default mock_config values.
+            afterEach(function () {
+                mock_config.usageAPI = {
+                    host: 'localhost',
+                    port: test_config.usageAPI_port,
+                    path: ''
+                };
+            });
+
+            after(function () {
+                task_callback();
+            });
 
             describe('Notify usage specification', function() {
                 var unitIds = {

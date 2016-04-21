@@ -49,7 +49,7 @@ var expressWinston_mock = {
     }
 };
 
-var mocker = function (database) {
+var mocker = function (database, done) {
     if (database === 'sql') {
         mock_config.database.type = './db';
         mock_config.database.name = databaseName;
@@ -103,28 +103,40 @@ var mocker = function (database) {
         if (err) {
             console.log('Error initializing the database');
             process.exit(1);
+        } else {
+            return done();
         }
     });
 }
 
-async.each(test_config.databases, function (database, task_callback) {
+after(function (done) {
+    async.eachSeries(test_config.databases, function (database, task_callback) {
+        prepare_test.clearDatabase(database, databaseName, task_callback);
+    }, function (err) {
+        if (err) {
+            console.log(err);
+            return done();
+        } else {
+            return done();
+        }
+    });
+});
 
-    describe('Testing the administration API', function (done) {
-
-        before(function () { // Mock the database
-            prepare_test.clearDatabase(database, databaseName, function () {
-                mocker(database);
-            });
-        });
-
-        /**
-         * Remove the database used for testing.
-         */
-        after(function (task_callback) {
-            prepare_test.clearDatabase(database, databaseName, task_callback);
-        });
+describe('Testing the administration API', function (done) {
+    
+    async.eachSeries(test_config.databases, function (database, task_callback) {
 
         describe('with database: ' + database, function () {
+
+            before(function (done) { // Mock the database
+                prepare_test.clearDatabase(database, databaseName, function () {
+                    mocker(database, done);
+                });
+            });
+
+            after(function () {
+                task_callback();
+            });
 
             describe('[GET:' + mock_config.api.administration_paths.units + '] accounting units request', function () {
 

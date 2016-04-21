@@ -98,7 +98,7 @@ var expressWinston_mock = {
     }
 };
 
-var mocker = function (database) {
+var mocker = function (database, done) {
     if (database === 'sql') {
         mock_config.database.type = './db';
         mock_config.database.name = databaseName;
@@ -171,6 +171,8 @@ var mocker = function (database) {
         if (err) {
             console.log('Error initializing the database');
             process.exit(1);
+        } else {
+            return done();
         }
     });
 }
@@ -178,21 +180,31 @@ var mocker = function (database) {
 console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run(test_config.accounting_port);
 
-async.each(test_config.databases, function (database, task_callback) {
-
-    /**
-     * Remove the database used for testing.
-     */
-    after(function (task_callback) {
+after(function (done) {
+    async.eachSeries(test_config.databases, function (database, task_callback) {
         prepare_test.clearDatabase(database, databaseName, task_callback);
+    }, function (err) {
+        if (err) {
+            console.log(err);
+            return done();
+        } else {
+            return done();
+        }
     });
+});
 
-    describe('Testing the accounting API. Generic REST use', function () {
+describe('Testing the accounting API. Generic REST use', function () {
+    
+    async.eachSeries(test_config.databases, function (database, task_callback) {
 
-        before(function () {
+        before(function (done) {
             prepare_test.clearDatabase(database, databaseName, function (err) {
-                mocker(database);
+                mocker(database, done);
             });
+        });
+
+        after(function () {
+            task_callback();
         });
 
         describe('with database ' + database, function () {

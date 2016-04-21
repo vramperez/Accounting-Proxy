@@ -10,7 +10,7 @@ var request = require('supertest'),
 
 var db_mock, cb_handler_mock, authentication_mock, accounter_mock;
 var mock_config = {};
-var databaseName = 'testDB_accounting.sqlite';
+var databaseName = 'testDB_accountingCB.sqlite';
 
 var logger_mock = { // Avoid display server information while running the tests
     Logger: function (transports) {
@@ -110,7 +110,7 @@ var FIWAREStrategy_mock = {
     }
 };
 
-var mocker = function (database) {
+var mocker = function (database,done) {
     if (database === 'sql') {
         mock_config.database.type = './db';
         mock_config.database.name = databaseName;
@@ -198,6 +198,8 @@ var mocker = function (database) {
         if (err) {
             console.log('Error initializing the database');
             process.exit(1);
+        } else {
+            return done();
         }
     });
 };
@@ -223,21 +225,25 @@ var checkAccounting = function (apiKey, value, callback) {
 console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run(test_config.accounting_CB_port);
 
-async.each(test_config.databases, function (database, task_callback) {
+after(function (done) {
+    prepare_test.removeDatabase(databaseName, done);
+});
 
-    after(function (task_callback) {
-        prepare_test.clearDatabase(database, databaseName, task_callback);
-    });
+describe('Testing the accounting API. Orion Context-Broker requests', function () {
 
-    describe('Testing the accounting API. Orion Context-Broker requests', function () {
-
-        before(function () {
-            prepare_test.clearDatabase(database, databaseName, function () {
-                mocker(database);
-            });
-        });
+    async.eachSeries(test_config.databases, function (database, task_callback) {
 
         describe('with database ' + database, function () {
+
+            before(function (done) {
+                prepare_test.clearDatabase(database, databaseName, function () {
+                    mocker(database, done);
+                });
+            });
+
+            after(function () {
+                task_callback();
+            });
 
             it('should fail (401) when the "X-API-KEY" header is not defined', function (done) {
                 var publicPath = '/public1';

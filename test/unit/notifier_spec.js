@@ -294,7 +294,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: 'Bearer ' + token
+                            'X-API-KEY': token
                         },
                         body: specification
                     });
@@ -356,7 +356,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: 'Bearer ' + token
+                            'X-API-KEY': token
                         },
                         body: specification
                     });
@@ -422,7 +422,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: 'Bearer ' + token
+                            'X-API-KEY': token
                         },
                         body: specification
                     });
@@ -491,7 +491,7 @@ describe('Testing Notifier', function () {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            authorization: 'Bearer ' + token
+                            'X-API-KEY': token
                         },
                         body: specification
                     });
@@ -676,7 +676,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: 'Bearer ' + token
+                        'X-API-KEY': token
                     });
                     done();
                 });
@@ -742,7 +742,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: 'Bearer ' + token
+                        'X-API-KEY': token
                     });
                     done();
                 });
@@ -810,7 +810,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: 'Bearer ' + token
+                        'X-API-KEY': token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);
                     assert.equal(spies.db.resetAccounting.getCall(0).args[0], notificationInfo.apiKey);
@@ -880,7 +880,7 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
                         'Content-Type': 'application/json',
-                        authorization: 'Bearer ' + token
+                        'X-API-KEY': token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);
                     assert.equal(spies.db.resetAccounting.getCall(0).args[0], notificationInfo.apiKey);

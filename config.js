@@ -62,7 +62,14 @@ config.usageAPI = {
     /**
      * Usage Management API.
      */
-    path: '/DSUsageManagement/api/usageManagement/v2'
+    path: '/DSUsageManagement/api/usageManagement/v2',
+
+
+    /**
+     * Configures the schedule daemon for usage notification. Cron format:
+     *     [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
+     */
+    schedule: '00 00 * * *'
 };
 
 // Resource configuration.

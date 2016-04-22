@@ -42,9 +42,7 @@ exports.init = function (callback) {
                 contextBroker.run();
             }
 
-            // Create daemon to update WStore every day. Cron format:
-            // [MINUTE] [HOUR] [DAY OF MONTH] [MONTH OF YEAR] [DAY OF WEEK] [YEAR (optional)]
-            cron.scheduleJob('00 00 * * *', function () {
+            cron.scheduleJob(config.usageAPI.schedule, function () {
                 logger.info('Sending accounting information...');
                 notifier.notifyUsage(function (err) {
                     if (err) {

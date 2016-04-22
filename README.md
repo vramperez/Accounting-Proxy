@@ -75,11 +75,13 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
 	- `host`: API host.
 	- `port`: API port.
 	- `path`: path for the usage management API.
+	- `schedule`: defines the daemon service schedule to notify the usage accounting info. The format is similar to the cron tab format:  "MINUTE HOUR DAY_OF_MONTH MONTH_OF_YEAR DAY_OF_WEEK YEAR (optional)". By the default, the usage notifications will be sent every day at 00:00.
 ```
 {
 	host: 'localhost',
     port: 8080,
-    path: '/DSUsageManagement/api/usageManagement/v2'
+    path: '/DSUsageManagement/api/usageManagement/v2',
+    schedule: '00 00 * * *'
 }
 ```
 

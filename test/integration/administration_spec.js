@@ -28,6 +28,32 @@ var mock_config = {
     },
     log: {
         file: 'file'
+    },
+    oauth2: {
+        roles: {
+            'admin': '106',
+            'customer': '',
+            'seller': ''
+        }
+    },
+};
+
+var userProfile = {
+    accessToken: 'accessToken',
+    id: 'userId',
+    emails: [{value: 'user@example.com'}],
+    displayName: 'userName',
+    roles: [{id: '106'}],
+    appId: 'appId'
+};
+
+var FIWAREStrategy_mock = {
+    OAuth2Strategy: function (options, callback) {
+        return {
+            userProfile: function (authToken, callback) {
+                return callback(null, userProfile);
+            }
+        }
     }
 };
 
@@ -55,6 +81,12 @@ var mocker = function (database, done) {
         mock_config.database.name = databaseName;
         db_mock = proxyquire('../../db', {
             './config': mock_config
+        });
+        authentication_mock = proxyquire('../../OAuth2_authentication', {
+            'passport-fiware-oauth': FIWAREStrategy_mock,
+            './config': mock_config,
+            'winston': log_mock,
+            './db': db_mock
         });
         api_server = proxyquire('../../APIServer', {
             './config': mock_config,
@@ -84,6 +116,12 @@ var mocker = function (database, done) {
             db_mock = proxyquire('../../db_Redis', {
                 './config': mock_config
             });
+            authentication_mock = proxyquire('../../OAuth2_authentication', {
+                'passport-fiware-oauth': FIWAREStrategy_mock,
+                './config': mock_config,
+                'winston': log_mock,
+                './db_Redis': db_mock
+            });
             api_server = proxyquire('../../APIServer', {
                 './config': mock_config,
                 './db_Redis': db_mock
@@ -95,7 +133,8 @@ var mocker = function (database, done) {
                 './notifier': {},
                 'winston': log_mock, // Not display logger messages while testing
                 'express-winston': expressWinston_mock,
-                './orion_context_broker/db_handler': {}
+                './orion_context_broker/db_handler': {},
+                './OAuth2_authentication': authentication_mock
             });
         }
     }
@@ -114,7 +153,7 @@ after(function (done) {
 });
 
 describe('Testing the administration API', function (done) {
-    
+
     async.eachSeries(test_config.databases, function (database, task_callback) {
 
         describe('with database: ' + database, function () {
@@ -133,25 +172,32 @@ describe('Testing the administration API', function (done) {
 
                 it('should return all the accounting units (200) when the request is correct', function (done) {
                     request(server.app)
-                        .get(mock_config.api.administration_paths.units)
-                        .expect(200, {units: mock_config.modules.accounting}, done);
+                    .get(mock_config.api.administration_paths.units)
+                    .expect(200, {units: mock_config.modules.accounting}, done);
                 });
             });
 
             describe('[GET:' +  mock_config.api.administration_paths.keys + '] user api-keys request', function () {
 
-                it('should fail (400) when "X-Actor-ID" header is not defined', function (done) {
+                it('should reject requests without authentication header', function (done) {
                     request(server.app)
-                        .get(mock_config.api.administration_paths.keys)
-                        .expect(400, {error: 'Undefined "X-Actor-ID" header'}, done);
+                    .get(mock_config.api.administration_paths.keys)
+                    .expect(401, {error: 'Auth-token not found in request headers'}, done);
+                });
+
+                it('should reject not authenticated requests', function (done) {
+                    var type = 'wrong';
+                    request(server.app)
+                    .get(mock_config.api.administration_paths.keys)
+                    .set('authorization', type + ' token')
+                    .expect(401, {error: 'Invalid Auth-Token type (' + type + ')'}, done);
                 });
 
                 it('should fail (400) when the user is not valid', function (done) {
-                    var user = 'wrong';
                     request(server.app)
-                        .get('/accounting_proxy/keys')
-                        .set('X-Actor-ID', user)
-                        .expect(404, {error: 'No api-keys available for the user ' + user}, done);
+                    .get('/accounting_proxy/keys')
+                    .set('authorization', 'bearer token')
+                    .expect(404, {error: 'No api-keys available for the user ' + userProfile.id}, done);
                 });
 
                 it('should return the api-keys when the request is correct', function (done) {
@@ -160,7 +206,7 @@ describe('Testing the administration API', function (done) {
                         publicPath: '/public1',
                         orderId: 'orderId1',
                         productId: 'productId',
-                        customer: '0001',
+                        customer: userProfile.id,
                         unit: 'megabyte',
                         recordType: 'data'
                     }
@@ -175,9 +221,9 @@ describe('Testing the administration API', function (done) {
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                        .get('/accounting_proxy/keys')
-                                        .set('X-Actor-ID', buyInfo1.customer)
-                                        .expect(200, [{ apiKey: buyInfo1.apiKey, productId: buyInfo1.productId, orderId: buyInfo1.orderId }], done);
+                                    .get('/accounting_proxy/keys')
+                                    .set('authorization', 'bearer token')
+                                    .expect(200, [{ apiKey: buyInfo1.apiKey, productId: buyInfo1.productId, orderId: buyInfo1.orderId }], done);
                                 }
                             });
                         }
@@ -189,26 +235,26 @@ describe('Testing the administration API', function (done) {
 
                 it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
-                        .post(mock_config.api.administration_paths.checkUrl)
-                        .set('content-type', 'text/html')
-                        .expect(415, {error: 'Content-Type must be "application/json"'}, done);
+                    .post(mock_config.api.administration_paths.checkUrl)
+                    .set('content-type', 'text/html')
+                    .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('should fail (400) when the body body is not correct', function (done) {
                     var url = 'http://localhost:9000/path';
                     request(server.app)
-                        .post(mock_config.api.administration_paths.checkUrl)
-                        .set('content-type', 'application/json')
-                        .expect(400, {error: 'Invalid body, url undefined'}, done);
+                    .post(mock_config.api.administration_paths.checkUrl)
+                    .set('content-type', 'application/json')
+                    .expect(400, {error: 'Invalid body, url undefined'}, done);
                 });
 
                 it('should fail (400) when the body url is not valid', function (done) {
                     var url = 'http://localhost:9000/wrong_path';
                     request(server.app)
-                        .post(mock_config.api.administration_paths.checkUrl)
-                        .set('content-type', 'application/json')
-                        .send({url: url})
-                        .expect(400, {error: 'Incorrect url ' + url}, done);
+                    .post(mock_config.api.administration_paths.checkUrl)
+                    .set('content-type', 'application/json')
+                    .send({url: url})
+                    .expect(400, {error: 'Incorrect url ' + url}, done);
                 });
 
                 it('should update the token (200) when the request is correct', function (done) {
@@ -225,16 +271,16 @@ describe('Testing the administration API', function (done) {
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                        .post(mock_config.api.administration_paths.checkUrl)
-                                        .set('content-type', 'application/json')
-                                        .set('X-API-KEY', newToken)
-                                        .send({url: url})
-                                        .expect(200, function () {
-                                            db_mock.getToken(function (err, token) {
-                                                assert.equal(err, null);
-                                                assert.equal(token, newToken);
-                                                done();
-                                            });
+                                    .post(mock_config.api.administration_paths.checkUrl)
+                                    .set('content-type', 'application/json')
+                                    .set('X-API-KEY', newToken)
+                                    .send({url: url})
+                                    .expect(200, function () {
+                                        db_mock.getToken(function (err, token) {
+                                            assert.equal(err, null);
+                                            assert.equal(token, newToken);
+                                            done();
+                                        });
                                     });
                                 }
                             });
@@ -247,17 +293,17 @@ describe('Testing the administration API', function (done) {
 
                 it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
-                        .post(mock_config.api.administration_paths.newBuy)
-                        .set('content-type', 'text/html')
-                        .expect(415, {error: 'Content-Type must be "application/json"'}, done);
+                    .post(mock_config.api.administration_paths.newBuy)
+                    .set('content-type', 'text/html')
+                    .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('should fail (400) when the json is not valid', function (done) {
                     request(server.app)
-                            .post(mock_config.api.administration_paths.newBuy)
-                            .set('content-type', 'application/json')
-                            .send({})
-                            .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
+                    .post(mock_config.api.administration_paths.newBuy)
+                    .set('content-type', 'application/json')
+                    .send({})
+                    .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
                 });
 
                 it('should save the buy information when the request is correct', function (done) {
@@ -278,16 +324,16 @@ describe('Testing the administration API', function (done) {
                             process.exit(1);
                         } else {
                             request(server.app)
-                                .post(mock_config.api.administration_paths.newBuy)
-                                .set('content-type', 'application/json')
-                                .send(buy)
-                                .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, function () {
-                                    db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function (err, res) {
-                                        assert.equal(err, null);
-                                        assert.deepEqual(res, { unit: buy.productSpecification.unit,
-                                          url: url});
-                                        done();
-                                    });
+                            .post(mock_config.api.administration_paths.newBuy)
+                            .set('content-type', 'application/json')
+                            .send(buy)
+                            .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, function () {
+                                db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function (err, res) {
+                                    assert.equal(err, null);
+                                    assert.deepEqual(res, { unit: buy.productSpecification.unit,
+                                      url: url});
+                                    done();
+                                });
                             });
                         }
                     });

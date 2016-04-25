@@ -248,8 +248,8 @@ app.set('port', config.accounting_proxy.port);
 
 app.post(admin_paths.checkUrl, api.checkIsJSON, bodyParser.json(), api.checkUrl);
 app.post(admin_paths.newBuy, api.checkIsJSON, bodyParser.json(), api.newBuy);
-app.get(admin_paths.keys, api.getApiKeys);
 app.get(admin_paths.units, api.getUnits);
+app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 
 app.use('/', oauth2.headerAuthentication, getBody, handler);
 

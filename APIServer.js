@@ -83,21 +83,17 @@ exports.newBuy = function (req, res) {
  * @param  {Object} res Outgoing response.
  */
 exports.getApiKeys = function (req, res) {
-    var user = req.get('X-Actor-ID');
+    var user = req.user.id;
 
-    if (user === undefined) {
-        res.status(400).json({error: 'Undefined "X-Actor-ID" header'});
-    } else {
-        db.getApiKeys(user, function (err, apiKeysInfo) {
-            if (err) {
-                res.status(500).send();
-            } else if (apiKeysInfo === null) {
-                res.status(404).json({error: 'No api-keys available for the user ' + user});
-            } else {
-                res.status(200).json(apiKeysInfo);
-            }
-        });
-    }
+    db.getApiKeys(user, function (err, apiKeysInfo) {
+        if (err) {
+            res.status(500).send();
+        } else if (apiKeysInfo === null) {
+            res.status(404).json({error: 'No api-keys available for the user ' + user});
+        } else {
+            res.status(200).json(apiKeysInfo);
+        }
+    });
 };
 
 /**

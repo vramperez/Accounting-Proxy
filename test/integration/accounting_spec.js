@@ -146,7 +146,6 @@ var mocker = function (database, done) {
                 'passport-fiware-oauth': FIWAREStrategy_mock,
                 './config': mock_config,
                 'winston': log_mock,
-                './db_Redis': db_mock,
                 './db_Redis': db_mock
             });
             accounter_mock = proxyquire('../../accounter', {

@@ -116,38 +116,12 @@ describe('Testing APIServer', function() {
 
     describe('Function "getApiKeys"', function() {
 
-        it('error user not specified', function(done) {
-            var implementations = {
-                req: {
-                    get: function(header) {
-                        return undefined;
-                    }
-                },
-                res: {
-                    status: function(code) {
-                        return this;
-                    },
-                    json: function(body) {}
-                }
-            };
-            mocker(implementations, function(api, spies) {
-                api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 400);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Undefined "X-Actor-ID" header'});
-                done();
-            });
-        });
-
         it('error getting the apiKeys from DB', function(done) {
             var user = '0001';
             var implementations = {
                 req: {
-                    get: function(header) {
-                        return user;
+                    user: {
+                        id: user
                     }
                 },
                 res: {
@@ -165,8 +139,6 @@ describe('Testing APIServer', function() {
             }
             mocker(implementations, function(api, spies) {
                 api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
                 assert.equal(spies.db.getApiKeys.callCount, 1);
                 assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
                 assert.equal(spies.res.status.callCount, 1);
@@ -180,8 +152,8 @@ describe('Testing APIServer', function() {
             var user = '0001';
             var implementations = {
                 req: {
-                    get: function(header) {
-                        return user;
+                    user: {
+                        id: user
                     }
                 },
                 res: {
@@ -198,8 +170,6 @@ describe('Testing APIServer', function() {
             }
             mocker(implementations, function(api, spies) {
                 api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
                 assert.equal(spies.db.getApiKeys.callCount, 1);
                 assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
                 assert.equal(spies.res.status.callCount, 1);
@@ -215,8 +185,8 @@ describe('Testing APIServer', function() {
             var apiKeys = ['apiKey1', 'apiKey1'];
             var implementations = {
                 req: {
-                    get: function(header) {
-                        return user;
+                    user: {
+                        id: user
                     }
                 },
                 res: {
@@ -234,8 +204,6 @@ describe('Testing APIServer', function() {
             }
             mocker(implementations, function(api, spies) {
                 api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-Actor-ID');
                 assert.equal(spies.db.getApiKeys.callCount, 1);
                 assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
                 assert.equal(spies.res.status.callCount, 1);

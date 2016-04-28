@@ -172,8 +172,8 @@ describe('Testing the administration API', function (done) {
 
                 it('should return all the accounting units (200) when the request is correct', function (done) {
                     request(server.app)
-                    .get(mock_config.api.administration_paths.units)
-                    .expect(200, {units: mock_config.modules.accounting}, done);
+                        .get(mock_config.api.administration_paths.units)
+                        .expect(200, {units: mock_config.modules.accounting}, done);
                 });
             });
 
@@ -181,23 +181,23 @@ describe('Testing the administration API', function (done) {
 
                 it('should reject requests without authentication header', function (done) {
                     request(server.app)
-                    .get(mock_config.api.administration_paths.keys)
-                    .expect(401, {error: 'Auth-token not found in request headers'}, done);
+                        .get(mock_config.api.administration_paths.keys)
+                        .expect(401, {error: 'Auth-token not found in request headers'}, done);
                 });
 
                 it('should reject not authenticated requests', function (done) {
                     var type = 'wrong';
                     request(server.app)
-                    .get(mock_config.api.administration_paths.keys)
-                    .set('authorization', type + ' token')
-                    .expect(401, {error: 'Invalid Auth-Token type (' + type + ')'}, done);
+                        .get(mock_config.api.administration_paths.keys)
+                        .set('authorization', type + ' token')
+                        .expect(401, {error: 'Invalid Auth-Token type (' + type + ')'}, done);
                 });
 
                 it('should fail (400) when the user is not valid', function (done) {
                     request(server.app)
-                    .get('/accounting_proxy/keys')
-                    .set('authorization', 'bearer token')
-                    .expect(404, {error: 'No api-keys available for the user ' + userProfile.id}, done);
+                        .get('/accounting_proxy/keys')
+                        .set('authorization', 'bearer token')
+                        .expect(404, {error: 'No api-keys available for the user ' + userProfile.id}, done);
                 });
 
                 it('should return the api-keys when the request is correct', function (done) {
@@ -209,7 +209,8 @@ describe('Testing the administration API', function (done) {
                         customer: userProfile.id,
                         unit: 'megabyte',
                         recordType: 'data'
-                    }
+                    };
+
                     db_mock.newService(buyInfo1.publicPath, 'http://localhost/private', 'appId', function (err) {
                         if (err) {
                             console.log('Error adding new service');
@@ -221,9 +222,9 @@ describe('Testing the administration API', function (done) {
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                    .get('/accounting_proxy/keys')
-                                    .set('authorization', 'bearer token')
-                                    .expect(200, [{ apiKey: buyInfo1.apiKey, productId: buyInfo1.productId, orderId: buyInfo1.orderId }], done);
+                                        .get('/accounting_proxy/keys')
+                                        .set('authorization', 'bearer token')
+                                        .expect(200, [{ apiKey: buyInfo1.apiKey, productId: buyInfo1.productId, orderId: buyInfo1.orderId }], done);
                                 }
                             });
                         }
@@ -235,30 +236,30 @@ describe('Testing the administration API', function (done) {
 
                 it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
-                    .post(mock_config.api.administration_paths.checkUrl)
-                    .set('content-type', 'text/html')
-                    .expect(415, {error: 'Content-Type must be "application/json"'}, done);
+                        .post(mock_config.api.administration_paths.checkUrl)
+                        .set('content-type', 'text/html')
+                        .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('should fail (400) when the body body is not correct', function (done) {
                     var url = 'http://localhost:9000/path';
                     request(server.app)
-                    .post(mock_config.api.administration_paths.checkUrl)
-                    .set('content-type', 'application/json')
-                    .expect(400, {error: 'Invalid body, url undefined'}, done);
+                        .post(mock_config.api.administration_paths.checkUrl)
+                        .set('content-type', 'application/json')
+                        .expect(400, {error: 'Invalid body, url undefined'}, done);
                 });
 
                 it('should fail (400) when the body url is not valid', function (done) {
                     var url = 'http://localhost:9000/wrong_path';
                     request(server.app)
-                    .post(mock_config.api.administration_paths.checkUrl)
-                    .set('content-type', 'application/json')
-                    .send({url: url})
-                    .expect(400, {error: 'Incorrect url ' + url}, done);
+                        .post(mock_config.api.administration_paths.checkUrl)
+                        .set('content-type', 'application/json')
+                        .send({url: url})
+                        .expect(400, {error: 'Incorrect url ' + url}, done);
                 });
 
                 it('should update the token (200) when the request is correct', function (done) {
-                    var url = 'http://localhost:9000/path';
+                    var url = 'http://localhost:9000/public2';
                     var newToken = 'token2';
                     db_mock.addToken('token1', function (err) {
                         if (err) {
@@ -271,17 +272,22 @@ describe('Testing the administration API', function (done) {
                                     process.exit(1);
                                 } else {
                                     request(server.app)
-                                    .post(mock_config.api.administration_paths.checkUrl)
-                                    .set('content-type', 'application/json')
-                                    .set('X-API-KEY', newToken)
-                                    .send({url: url})
-                                    .expect(200, function () {
-                                        db_mock.getToken(function (err, token) {
-                                            assert.equal(err, null);
-                                            assert.equal(token, newToken);
-                                            done();
+                                        .post(mock_config.api.administration_paths.checkUrl)
+                                        .set('content-type', 'application/json')
+                                        .set('X-API-KEY', newToken)
+                                        .send({url: url})
+                                        .expect(200)
+                                        .end(function (err, res) {
+                                            if (err) {
+                                                done(err);
+                                            } else {
+                                                db_mock.getToken(function (err, token) {
+                                                    assert.equal(err, null);
+                                                    assert.equal(token, newToken);
+                                                    done();
+                                                });
+                                            }
                                         });
-                                    });
                                 }
                             });
                         }
@@ -293,17 +299,17 @@ describe('Testing the administration API', function (done) {
 
                 it('should fail (415) when the content-type is not "application/json"', function (done) {
                     request(server.app)
-                    .post(mock_config.api.administration_paths.newBuy)
-                    .set('content-type', 'text/html')
-                    .expect(415, {error: 'Content-Type must be "application/json"'}, done);
+                        .post(mock_config.api.administration_paths.newBuy)
+                        .set('content-type', 'text/html')
+                        .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
                 it('should fail (400) when the json is not valid', function (done) {
                     request(server.app)
-                    .post(mock_config.api.administration_paths.newBuy)
-                    .set('content-type', 'application/json')
-                    .send({})
-                    .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
+                        .post(mock_config.api.administration_paths.newBuy)
+                        .set('content-type', 'application/json')
+                        .send({})
+                        .expect(400, {error: 'Invalid json. "orderId" is required'}, done);
                 });
 
                 it('should save the buy information when the request is correct', function (done) {
@@ -317,24 +323,30 @@ describe('Testing the administration API', function (done) {
                             unit: 'megabyte',
                             recordType: 'data',
                         }
-                    }
+                    };
+
                     db_mock.newService('/path3', url, 'appId', function (err) {
                         if (err) {
                             console.log('Error adding new service');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .post(mock_config.api.administration_paths.newBuy)
-                            .set('content-type', 'application/json')
-                            .send(buy)
-                            .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'}, function () {
-                                db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function (err, res) {
-                                    assert.equal(err, null);
-                                    assert.deepEqual(res, { unit: buy.productSpecification.unit,
-                                      url: url});
-                                    done();
+                                .post(mock_config.api.administration_paths.newBuy)
+                                .set('content-type', 'application/json')
+                                .send(buy)
+                                .expect(201, {'API-KEY': 'ad07029406d7779de0586a1df57545ab5d14eb45'})
+                                .end(function (err, res) {
+                                    if (err) {
+                                        done(err);
+                                    } else {
+                                        db_mock.getAccountingInfo('ad07029406d7779de0586a1df57545ab5d14eb45', function (err, res) {
+                                            assert.equal(err, null);
+                                            assert.deepEqual(res, { unit: buy.productSpecification.unit,
+                                            url: url});
+                                            done();
+                                        });
+                                    }
                                 });
-                            });
                         }
                     });
                 });

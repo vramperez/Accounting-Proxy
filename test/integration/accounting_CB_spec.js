@@ -210,7 +210,7 @@ var checkAccounting = function (apiKey, value, callback) {
             console.log('Error checking the accounting');
             return callback();
         } else {
-            async.each(allAccInfo, function (accInfo, task_callback) {
+            async.eachSeries(allAccInfo, function (accInfo, task_callback) {
                 if(accInfo.apiKey === apiKey) {
                     assert.equal(accInfo.value, value);
                     return callback();
@@ -249,15 +249,15 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 var publicPath = '/public1';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
-                prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .expect(401, { error: 'Undefined "X-API-KEY" header'}, done);
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .expect(401, { error: 'Undefined "X-API-KEY" header'}, done);
                     }
                 });
             });
@@ -275,16 +275,16 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', 'wrong')
-                        .expect(401, { error: 'Invalid API_KEY or user'}, done);
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', 'wrong')
+                            .expect(401, { error: 'Invalid API_KEY or user'}, done);
                     }
                 });
             });
@@ -303,16 +303,16 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(504, done);
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(504, done);
                     }
                 });
             });
@@ -331,21 +331,21 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'wrong',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, done);
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(500, done);
                     }
                 });
             });
 
-            it('should return the entity (200) and make correct accounting usgin megabyte unit', function (done) {
+            it('should return the entity (200) and make correct accounting using megabyte unit', function (done) {
                 var publicPath = '/public5';
                 var apiKey = 'apiKey4';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -359,25 +359,30 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 0.00022125244140625, function () {
-                                done();
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    checkAccounting(buys[0].apiKey, 0.00022125244140625, function () {
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
 
-            it('should return the entity (200) and make correct accounting usgin megabyte unit', function (done) {
+            it('should return the entity (200) and make correct accounting using megabyte unit', function (done) {
                 var publicPath = '/public6';
                 var apiKey = 'apiKey5';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -391,25 +396,30 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEntity/Room1')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 1, function () {
-                                done();
+                            .get(publicPath + '/v1/contextEntity/Room1')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    checkAccounting(buys[0].apiKey, 1, function () {
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
 
-            it('should return the entity (200) and make correct accounting usgin millisecond unit', function (done) {
+            it('should return the entity (200) and make correct accounting using millisecond unit', function (done) {
                 var publicPath = '/public7';
                 var apiKey = 'apiKey6';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -423,25 +433,30 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEnties')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 0.00002765655517578125, function () {
-                                done();
+                            .get(publicPath + '/v1/contextEnties')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    checkAccounting(buys[0].apiKey, 0.00002765655517578125, function () {
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
 
-            it('should return all entities (200) and make correct accounting usgin call unit', function (done) {
+            it('should return all entities (200) and make correct accounting using call unit', function (done) {
                 var publicPath = '/public8';
                 var apiKey = 'apiKey7';
                 var url = 'http://localhost:' + test_config.accounting_CB_port;
@@ -455,20 +470,25 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextEnties')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 1, function () {
-                                done();
+                            .get(publicPath + '/v1/contextEnties')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    checkAccounting(buys[0].apiKey, 1, function () {
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -487,20 +507,21 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'megabyte',
                     recordType: 'data'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextTypes')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 0.0001773834228515625, function () {
-                                done();
+                            .get(publicPath + '/v1/contextTypes')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function(err, res) {
+                                checkAccounting(buys[0].apiKey, 0.0001773834228515625, function () {
+                                    done();
+                                });
                             });
-                        });
                     }
                 });
             });
@@ -519,20 +540,25 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     unit: 'call',
                     recordType: 'callusage'
                 }];
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .get(publicPath + '/v1/contextTypes')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .expect(500, function () {
-                            checkAccounting(buys[0].apiKey, 1, function () {
-                                done();
+                            .get(publicPath + '/v1/contextTypes')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    checkAccounting(buys[0].apiKey, 1, function () {
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -540,7 +566,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             it('[Subscribe] shoudl fail (415) when "content-type" is different from "application/json"', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
-                var url = 'http://localhost';
+                var url = 'http://localhost' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
                 var buys = [{
                     apiKey: apiKey,
@@ -574,18 +600,18 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'text/plain')
-                        .send(JSON.stringify(payload))
-                        .expect(415, { error: 'Content-Type must be "application/json"' }, done);
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'text/plain')
+                            .send(JSON.stringify(payload))
+                            .expect(415, { error: 'Content-Type must be "application/json"' }, done);
                     }
                 });
             });
@@ -593,7 +619,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             it('[Subscribe] should fail (504) when an error occur sending the request to Context-Broker', function (done) {
                 var publicPath = '/public10';
                 var apiKey = 'apiKey9';
-                var url = 'http://localhost';
+                var url = 'http://localhost' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
                 var buys = [{
                     apiKey: apiKey,
@@ -627,19 +653,19 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(504, done);
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(504, done);
                     }
                 });
             });
@@ -681,30 +707,34 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, {
-                                    apiKey: apiKey,
-                                    notificationUrl: payload["reference"],
-                                    unit: buys[0].unit
-                                });
-                                done();
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                        assert.equal(err, null);
+                                        assert.deepEqual(subsInfo, {
+                                            apiKey: apiKey,
+                                            notificationUrl: payload["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        done();
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -746,32 +776,36 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 }
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, {
-                                    apiKey: apiKey,
-                                    notificationUrl: payload["reference"],
-                                    unit: buys[0].unit
-                                });
-                                checkAccounting(apiKey, 30*24*60*60*1000, function () {
-                                    done();
-                                });
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                        assert.equal(err, null);
+                                        assert.deepEqual(subsInfo, {
+                                            apiKey: apiKey,
+                                            notificationUrl: payload["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        checkAccounting(apiKey, 30*24*60*60*1000, function () {
+                                            done();
+                                        });
+                                    });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -779,7 +813,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             it('[Unsubscribe] should fail (504) when an error occur sending the request to Context-Broker', function (done) {
                 var publicPath = '/public12';
                 var apiKey = 'apiKey11';
-                var url = 'http://localhost';
+                var url = 'http://localhost' + test_config.accounting_CB_port;
                 var services = [{publicPath: publicPath, url: url, appId: userProfile.appId}];
                 var buys = [{
                     apiKey: apiKey,
@@ -791,19 +825,19 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     recordType: 'callusage'
                 }];
                 var payload = {};
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/unsubscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(504, done);
+                            .post(publicPath + '/v1/unsubscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(504, done);
                     }
                 });
             });
@@ -845,42 +879,51 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { apiKey: apiKey,
-                                    notificationUrl: payload["reference"],
-                                    unit: buys[0].unit
-                                });
-                                request(server.app)
-                                .post(publicPath + '/v1/unsubscribeContext')
-                                .set('content-type', 'application/json')
-                                .set('X-API-KEY', apiKey)
-                                .type('json')
-                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
-                                        assert.equal(subsInfo, null);
-                                        done();
+                                        assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                            notificationUrl: payload["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        request(server.app)
+                                            .post(publicPath + '/v1/unsubscribeContext')
+                                            .set('content-type', 'application/json')
+                                            .set('x-auth-token', userProfile.accessToken)
+                                            .set('X-API-KEY', apiKey)
+                                            .type('json')
+                                            .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
+                                            .expect(200)
+                                            .end(function (err, res) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
+                                                        assert.equal(err, null);
+                                                        assert.equal(subsInfo, null);
+                                                        done();
+                                                    });
+                                                }
+                                        });
                                     });
-                                });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -922,42 +965,51 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payload))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { apiKey: apiKey,
-                                    notificationUrl: payload["reference"],
-                                    unit: buys[0].unit
-                                });
-                                request(server.app)
-                                .delete(publicPath + '/v1/unsubscribeContext' + res.body.subscribeResponse.subscriptionId)
-                                .set('content-type', 'application/json')
-                                .set('X-API-KEY', apiKey)
-                                .type('json')
-                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payload))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
-                                        assert.equal(subsInfo, null);
-                                        done();
+                                        assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                            notificationUrl: payload["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        request(server.app)
+                                            .delete(publicPath + '/v1/unsubscribeContext' + res.body.subscribeResponse.subscriptionId)
+                                            .set('content-type', 'application/json')
+                                            .set('x-auth-token', userProfile.accessToken)
+                                            .set('X-API-KEY', apiKey)
+                                            .type('json')
+                                            .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId}))
+                                            .expect(200)
+                                            .end(function (err, res) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    db_mock.getCBSubscription(res.body.subscriptionId, function (err, subsInfo) {
+                                                        assert.equal(err, null);
+                                                        assert.equal(subsInfo, null);
+                                                        done();
+                                                    });
+                                                }
+                                        });
                                     });
-                                });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -999,43 +1051,51 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payloadSubscription))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { apiKey: apiKey,
-                                    notificationUrl: payloadSubscription["reference"],
-                                    unit: buys[0].unit
-                                });
-                                request(server.app)
-                                .post(publicPath + '/v1/updateContextSubscription')
-                                .set('x-auth-token', userProfile.accessToken)
-                                .set('content-type', 'application/json')
-                                .set('X-API-KEY', apiKey)
-                                .type('json')
-                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    db_mock.getNotificationInfo( function (err, info) {
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payloadSubscription))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
-                                        assert.equal(err, null);
-                                        done();
+                                        assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                            notificationUrl: payloadSubscription["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        request(server.app)
+                                            .post(publicPath + '/v1/updateContextSubscription')
+                                            .set('x-auth-token', userProfile.accessToken)
+                                            .set('content-type', 'application/json')
+                                            .set('X-API-KEY', apiKey)
+                                            .type('json')
+                                            .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                            .expect(200)
+                                            .end(function (err, res) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    db_mock.getNotificationInfo( function (err, info) {
+                                                        assert.equal(err, null);
+                                                        assert.equal(err, null);
+                                                        done();
+                                                    });
+                                                }
+                                        });
                                     });
-                                });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -1077,43 +1137,51 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payloadSubscription))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { apiKey: apiKey,
-                                    notificationUrl: payloadSubscription["reference"],
-                                    unit: buys[0].unit
-                                });
-                                request(server.app)
-                                .post(publicPath + '/v1/updateContextSubscription')
-                                .set('x-auth-token', userProfile.accessToken)
-                                .set('content-type', 'application/json')
-                                .set('X-API-KEY', apiKey)
-                                .type('json')
-                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    db_mock.getNotificationInfo( function (err, info) {
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payloadSubscription))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
                                         assert.equal(err, null);
-                                        assert.equal(err, null);
-                                        done();
+                                        assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                            notificationUrl: payloadSubscription["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        request(server.app)
+                                            .post(publicPath + '/v1/updateContextSubscription')
+                                            .set('x-auth-token', userProfile.accessToken)
+                                            .set('content-type', 'application/json')
+                                            .set('X-API-KEY', apiKey)
+                                            .type('json')
+                                            .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                            .expect(200)
+                                            .end(function (err, res) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    db_mock.getNotificationInfo( function (err, info) {
+                                                        assert.equal(err, null);
+                                                        assert.equal(err, null);
+                                                        done();
+                                                    });
+                                                }
+                                            });
                                     });
-                                });
+                                }
                             });
-                        });
                     }
                 });
             });
@@ -1155,40 +1223,48 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     ],
                     "throttling": "PT5S"
                 };
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                     if (err) {
                         console.log('Error preparing the database');
                         process.exit(1);
                     } else {
                         request(server.app)
-                        .post(publicPath + '/v1/subscribeContext')
-                        .set('x-auth-token', userProfile.accessToken)
-                        .set('X-API-KEY', apiKey)
-                        .set('content-type', 'application/json')
-                        .type('json')
-                        .send(JSON.stringify(payloadSubscription))
-                        .expect(200)
-                        .end(function (err, res) {
-                            db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
-                                assert.equal(err, null);
-                                assert.deepEqual(subsInfo, { apiKey: apiKey,
-                                    notificationUrl: payloadSubscription["reference"],
-                                    unit: buys[0].unit
-                                });
-                                request(server.app)
-                                .post(publicPath + '/v1/updateContextSubscription')
-                                .set('x-auth-token', userProfile.accessToken)
-                                .set('content-type', 'application/json')
-                                .set('X-API-KEY', apiKey)
-                                .type('json')
-                                .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    checkAccounting(apiKey, 2*(30*24*60*60*1000)+(31*24*60*60*1000), function () {
-                                        done();
+                            .post(publicPath + '/v1/subscribeContext')
+                            .set('x-auth-token', userProfile.accessToken)
+                            .set('X-API-KEY', apiKey)
+                            .set('content-type', 'application/json')
+                            .type('json')
+                            .send(JSON.stringify(payloadSubscription))
+                            .expect(200)
+                            .end(function (err, res) {
+                                if (err) {
+                                    done(err);
+                                } else {
+                                    db_mock.getCBSubscription(res.body.subscribeResponse.subscriptionId, function (err, subsInfo) {
+                                        assert.equal(err, null);
+                                        assert.deepEqual(subsInfo, { apiKey: apiKey,
+                                            notificationUrl: payloadSubscription["reference"],
+                                            unit: buys[0].unit
+                                        });
+                                        request(server.app)
+                                            .post(publicPath + '/v1/updateContextSubscription')
+                                            .set('x-auth-token', userProfile.accessToken)
+                                            .set('content-type', 'application/json')
+                                            .set('X-API-KEY', apiKey)
+                                            .type('json')
+                                            .send(JSON.stringify({"subscriptionId": res.body.subscribeResponse.subscriptionId, duration: 'P2M'}))
+                                            .expect(200)
+                                            .end(function (err, res) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    checkAccounting(apiKey, 2*(30*24*60*60*1000)+(31*24*60*60*1000), function () {
+                                                        done();
+                                                    });
+                                                }
+                                            });
                                     });
-                                });
-                            });
+                                }
                         });
                     }
                 });

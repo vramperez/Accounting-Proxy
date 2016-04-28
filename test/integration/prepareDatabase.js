@@ -107,8 +107,22 @@ var loadSpecificationRefs = function (specifications, callback) {
     }
 };
 
+var loadToken = function (token, callback) {
+    if (token) {
+        db_mock.addToken(token, function (err) {
+            if (err) {
+                callback(err);
+            } else {
+                callback(null);
+            }
+        });
+    } else {
+        return callback(null);
+    }
+};
+
 // Prepare the database for the test adding the services, buy information, subscriptions.
-exports.addToDatabase = function (db, services, buys, subscriptions, admins, accountings, specifications, callback) {
+exports.addToDatabase = function (db, services, buys, subscriptions, admins, accountings, specifications, token, callback) {
     db_mock = db;
 
     async.series([
@@ -129,6 +143,9 @@ exports.addToDatabase = function (db, services, buys, subscriptions, admins, acc
         },
         function (callback) {
             loadSpecificationRefs(specifications, callback);
+        },
+        function (callback) {
+            loadToken(token, callback);
         }
     ], function (err) {
         if (err) {

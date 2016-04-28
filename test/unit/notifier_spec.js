@@ -73,7 +73,7 @@ describe('Testing Notifier', function () {
 
     describe('Function "notifyUsageSpecification"', function () {
 
-        it('error loading accounting module', function (done) {
+        it('should call the callback with error when there is an error loading accounting module', function (done) {
             var unit = 'wrong';
             var implementations = {
                 config: {
@@ -82,6 +82,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, 'No accounting module for unit "' + unit + 
@@ -93,7 +94,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error getting the href from db', function (done) {
+        it('should call the callback with error when there is an error getting the href from db', function (done) {
             var unit = 'megabyte';
             var implementations = {
                 config: {
@@ -107,6 +108,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, 'Error');
@@ -119,7 +121,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('specification already notify', function (done) {
+        it('should not notify when the specification has been already notified', function (done) {
             var unit = 'megabyte';
             var implementations = {
                 config: {
@@ -133,6 +135,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, null);
@@ -145,68 +148,8 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error, function "getSpecification" not defined in accounting module', function (done) {
+        it('should call the back with error when there is an error getting the token', function (done) {
             var unit = 'megabyte';
-            var implementations = {
-                config: {
-                    modules: {
-                        accounting: [unit]
-                    }
-                },
-                db: {
-                    getHref: function (unit, callback) {
-                        return callback(null, null);
-                    }
-                }
-            };
-            mocker(implementations, function (notifier, spies) {
-                notifier.notifyUsageSpecification( function(err) {
-                    assert.equal(err, 'Error, function getSpecification undefined for unit ' + unit);
-                    assert.equal(spies.async.each.callCount, 1);
-                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
-                    assert.equal(spies.db.getHref.callCount, 1);
-                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
-                    done();
-                });
-            });
-        });
-
-        it('error, specification not defined', function (done) {
-            var unit = 'megabyte';
-            var implementations = {
-                config: {
-                    modules: {
-                        accounting: [unit]
-                    }
-                },
-                db: {
-                    getHref: function (unit, callback) {
-                        return callback(null, null);
-                    }
-                },
-                megabyte: {
-                    getSpecification: function (callback) { 
-                        return callback(undefined); 
-                    }
-                }
-            };
-            mocker(implementations, function (notifier, spies) {
-                notifier.notifyUsageSpecification( function(err) {
-                    assert.equal(err, 'Error, specification no available for unit ' + unit);
-                    assert.equal(spies.async.each.callCount, 1);
-                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
-                    assert.equal(spies.db.getHref.callCount, 1);
-                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
-                    done();
-                });
-            });
-        });
-
-        it('error getting the token', function (done) {
-            var unit = 'megabyte';
-            var specification = {
-                'key1': 'value1'
-            };
             var implementations = {
                 config: {
                     modules: {
@@ -227,6 +170,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, 'Error');
@@ -240,7 +184,113 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error sending the specification', function (done) {
+        it('should not notify when there is not a token', function (done) {
+            var unit = 'megabyte';
+            var implementations = {
+                config: {
+                    modules: {
+                        accounting: [unit]
+                    }
+                },
+                db: {
+                    getHref: function (unit, callback) {
+                        return callback(null, null);
+                    },
+                    getToken: function (callback) {
+                        return callback(null, null);
+                    }
+                },
+                megabyte: {
+                    getSpecification: function (callback) { 
+                        return callback(specification);
+                    }
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsageSpecification( function(err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
+                    assert.equal(spies.db.getHref.callCount, 1);
+                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('should call the callback with error when the function "getSpecification" is not defined', function (done) {
+            var unit = 'megabyte';
+            var token = 'token';
+            var implementations = {
+                config: {
+                    modules: {
+                        accounting: [unit]
+                    }
+                },
+                db: {
+                    getHref: function (unit, callback) {
+                        return callback(null, null);
+                    },
+                    getToken: function (callback) {
+                        return callback(null, token);
+                    }
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsageSpecification( function(err) {
+                    assert.equal(err, 'Error, function getSpecification undefined for unit ' + unit);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
+                    assert.equal(spies.db.getHref.callCount, 1);
+                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('should call the callback with error when the specification is undefined', function (done) {
+            var unit = 'megabyte';
+            var token = 'token';
+            var implementations = {
+                config: {
+                    modules: {
+                        accounting: [unit]
+                    }
+                },
+                db: {
+                    getHref: function (unit, callback) {
+                        return callback(null, null);
+                    },
+                    getToken: function (callback) {
+                        return callback(null, token);
+                    }
+                },
+                megabyte: {
+                    getSpecification: function (callback) { 
+                        return callback(undefined); 
+                    }
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsageSpecification( function(err) {
+                    assert.equal(err, 'Error, specification no available for unit ' + unit);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.equal(spies.async.each.getCall(0).args[0], implementations.config.modules.accounting);
+                    assert.equal(spies.db.getHref.callCount, 1);
+                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
+                    assert.equal(spies.megabyte.getSpecification.callCount, 1);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('should call the callback with error when the notification fails', function (done) {
             var unit = 'megabyte';
             var token = 'token';
             var specification = {
@@ -293,7 +343,6 @@ describe('Testing Notifier', function () {
                         json: true,
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
                             'X-API-KEY': token
                         },
                         body: specification
@@ -303,7 +352,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error, response status code other than 201', function (done) {
+        it('should call the callback with error when the response status code is not 201', function (done) {
             var unit = 'megabyte';
             var token = 'token';
             var specification = {
@@ -338,6 +387,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, 'Error, 404 Not Found');
@@ -355,7 +405,6 @@ describe('Testing Notifier', function () {
                         json: true,
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
                             'X-API-KEY': token
                         },
                         body: specification
@@ -365,7 +414,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error adding the specification href', function (done) {
+        it('should call the callback with error when there is an error adding the href', function (done) {
             var unit = 'megabyte';
             var token = 'token';
             var href = 'http://example:8080/specification/id'
@@ -404,6 +453,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, 'Error');
@@ -421,7 +471,6 @@ describe('Testing Notifier', function () {
                         json: true,
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
                             'X-API-KEY': token
                         },
                         body: specification
@@ -434,7 +483,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('correct notification', function (done) {
+        it('should send the usage specification when it has not been already notified', function (done) {
             var unit = 'megabyte';
             var token = 'token';
             var href = 'http://example:8080/specification/id'
@@ -473,6 +522,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsageSpecification( function(err) {
                     assert.equal(err, null);
@@ -490,7 +540,6 @@ describe('Testing Notifier', function () {
                         json: true,
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
                             'X-API-KEY': token
                         },
                         body: specification
@@ -506,7 +555,7 @@ describe('Testing Notifier', function () {
 
     describe('Function "notifyUsage"', function () {
 
-        it('error getting the notification info from db', function (done) {
+        it('should call the callback with error when there is an error getting the notification info from db', function (done) {
             var implementations = {
                 db: {
                     getNotificationInfo: function (callback) {
@@ -514,6 +563,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, 'Error');
@@ -523,7 +573,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('no accounting info vailable to notify', function (done) {
+        it('should call the callback with error when there is no accounting info available to notify', function (done) {
             var implementations = {
                 db: {
                     getNotificationInfo: function (callback) {
@@ -531,6 +581,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, null);
@@ -540,7 +591,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error getting the ref from db', function (done) {
+        it('should call the callback with error when there is an error getting the ref from db', function (done) {
             var unit = 'megabyte';
             var notificationInfo = [{
                 unit: unit
@@ -555,6 +606,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, 'Error');
@@ -570,7 +622,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error getting the token', function (done) {
+        it('should call the callback with error when there is an error getting the token', function (done) {
             var unit = 'megabyte';
             var href = 'http://example:9223/path';
             var notificationInfo = [{
@@ -601,6 +653,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, 'Error');
@@ -617,7 +670,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error sending the accounting information', function (done) {
+        it('should call the callback with error when there is an error sending the accounting information', function (done) {
             var unit = 'megabyte';
             var href = 'http://example:9223/path';
             var token = 'token';
@@ -658,9 +711,10 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
-                    assert.equal(err, 'Error sending the usage: ' + errCode);
+                    assert.equal(err, 'Error notifying usage to the Usage Management API: ' + errCode);
                     assert.equal(spies.db.getNotificationInfo.callCount, 1);
                     assert.equal(spies.db.getHref.callCount, 1);
                     assert.equal(spies.logger.info.callCount, 1);
@@ -675,7 +729,6 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].json, true);
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
-                        'Content-Type': 'application/json',
                         'X-API-KEY': token
                     });
                     done();
@@ -683,11 +736,13 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error, response status code other than 201', function (done) {
+        it('should call the callback with error when the status code is not 201', function (done) {
             var unit = 'megabyte';
             var href = 'http://example:9223/path';
             var token = 'token';
             var errCode = 'ECONREFUSED';
+            var statusCode = 404;
+            var statusMessage = 'Not Found';
             var notificationInfo = [{
                 unit: unit,
                 recordType: 'data',
@@ -724,9 +779,10 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
-                    assert.equal(err, 'Error, 404 Not Found');
+                    assert.equal(err, 'Error notifying usage to the Usage Management API: ' + statusCode + ' ' + statusMessage);
                     assert.equal(spies.db.getNotificationInfo.callCount, 1);
                     assert.equal(spies.db.getHref.callCount, 1);
                     assert.equal(spies.logger.info.callCount, 1);
@@ -741,7 +797,6 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].json, true);
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
-                        'Content-Type': 'application/json',
                         'X-API-KEY': token
                     });
                     done();
@@ -749,7 +804,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('error reseting the accounting', function (done) {
+        it('should call the callback with error when there is an error reseting the accounting', function (done) {
             var unit = 'megabyte';
             var href = 'http://example:9223/path';
             var token = 'token';
@@ -792,6 +847,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, 'Error while reseting the accounting after notify the usage');
@@ -809,7 +865,6 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].json, true);
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
-                        'Content-Type': 'application/json',
                         'X-API-KEY': token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);
@@ -819,7 +874,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('correct usage notification', function (done) {
+        it('should notify the usage when there is no error', function (done) {
             var unit = 'megabyte';
             var href = 'http://example:9223/path';
             var token = 'token';
@@ -862,6 +917,7 @@ describe('Testing Notifier', function () {
                     }
                 }
             };
+
             mocker(implementations, function (notifier, spies) {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, null);
@@ -879,7 +935,6 @@ describe('Testing Notifier', function () {
                     assert.equal(spies.requester.request.getCall(0).args[0].json, true);
                     assert.equal(spies.requester.request.getCall(0).args[0].method, 'POST');
                     assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {
-                        'Content-Type': 'application/json',
                         'X-API-KEY': token
                     });
                     assert.equal(spies.db.resetAccounting.callCount, 1);

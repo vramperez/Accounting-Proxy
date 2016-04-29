@@ -12,36 +12,49 @@ var acc_modules = {};
  * @param  {string}   unit     Accounting unit.
  */
 var sendSpecification = function (unit, callback) {
-    if (acc_modules[unit].getSpecification === undefined) {
-        return callback('Error, function getSpecification undefined for unit ' + unit);
-    } else {
-        acc_modules[unit].getSpecification(function (specification) {
-            if (specification === undefined) {
-                return callback('Error, specification no available for unit ' + unit);
+
+    db.getToken(function (err, token) {
+        if (err) {
+            return callback(err);
+
+        } else if (!token) {
+            return callback(null);
+
+        } else {
+
+            if (acc_modules[unit].getSpecification === undefined) {
+                return callback('Error, function getSpecification undefined for unit ' + unit);
             } else {
-                db.getToken(function (err, token) {
-                    if (err) {
-                        return callback(err);
+
+                acc_modules[unit].getSpecification(function (specification) {
+                    if (specification === undefined) {
+                        return callback('Error, specification no available for unit ' + unit);
+
                     } else {
+
                         var options = {
                             url: 'http://' + config.usageAPI.host + ':' + 
-                                config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                            config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
                             json: true,
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                authorization: 'Bearer ' + token
+                                'X-API-KEY': token
                             },
                             body: specification
                         };
 
                         logger.info('Sending specification for unit: ' + unit);
                         request(options, function (err, resp, body) {
+
                             if (err) {
                                 return callback('Error sending the Specification: ' + err.code);
+
                             } else if (resp.statusCode !== 201) {
+
                                 return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
+
                             } else {
+
                                 db.addSpecificationRef(unit, body.href, function (err) {
                                     if (err) {
                                         return callback(err);
@@ -54,8 +67,8 @@ var sendSpecification = function (unit, callback) {
                     }
                 });
             }
-        });
-    }
+        }
+    });
 };
 
 /**
@@ -111,18 +124,19 @@ var sendUsage = function (accInfo, callback) {
                         json: true,
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            authorization: 'Bearer ' + token
+                            'X-API-KEY': token
                         },
                         body: body
                     };
 
+                    // Notify usage to the Usage Management API
                     request(options, function (err, resp, body) {
                         if (err) {
-                            return callback('Error sending the usage: ' + err.code);
+                            return callback('Error notifying usage to the Usage Management API: ' + err.code);
                         } else if (resp.statusCode !== 201){
-                            return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
+                            return callback('Error notifying usage to the Usage Management API: ' + resp.statusCode + ' ' + resp.statusMessage);
                         } else {
+                            
                             db.resetAccounting(accInfo.apiKey, function (err) {
                                 if (err) {
                                     return callback('Error while reseting the accounting after notify the usage');

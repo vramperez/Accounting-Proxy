@@ -146,7 +146,6 @@ var mocker = function (database, done) {
                 'passport-fiware-oauth': FIWAREStrategy_mock,
                 './config': mock_config,
                 'winston': log_mock,
-                './db_Redis': db_mock,
                 './db_Redis': db_mock
             });
             accounter_mock = proxyquire('../../accounter', {
@@ -204,38 +203,38 @@ describe('Testing the accounting API. Generic REST use', function () {
 
                 it('should fail (401) when the header "authorization" is undefined', function (done) {
                     request(server.app)
-                    .get('/public/resource')
-                    .expect(401, { error: 'Auth-token not found in request headers'}, done);
+                        .get('/public/resource')
+                        .expect(401, { error: 'Auth-token not found in request headers'}, done);
                 });
 
                 it('should fail (401) when the authorization token is invalid', function (done) {
                     var type = 'wrong';
                     request(server.app)
-                    .get('/public/resource')
-                    .set('authorization', type + ' token')
-                    .expect(401, { error: 'Invalid Auth-Token type (' + type + ')' }, done);
+                        .get('/public/resource')
+                        .set('authorization', type + ' token')
+                        .expect(401, { error: 'Invalid Auth-Token type (' + type + ')' }, done);
                 });
 
                 it('should fail (401) when the token is from other application (wrong appId)', function (done) {
                     request(server.app)
-                    .get('/public/resource')
-                    .set('x-auth-token', userProfile.accessToken)
-                    .expect(401, {error: 'The auth-token scope is not valid for the current application'}, done);
+                        .get('/public/resource')
+                        .set('x-auth-token', userProfile.accessToken)
+                        .expect(401, {error: 'The auth-token scope is not valid for the current application'}, done);
                 });
 
                 it('should fail (504) when an error occur sending request to the endpoint', function (done) {
                     var publicPath = '/public1';
                     var services = [{publicPath: publicPath, url: 'wrong_url', appId: userProfile.appId}];
                     var admins = [{idAdmin: userProfile.id, publicPath: publicPath}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .expect(504, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .expect(504, done);
                         }
                     });
                 });
@@ -245,15 +244,15 @@ describe('Testing the accounting API. Generic REST use', function () {
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
                     var admins = [{idAdmin: userProfile.id, publicPath: publicPath}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], admins, [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .expect(200, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .expect(200, done);
                         }
                     });
                 });
@@ -265,15 +264,15 @@ describe('Testing the accounting API. Generic REST use', function () {
                     var publicPath = '/public3';
                     var url = 'http://localhost:' + test_config.accounting_port;
                     var services = [{publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId}];
-                    prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, [], [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .expect(401, { error: 'Undefined "X-API-KEY" header'}, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .expect(401, { error: 'Undefined "X-API-KEY" header'}, done);
                         }
                     });
                 });
@@ -291,16 +290,16 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', 'wrong')
-                            .expect(401, { error: 'Invalid API_KEY or user'}, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', 'wrong')
+                                .expect(401, { error: 'Invalid API_KEY or user'}, done);
                         }
                     });
                 });
@@ -319,16 +318,16 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', apiKey)
-                            .expect(504, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', apiKey)
+                                .expect(504, done);
                         }
                     });
                 });
@@ -347,16 +346,16 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'wrong',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', apiKey)
-                            .expect(500, done);
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', apiKey)
+                                .expect(500, done);
                         }
                     });
                 });
@@ -375,39 +374,44 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'call',
                         recordType: 'callusage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/call')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', apiKey)
-                            .expect(200, function () {
-                                db_mock.getNotificationInfo(function (err, accInfo) {
-                                    async.each(accInfo, function (acc, task_callback) {
-                                        if (acc.apiKey === apiKey) {
-                                            assert.equal(err, null);
-                                            assert.deepEqual(acc, {
-                                                apiKey: apiKey,
-                                                correlationNumber: '0',
-                                                customer: buys[0].customer,
-                                                orderId: buys[0].orderId,
-                                                productId: buys[0].productId,
-                                                recordType: buys[0].recordType,
-                                                unit: buys[0].unit,
-                                                value: '1'
+                                .get(publicPath + '/rest/call')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', apiKey)
+                                .expect(200)
+                                .end(function (err, res) {
+                                    if (err) {
+                                        done(err);
+                                    } else {
+                                        db_mock.getNotificationInfo(function (err, accInfo) {
+                                            async.eachSeries(accInfo, function (acc, task_callback) {
+                                                if (acc.apiKey === apiKey) {
+                                                    assert.equal(err, null);
+                                                    assert.deepEqual(acc, {
+                                                        apiKey: apiKey,
+                                                        correlationNumber: '0',
+                                                        customer: buys[0].customer,
+                                                        orderId: buys[0].orderId,
+                                                        productId: buys[0].productId,
+                                                        recordType: buys[0].recordType,
+                                                        unit: buys[0].unit,
+                                                        value: '1'
+                                                    });
+                                                    task_callback();
+                                                } else {
+                                                    task_callback();
+                                                }
+                                            }, function () {
+                                                done();
                                             });
-                                            task_callback();
-                                        } else {
-                                            task_callback();
-                                        }
-                                    }, function () {
-                                        done();
-                                    });
+                                        });
+                                    }
                                 });
-                            });
                         }
                     });
                 });
@@ -426,39 +430,44 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'megabyte',
                         recordType: 'amountData'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/megabyte')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', apiKey)
-                            .expect(200, function () {
-                                db_mock.getNotificationInfo(function (err, accInfo) {
-                                    async.each(accInfo, function (acc, task_callback) {
-                                        if (acc.apiKey === apiKey) {
-                                            assert.equal(err, null);
-                                            assert.deepEqual(acc, {
-                                                apiKey: apiKey,
-                                                correlationNumber: '0',
-                                                customer: buys[0].customer,
-                                                orderId: buys[0].orderId,
-                                                productId: buys[0].productId,
-                                                recordType: buys[0].recordType,
-                                                unit: buys[0].unit,
-                                                value: '0.16722679138183594'
+                                .get(publicPath + '/rest/megabyte')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', apiKey)
+                                .expect(200)
+                                .end(function (err, res) {
+                                    if (err) {
+                                        done(err);
+                                    } else {
+                                        db_mock.getNotificationInfo(function (err, accInfo) {
+                                            async.eachSeries(accInfo, function (acc, task_callback) {
+                                                if (acc.apiKey === apiKey) {
+                                                    assert.equal(err, null);
+                                                    assert.deepEqual(acc, {
+                                                        apiKey: apiKey,
+                                                        correlationNumber: '0',
+                                                        customer: buys[0].customer,
+                                                        orderId: buys[0].orderId,
+                                                        productId: buys[0].productId,
+                                                        recordType: buys[0].recordType,
+                                                        unit: buys[0].unit,
+                                                        value: '0.16722679138183594'
+                                                    });
+                                                    task_callback();
+                                                } else {
+                                                    task_callback();
+                                                }
+                                            }, function () {
+                                                done();
                                             });
-                                            task_callback();
-                                        } else {
-                                            task_callback();
-                                        }
-                                    }, function () {
-                                        done();
-                                    });
+                                        });
+                                    }
                                 });
-                            });
                         }
                     });
                 });
@@ -477,37 +486,42 @@ describe('Testing the accounting API. Generic REST use', function () {
                         unit: 'millisecond',
                         recordType: 'timeUsage'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], [], [], null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             request(server.app)
-                            .get(publicPath + '/rest/megabyte')
-                            .set('x-auth-token', userProfile.accessToken)
-                            .set('X-API-KEY', apiKey)
-                            .expect(200, function () {
-                                db_mock.getNotificationInfo(function (err, accInfo) {
-                                    async.each(accInfo, function (acc, task_callback) {
-                                        if (acc.apiKey === apiKey) {
-                                            assert.equal(err, null);
-                                            assert.equal(acc.apiKey, apiKey);
-                                            assert.equal(acc.correlationNumber, '0');
-                                            assert.equal(acc.customer, buys[0].customer);
-                                            assert.equal(acc.orderId, buys[0].orderId);
-                                            assert.equal(acc.productId, buys[0].productId);
-                                            assert.equal(acc.recordType, buys[0].recordType);
-                                            assert.equal(acc.unit, buys[0].unit);
-                                            assert.notEqual(acc.value, 0);
-                                            task_callback();
-                                        } else {
-                                            task_callback();
-                                        }
-                                    }, function () {
-                                        done();
-                                    });
+                                .get(publicPath + '/rest/megabyte')
+                                .set('x-auth-token', userProfile.accessToken)
+                                .set('X-API-KEY', apiKey)
+                                .expect(200)
+                                .end(function (err, res) {
+                                    if (err) {
+                                        done(err);
+                                    } else {
+                                        db_mock.getNotificationInfo(function (err, accInfo) {
+                                            async.eachSeries(accInfo, function (acc, task_callback) {
+                                                if (acc.apiKey === apiKey) {
+                                                    assert.equal(err, null);
+                                                    assert.equal(acc.apiKey, apiKey);
+                                                    assert.equal(acc.correlationNumber, '0');
+                                                    assert.equal(acc.customer, buys[0].customer);
+                                                    assert.equal(acc.orderId, buys[0].orderId);
+                                                    assert.equal(acc.productId, buys[0].productId);
+                                                    assert.equal(acc.recordType, buys[0].recordType);
+                                                    assert.equal(acc.unit, buys[0].unit);
+                                                    assert.notEqual(acc.value, 0);
+                                                    task_callback();
+                                                } else {
+                                                    task_callback();
+                                                }
+                                            }, function () {
+                                                done();
+                                            });
+                                        });
+                                    }
                                 });
-                            });
                         }
                     });
                 });

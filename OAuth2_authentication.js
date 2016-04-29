@@ -64,32 +64,36 @@ var getAuthToken = function (headers) {
  * @param  {Object}   req      Incoming request.
  */
 var verifyAppId = function (reqAppId, req, callback) {
-    db.getAppId(req.path, function (err, appId) { // Check with the whole path
-        if (err) {
-            return callback(err, false);
-        } else if (appId === reqAppId) {
-            req.restPath = '';
-            // Public path is the whole path
-            req.publicPath = req.path;
-            return callback(null, true);
-        } else {
+    if (req.path === config.api.administration_paths.keys) {
+        return callback(null, true);
+    } else {
+        db.getAppId(req.path, function (err, appId) { // Check with the whole path
+            if (err) {
+                return callback(err, false);
+            } else if (appId === reqAppId) {
+                req.restPath = '';
+                // Public path is the whole path
+                req.publicPath = req.path;
+                return callback(null, true);
+            } else {
 
-            var splitPath = req.path.split('/');
-            db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first part of the path
-                if (err) {
-                    return callback(err, false);
-                } else if (appId === reqAppId) {
-                    // Save the path to the endpoint
-                    req.restPath = '/' + req.path.substring(splitPath[1].length + 2);
-                    // Public path is only the first part of the request path
-                    req.publicPath =  '/' + splitPath[1];
-                    return callback(null, true);
-                } else {
-                    return callback(null, false);
-                }
-            });
-        }
-    });
+                var splitPath = req.path.split('/');
+                db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first part of the path
+                    if (err) {
+                        return callback(err, false);
+                    } else if (appId === reqAppId) {
+                        // Save the path to the endpoint
+                        req.restPath = '/' + req.path.substring(splitPath[1].length + 2);
+                        // Public path is only the first part of the request path
+                        req.publicPath =  '/' + splitPath[1];
+                        return callback(null, true);
+                    } else {
+                        return callback(null, false);
+                    }
+                });
+            }
+        });
+    }
 };
 
 /**
@@ -153,6 +157,7 @@ exports.headerAuthentication = function (req, res, next) {
         });
 
     } catch (err) {
+
         if (err.name === 'AuthorizationTokenNotFound') {
             res.status(401).json({error: err.message});
         } else {

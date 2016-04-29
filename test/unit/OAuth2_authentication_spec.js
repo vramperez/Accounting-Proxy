@@ -65,7 +65,7 @@ var mocker = function (implementations, callback) {
 describe('Testing "OAuth2_authentication"', function () {
 
     describe('Function "getAuthToken"', function () {
-        var tokenType = 'bearer';
+        var tokenType = 'Bearer';
         var token = 'token';
         var userProfile = {
             appId: 'appId',
@@ -157,6 +157,67 @@ describe('Testing "OAuth2_authentication"', function () {
             });
         });
 
+        it('should permit requests for retreive  API Keys', function (done) {
+            var apiKeysPath = '/accounting_proxy/keys';
+            var implementations = {
+                req: {
+                    headers: {
+                        'authorization':  tokenType + ' ' + token
+                    },
+                    path: apiKeysPath
+                },
+                res: {
+                    status: function (code) {
+                        return this;
+                    },
+                    send: function () {}
+                },
+                passport: {
+                    OAuth2Strategy: function (options, callback) {
+                        return {
+                            userProfile: function (authToken, callback) {
+                                return callback(null, userProfile);
+                            }
+                        }
+                    }
+                },
+                config: {
+                    api: {
+                        administration_paths: {
+                            keys: apiKeysPath
+                        }
+                    },
+                    oauth2: {
+                        roles: {
+                            admin: 'admin',
+                            customer: '',
+                            seller: ''
+                        }
+                    }
+                }
+            };
+            mocker(implementations, function (auth, spies) {
+                auth.headerAuthentication(implementations.req, implementations.res, function () {});
+                assert.deepEqual(implementations.req.user, { 
+                    appId: userProfile.appId,
+                    id: userProfile.id,
+                    emails: userProfile.emails,
+                    displayName: userProfile.displayName,
+                    roles: userProfile.roles,
+                    accessToken: token
+                });
+                assert.deepEqual(implementations.req.headers, { 
+                    authorization: tokenType + ' ' + token,
+                    'Authorization': tokenType + ' ' + token,
+                    'X-Nick-Name': userProfile.id,
+                    'X-Email': userProfile.emails[0].value,
+                    'X-Display-Name': userProfile.displayName,
+                    'X-Roles': 'admin,'
+                });
+                done();
+            });
+        });
+
         it('error verifying the appId (short publicPath)', function (done) {
             var implementations = {
                 req: {
@@ -183,6 +244,13 @@ describe('Testing "OAuth2_authentication"', function () {
                 db: {
                     getAppId: function (path, callback) {
                         return callback('Error', null);
+                    }
+                },
+                config: {
+                    api: {
+                        administration_paths: {
+                            keys: '/accounting_proxy/keys'
+                        }
                     }
                 }
             };
@@ -230,19 +298,26 @@ describe('Testing "OAuth2_authentication"', function () {
                             return callback('Error', null);
                         }
                     }
+                },
+                config: {
+                    api: {
+                        administration_paths: {
+                            keys: '/accounting_proxy/keys'
+                        }
+                    }
                 }
             };
             mocker(implementations, function (auth, spies) {
                 auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.db.getAppId.callCount, 2);
-                assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
-                done();
+                    assert.equal(spies.db.getAppId.callCount, 2);
+                    assert.equal(spies.db.getAppId.getCall(0).args[0], path);
+                    assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
+                    assert.equal(spies.res.status.callCount, 1);
+                    assert.equal(spies.res.status.getCall(0).args[0], 500);
+                    assert.equal(spies.res.send.callCount, 1);
+                    assert.equal(spies.logger.error.callCount, 1);
+                    assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
+                    done();
             });
         });
 
@@ -275,6 +350,13 @@ describe('Testing "OAuth2_authentication"', function () {
                             return callback(null, 'wrongAppId');
                         } else {
                             return callback(null, 'wrongAppId');
+                        }
+                    }
+                },
+                config: {
+                    api: {
+                        administration_paths: {
+                            keys: '/accounting_proxy/keys'
                         }
                     }
                 }
@@ -329,6 +411,11 @@ describe('Testing "OAuth2_authentication"', function () {
                             customer: '',
                             seller: ''
                         }
+                    },
+                    api: {
+                        administration_paths: {
+                            keys: '/accounting_proxy/keys'
+                        }
                     }
                 }
             };
@@ -336,11 +423,12 @@ describe('Testing "OAuth2_authentication"', function () {
                 auth.headerAuthentication(implementations.req, implementations.res, function () {});
                 assert.equal(spies.db.getAppId.callCount, 1);
                 assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.deepEqual(implementations.req.headers, { authorization: 'bearer token',
-                    'Authorization': 'Bearer token',
-                    'X-Nick-Name': 'user',
-                    'X-Email': 'user@gmail.com',
-                    'X-Display-Name': 'userName',
+                assert.deepEqual(implementations.req.headers, { 
+                    authorization: tokenType + ' ' + token,
+                    'Authorization': tokenType + ' ' + token,
+                    'X-Nick-Name': userProfile.id,
+                    'X-Email': userProfile.emails[0].value,
+                    'X-Display-Name': userProfile.displayName,
                     'X-Roles': 'admin,'
                 });
                 done();
@@ -386,6 +474,11 @@ describe('Testing "OAuth2_authentication"', function () {
                             customer: '',
                             seller: ''
                         }
+                    },
+                    api: {
+                        administration_paths: {
+                            keys: '/accounting_proxy/keys'
+                        }
                     }
                 }
             };
@@ -394,11 +487,12 @@ describe('Testing "OAuth2_authentication"', function () {
                 assert.equal(spies.db.getAppId.callCount, 2);
                 assert.equal(spies.db.getAppId.getCall(0).args[0], path);
                 assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
-                assert.deepEqual(implementations.req.headers, { authorization: 'bearer token',
-                    'Authorization': 'Bearer token',
-                    'X-Nick-Name': 'user',
-                    'X-Email': 'user@gmail.com',
-                    'X-Display-Name': 'userName',
+                assert.deepEqual(implementations.req.headers, { 
+                    authorization: tokenType + ' ' + token,
+                    'Authorization': tokenType + ' ' + token,
+                    'X-Nick-Name': userProfile.id,
+                    'X-Email': userProfile.emails[0].value,
+                    'X-Display-Name': userProfile.displayName,
                     'X-Roles': 'admin,'
                 });
                 done();

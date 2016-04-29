@@ -104,9 +104,7 @@ var mocker = function (database, done) {
                 });
                 callback(null);
             }
-        ], function () {
-            return done();
-        });
+        ]);
     } else {
         async.series([
             function (callback) {
@@ -157,10 +155,16 @@ var mocker = function (database, done) {
                 });
                 callback();
             }
-        ], function () {
-            return done();
-        });
+        ]);
     }
+    db_mock.init(function (err) {
+        if (err) {
+            console.log('Error initializing the database');
+            process.exit(1);
+        } else {
+            return done();
+        }
+    });
 };
 
 var checkUsageNotifications = function (apiKey, value, correlationNumber, callback) {
@@ -172,7 +176,7 @@ var checkUsageNotifications = function (apiKey, value, correlationNumber, callba
             assert.equal(value, 0);
             return callback();
         } else {
-            async.each(allAccInfo, function (accInfo, task_callback) {
+            async.eachSeries(allAccInfo, function (accInfo, task_callback) {
                 if(accInfo.apiKey === apiKey) {
                     assert.equal(accInfo.value, value);
                     assert.equal(accInfo.correlationNumber, correlationNumber);
@@ -198,7 +202,7 @@ describe('Testing the usage specification and usage notifications', function () 
 
         describe('with database ' + database, function () {
 
-            before(function (done) {
+            beforeEach(function (done) {
                 prepare_test.clearDatabase(database, databaseName, function () {
                     mocker(database, done);
                 });
@@ -232,9 +236,17 @@ describe('Testing the usage specification and usage notifications', function () 
                     mock_config.modules = {
                         accounting: ['call']
                     };
-                    server.init( function (err) {
-                        assert.equal(err, 'Error starting the accounting-proxy. Error sending the Specification: ENOTFOUND');
-                        done();
+
+                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
+                        if (err) {
+                            console.log('Error preparing the database');
+                            process.exit(1);
+                        } else {
+                            server.init( function (err) {
+                                assert.equal(err, 'Error starting the accounting-proxy. Error sending the Specification: ENOTFOUND');
+                                done();
+                            });
+                        }
                     });
                 });
 
@@ -242,16 +254,24 @@ describe('Testing the usage specification and usage notifications', function () 
                     mock_config.modules = {
                         accounting: ['call']
                     };
-                    server.init( function (err) {
-                        db_mock.getHref(mock_config.modules.accounting[0], function (err, href) {
-                            if (err) {
-                                console.log('Error getting the href for unit: ' + mock_config.modules.accounting[0]);
-                                process.exit(1);
-                            } else {
-                                assert.equal(href, 'http://localhost:9040/usageSpecification/1');
-                                done();
-                            }
-                        });
+                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
+                        if (err) {
+                            console.log('Error preparing the database');
+                            process.exit(1);
+                        } else {
+                            server.init( function (err) {
+                                assert.equal(err, null);
+                                db_mock.getHref(mock_config.modules.accounting[0], function (err, href) {
+                                    if (err) {
+                                        console.log('Error getting the href for unit: ' + mock_config.modules.accounting[0]);
+                                        process.exit(1);
+                                    } else {
+                                        assert.equal(href, 'http://localhost:9040/usageSpecification/1');
+                                        done();
+                                    }
+                                });
+                            });
+                        }
                     });
                 });
 
@@ -259,34 +279,43 @@ describe('Testing the usage specification and usage notifications', function () 
                     mock_config.modules = {
                         accounting: ['call', 'megabyte']
                     };
-                    server.init( function (err) {
-                        async.each(mock_config.modules.accounting, function (unit, task_callback) {
-                            db_mock.getHref(unit, function (err, href) {
-                                if (err) {
-                                    console.log('Error getting the href for unit: ' + unit);
-                                    process.exit(1);
-                                } else {
-                                    assert.equal(href, 'http://localhost:9040/usageSpecification/' + unitIds[unit]);
-                                    task_callback();
-                                }
+                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
+                        if (err) {
+                            console.log('Error preparing the database');
+                            process.exit(1);
+                        } else {
+                            server.init( function (err) {
+                                assert.equal(err, null);
+                                async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
+                                    db_mock.getHref(unit, function (err, href) {
+                                        if (err) {
+                                            console.log('Error getting the href for unit: ' + unit);
+                                            process.exit(1);
+                                        } else {
+                                            assert.equal(href, 'http://localhost:9040/usageSpecification/' + unitIds[unit]);
+                                            task_callback();
+                                        }
+                                    });
+                                }, done);
                             });
-                        }, done);
+                        }
                     });
                 });
 
                 it('Specification already notified, should not notify', function (done) {
-                    var unit = 'unitStub';
+                    var unit = 'call';
                     mock_config.modules = {
                         accounting: [unit]
                     };
                     var href = 'http://example:3333/usageSpecification/Id';
-                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], function (err) {
+                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], null, function (err) {
                         if (err) {
                             console.log('Error preparing test');
                             process.exit(1);
                             done();
                         } else {
                             server.init(function (err) {
+                                assert.equal(err, null);
                                 db_mock.getHref(mock_config.modules.accounting[0], function (err, res) {
                                     if (err) {
                                         console.log('Error getting the href for unit: ' + mock_config.modules.accounting[0]);
@@ -303,11 +332,11 @@ describe('Testing the usage specification and usage notifications', function () 
 
                 it('Specifications already notified, should not notify', function (done) {
                     mock_config.modules = {
-                        accounting: ['unitStub1', 'unitStub2']
+                        accounting: ['call', 'megabyte']
                     };
-                    var href = 'http://example:3333/usageSpecification/Id';
-                    async.each(mock_config.modules.accounting, function (unit, task_callback) {
-                        prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], function (err) {
+                    var href = 'http://example:4444/usageSpecification/Id';
+                    async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
+                        prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], null, function (err) {
                             if (err) {
                                 console.log('Error preparing test');
                                 process.exit(1);
@@ -316,17 +345,20 @@ describe('Testing the usage specification and usage notifications', function () 
                             }
                         });
                     }, function () {
-                        async.each(mock_config.modules.accounting, function (unit, task_callback) {
-                            db_mock.getHref(unit, function (err, res) {
-                                if (err) {
-                                    console.log('Error getting the href for unit: ' + unit);
-                                    process.exit(1);
-                                } else {
-                                    assert.equal(res, href);
-                                    task_callback();
-                                }
-                            });
-                        }, done);
+                        server.init(function (err) {
+                            assert.equal(err, null);
+                            async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
+                                db_mock.getHref(unit, function (err, res) {
+                                    if (err) {
+                                        console.log('Error getting the href for unit: ' + unit);
+                                        process.exit(1);
+                                    } else {
+                                        assert.equal(res, href);
+                                        task_callback();
+                                    }
+                                });
+                            }, done);
+                        });
                     });
                 });
             });
@@ -363,13 +395,13 @@ describe('Testing the usage specification and usage notifications', function () 
                         unit: unit,
                         href: 'http://example/usageSpecification/Id'
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, 'token', function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             server.init(function (err) {
-                                assert.equal(err, 'Error starting the accounting-proxy. Error sending the usage: ENOTFOUND');
+                                assert.equal(err, 'Error starting the accounting-proxy. Error notifying usage to the Usage Management API: ENOTFOUND');
                                 done();
                             });
                         }
@@ -397,12 +429,13 @@ describe('Testing the usage specification and usage notifications', function () 
                         apiKey: apiKey,
                         value: 2
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], function (err) {
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             server.init(function (err) {
+                                assert.equal(err, null);
                                 checkUsageNotifications(apiKey, 0, 1, function () {
                                     done();
                                 });
@@ -451,13 +484,15 @@ describe('Testing the usage specification and usage notifications', function () 
                         unit: units[1],
                         href: href
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, function (err) {
+
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, 'token', function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             server.init(function (err) {
-                                async.each(apiKeys, function (apiKey, task_callback) {
+                                assert.equal(err, null);
+                                async.eachSeries(apiKeys, function (apiKey, task_callback) {
                                     checkUsageNotifications(apiKey, 0, 1, function () {
                                         task_callback();
                                     });
@@ -507,13 +542,15 @@ describe('Testing the usage specification and usage notifications', function () 
                         unit: units[1],
                         href: href
                     }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, function (err) {
+
+                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, null, function (err) {
                         if (err) {
                             console.log('Error preparing the database');
                             process.exit(1);
                         } else {
                             server.init(function (err) {
-                                async.each(apiKeys, function (apiKey, task_callback) {
+                                assert.equal(err, null);
+                                async.eachSeries(apiKeys, function (apiKey, task_callback) {
                                     checkUsageNotifications(apiKey, 0, 0, function () {
                                         task_callback();
                                     });

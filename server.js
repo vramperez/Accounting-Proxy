@@ -43,7 +43,6 @@ exports.init = function (callback) {
             }
 
             cron.scheduleJob(config.usageAPI.schedule, function () {
-                logger.info('Sending accounting information...');
                 notifier.notifyUsage(function (err) {
                     if (err) {
                         logger.error('Error while notifying the accounting: ' + err);

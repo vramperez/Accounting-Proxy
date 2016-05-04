@@ -77,48 +77,58 @@ var sendSpecification = function (unit, callback) {
  * @param  {Object}   accInfo  Accounting information to notify.
  */
 var sendUsage = function (accInfo, callback) {
-    db.getHref(accInfo.unit, function (err, href) {
+
+    db.getToken( function (err, token) {
+
         if (err) {
             return callback(err);
+        } else if (!token) {
+            return callback(null);
         } else {
-            var body = {
-                date: (new Date()).toISOString(),
-                type: accInfo.recordType,
-                status: 'Received',
-                usageSpecification: {
-                    href: href,
-                    name: accInfo.unit
-                },
-                usageCharacteristic: [
-                    {
-                        name: 'orderId',
-                        value: accInfo.orderId
-                    }, {
-                        name: 'productId',
-                        value: accInfo.productId
-                    }, {
-                        name: 'correlationNumber',
-                        value: accInfo.correlationNumber
-                    }, {
-                        name: 'unit',
-                        value: accInfo.unit
-                    }, {
-                        name: 'value',
-                        value: accInfo.value
-                    }
-                ],
-                relatedParty: [{
-                    role: 'customer',
-                    id: accInfo.customer,
-                    href: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port +
-                        '/partyManagement/individual/' + accInfo.customer
-                }]
-            };
 
-            db.getToken(function (err, token) {
+            logger.info('Notifying the accounting...');
+
+            db.getHref(accInfo.unit, function (err, href) {
+
                 if (err) {
                     return callback(err);
                 } else {
+
+                    var body = {
+                        date: (new Date()).toISOString(),
+                        type: accInfo.recordType,
+                        status: 'Received',
+                        usageSpecification: {
+                            href: href,
+                            name: accInfo.unit
+                        },
+                        usageCharacteristic: [
+                            {
+                                name: 'orderId',
+                                value: accInfo.orderId
+                            }, {
+                                name: 'productId',
+                                value: accInfo.productId
+                            }, {
+                                name: 'correlationNumber',
+                                value: accInfo.correlationNumber
+                            }, {
+                                name: 'unit',
+                                value: accInfo.unit
+                            }, {
+                                name: 'value',
+                                value: accInfo.value
+                            }
+                        ],
+                        relatedParty: [{
+                            role: 'customer',
+                            id: accInfo.customer,
+                            href: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port +
+                                '/partyManagement/individual/' + accInfo.customer
+                        }]
+                    };
+
+
                     var options = {
                         url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usage',
                         json: true,
@@ -131,12 +141,13 @@ var sendUsage = function (accInfo, callback) {
 
                     // Notify usage to the Usage Management API
                     request(options, function (err, resp, body) {
+                        
                         if (err) {
                             return callback('Error notifying usage to the Usage Management API: ' + err.code);
                         } else if (resp.statusCode !== 201){
                             return callback('Error notifying usage to the Usage Management API: ' + resp.statusCode + ' ' + resp.statusMessage);
                         } else {
-                            
+
                             db.resetAccounting(accInfo.apiKey, function (err) {
                                 if (err) {
                                     return callback('Error while reseting the accounting after notify the usage');
@@ -188,7 +199,7 @@ var notifyUsage = function (callback) {
         } else if (notificationInfo === null) { // no info to notify
             return callback(null);
         } else {
-            logger.info('Notifying the accounting...');
+            
             async.each(notificationInfo, function (info, task_callback) {
                 sendUsage(info, function (err) {
                     if (err) {

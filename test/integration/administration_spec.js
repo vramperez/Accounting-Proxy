@@ -75,6 +75,12 @@ var expressWinston_mock = {
     }
 };
 
+var notifier_mock = {
+    notifyUsageSpecification: function (callback) {
+        return callback(null);
+    }
+};
+
 var mocker = function (database, done) {
     if (database === 'sql') {
         mock_config.database.type = './db';
@@ -90,7 +96,8 @@ var mocker = function (database, done) {
         });
         api_server = proxyquire('../../APIServer', {
             './config': mock_config,
-            './db': db_mock
+            './db': db_mock,
+            './notifier': notifier_mock
         });
         server = proxyquire('../../server', {
             './config': mock_config,
@@ -124,7 +131,8 @@ var mocker = function (database, done) {
             });
             api_server = proxyquire('../../APIServer', {
                 './config': mock_config,
-                './db_Redis': db_mock
+                './db_Redis': db_mock,
+                './notifier': notifier_mock
             });
             server = proxyquire('../../server', {
                 './config': mock_config,

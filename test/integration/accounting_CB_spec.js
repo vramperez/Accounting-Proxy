@@ -233,17 +233,18 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
 
     async.eachSeries(test_config.databases, function (database, task_callback) {
 
+            
+        before(function (done) {
+            prepare_test.clearDatabase(database, databaseName, function () {
+                mocker(database, done);
+            });
+        });
+
+        after(function () {
+            task_callback();
+        });
+
         describe('with database ' + database, function () {
-
-            before(function (done) {
-                prepare_test.clearDatabase(database, databaseName, function () {
-                    mocker(database, done);
-                });
-            });
-
-            after(function () {
-                task_callback();
-            });
 
             it('should fail (401) when the "X-API-KEY" header is not defined', function (done) {
                 var publicPath = '/public1';

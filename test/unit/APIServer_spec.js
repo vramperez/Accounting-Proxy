@@ -21,7 +21,8 @@ var mocker = function(implementations, callback) {
         url: {},
         logger: {
                 error: function(msg) {}
-        }
+        },
+        notifier: {}
     };
     var spies = {
         app: {},
@@ -32,7 +33,8 @@ var mocker = function(implementations, callback) {
         validation: {},
         logger: {
             error: sinon.spy(mocks.logger, 'error')
-        }
+        },
+        notifier: {}
     };
     // Complete app mock implementation and add spies.
     async.each(Object.keys(implementations), function(obj, task_callback1) {
@@ -71,7 +73,8 @@ var mocker = function(implementations, callback) {
             './db': mocks.db,
             url: mocks.url,
             winston: mocks.logger,
-            './validation': mocks.validation
+            './validation': mocks.validation,
+            './notifier': mocks.notifier
         });
         return callback(api_server, spies);
     });
@@ -316,7 +319,7 @@ describe('Testing APIServer', function() {
                 },
                 db: {
                     addToken: function(token, callback) {
-                        return callback('Error');
+                        return callback(null);
                     },
                     checkPath: function(path, callback) {
                         return callback(null, false);
@@ -327,6 +330,11 @@ describe('Testing APIServer', function() {
                         return {
                             pathname: path
                         }
+                    }
+                },
+                notifier: {
+                    notifyUsageSpecification: function (callback) {
+                        return callback('Error');
                     }
                 }
             }
@@ -343,6 +351,7 @@ describe('Testing APIServer', function() {
                 assert.equal(spies.db.addToken.getCall(0).args[0], token);
                 assert.equal(spies.logger.error.callCount, 1);
                 assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
+                assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
                 assert.equal(spies.url.parse.callCount, 1);
                 assert.equal(spies.url.parse.getCall(0).args[0], url);
                 assert.equal(spies.db.checkPath.callCount, 1);

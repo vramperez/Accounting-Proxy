@@ -3,7 +3,8 @@ var crypto = require('crypto'),
     validation = require('./validation'),
     url = require('url'),
     db = require(config.database.type),
-    logger = require('winston');
+    logger = require('winston'),
+    notifier = require('./notifier');
 
 "use strict";
 
@@ -19,16 +20,29 @@ exports.checkUrl = function (req, res) {
 
     if (body.url === undefined) {
         res.status(400).json({error: 'Invalid body, url undefined'});
+
     } else {
-        if (req.get('X-API-KEY') !== undefined) { //Save the token to notify the WStore
+
+        //Save the token to notify the WStore
+        if (req.get('X-API-KEY') !== undefined) {
+
             db.addToken(req.get('X-API-KEY'), function (err) {
                 if (err) {
                     logger.error(err);
+                } else {
+
+                    // Send the usage specifications if they have not been notified previously
+                    notifier.notifyUsageSpecification(function (err) {
+                        if (err) {
+                            logger.error(err);
+                        }
+                    });
                 }
             });
         }
+
         // Only check the path because the host and port are the same used for make this request,
-        // so they must be correct.
+        // so they must be correct
         db.checkPath(url.parse(body.url).pathname, function (err, correct) {
             if (err) {
                 res.status(500).send();

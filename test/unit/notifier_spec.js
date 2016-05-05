@@ -573,7 +573,7 @@ describe('Testing Notifier', function () {
             });
         });
 
-        it('should call the callback with error when there is no accounting info available to notify', function (done) {
+        it('should call the callback without error when there is no accounting info available to notify', function (done) {
             var implementations = {
                 db: {
                     getNotificationInfo: function (callback) {
@@ -586,37 +586,6 @@ describe('Testing Notifier', function () {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, null);
                     assert.equal(spies.db.getNotificationInfo.callCount, 1);
-                    done();
-                });
-            });
-        });
-
-        it('should call the callback with error when there is an error getting the ref from db', function (done) {
-            var unit = 'megabyte';
-            var notificationInfo = [{
-                unit: unit
-            }];
-            var implementations = {
-                db: {
-                    getNotificationInfo: function (callback) {
-                        return callback(null, notificationInfo);
-                    },
-                    getHref: function (unit, callback) {
-                        return callback('Error');
-                    }
-                }
-            };
-
-            mocker(implementations, function (notifier, spies) {
-                notifier.notifyUsage(function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.db.getNotificationInfo.callCount, 1);
-                    assert.equal(spies.db.getHref.callCount, 1);
-                    assert.equal(spies.logger.info.callCount, 1);
-                    assert.equal(spies.logger.info.getCall(0).args[0], 'Notifying the accounting...');
-                    assert.equal(spies.async.each.callCount, 1);
-                    assert.deepEqual(spies.async.each.getCall(0).args[0], notificationInfo);
-                    assert.equal(spies.db.getHref.getCall(0).args[0], unit);
                     done();
                 });
             });
@@ -639,9 +608,6 @@ describe('Testing Notifier', function () {
                     getNotificationInfo: function (callback) {
                         return callback(null, notificationInfo);
                     },
-                    getHref: function (unit, callback) {
-                        return callback(null, href);
-                    },
                     getToken: function (callback) {
                         return callback('Error', null);
                     }
@@ -658,13 +624,84 @@ describe('Testing Notifier', function () {
                 notifier.notifyUsage(function (err) {
                     assert.equal(err, 'Error');
                     assert.equal(spies.db.getNotificationInfo.callCount, 1);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.deepEqual(spies.async.each.getCall(0).args[0], notificationInfo);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('should not send notification when there is not a token', function (done) {
+            var unit = 'megabyte';
+            var href = 'http://example:9223/path';
+            var notificationInfo = [{
+                unit: unit,
+                recordType: 'data',
+                orderId: 'orderId',
+                productId: 'productId',
+                correlationNumber: 0,
+                value: 1.326,
+                customer: 'user'
+            }];
+            var implementations = {
+                db: {
+                    getNotificationInfo: function (callback) {
+                        return callback(null, notificationInfo);
+                    },
+                    getToken: function (callback) {
+                        return callback(null, null);
+                    }
+                },
+                config: {
+                    usageAPI: {
+                        host: 'localhost',
+                        port: 8080
+                    }
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsage(function (err) {
+                    assert.equal(err, null);
+                    assert.equal(spies.db.getNotificationInfo.callCount, 1);
+                    assert.equal(spies.async.each.callCount, 1);
+                    assert.deepEqual(spies.async.each.getCall(0).args[0], notificationInfo);
+                    assert.equal(spies.db.getToken.callCount, 1);
+                    done();
+                });
+            });
+        });
+
+        it('should call the callback with error when there is an error getting the ref from db', function (done) {
+            var unit = 'megabyte';
+            var notificationInfo = [{
+                unit: unit
+            }];
+            var implementations = {
+                db: {
+                    getNotificationInfo: function (callback) {
+                        return callback(null, notificationInfo);
+                    },
+                    getHref: function (unit, callback) {
+                        return callback('Error');
+                    },
+                    getToken: function (callback) {
+                        return callback(null, 'token');
+                    }
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+                notifier.notifyUsage(function (err) {
+                    assert.equal(err, 'Error');
+                    assert.equal(spies.db.getNotificationInfo.callCount, 1);
                     assert.equal(spies.db.getHref.callCount, 1);
                     assert.equal(spies.logger.info.callCount, 1);
                     assert.equal(spies.logger.info.getCall(0).args[0], 'Notifying the accounting...');
                     assert.equal(spies.async.each.callCount, 1);
                     assert.deepEqual(spies.async.each.getCall(0).args[0], notificationInfo);
                     assert.equal(spies.db.getHref.getCall(0).args[0], unit);
-                    assert.equal(spies.db.getToken.callCount, 1);
                     done();
                 });
             });

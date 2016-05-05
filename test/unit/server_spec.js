@@ -269,9 +269,8 @@ describe('Testing Server', function () {
                     assert.equal(spies.notifier.notifyUsage.callCount, 2);
                     assert.equal(spies.cron.scheduleJob.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.getCall(0).args[0], implementations.config.usageAPI.schedule);
-                    assert.equal(spies.logger.info.callCount, 2);
+                    assert.equal(spies.logger.info.callCount, 1);
                     assert.equal(spies.logger.info.getCall(0).args[0], 'Loading module for Orion Context Broker...');
-                    assert.equal(spies.logger.info.getCall(1).args[0], 'Sending accounting information...');
                     assert.equal(spies.contextBroker.run.callCount, 1);
                     assert.equal(spies.logger.error.callCount, 1);
                     assert.equal(spies.logger.error.getCall(0).args[0], 'Error while notifying the accounting: Error');

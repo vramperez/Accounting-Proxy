@@ -202,7 +202,7 @@ describe('Testing the usage specification and usage notifications', function () 
 
         describe('with database ' + database, function () {
 
-            beforeEach(function (done) {
+            before(function (done) {
                 prepare_test.clearDatabase(database, databaseName, function () {
                     mocker(database, done);
                 });

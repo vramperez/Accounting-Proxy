@@ -187,17 +187,17 @@ describe('Testing the accounting API. Generic REST use', function () {
     
     async.eachSeries(test_config.databases, function (database, task_callback) {
 
-        before(function (done) {
-            prepare_test.clearDatabase(database, databaseName, function (err) {
-                mocker(database, done);
-            });
-        });
-
-        after(function () {
-            task_callback();
-        });
-
         describe('with database ' + database, function () {
+
+            before(function (done) {
+                prepare_test.clearDatabase(database, databaseName, function (err) {
+                    mocker(database, done);
+                });
+            });
+
+            after(function () {
+                task_callback();
+            });
 
             describe('ADMINISTRATOR', function () {
 

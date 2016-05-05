@@ -53,10 +53,12 @@ describe('Testing SQLITE database', function () {
             'PRAGMA encoding = "UTF-8";',
             'PRAGMA foreign_keys = 1;',
             'CREATE TABLE IF NOT EXISTS token ( \
-                    token               TEXT         )',
+                    token               TEXT, \
+                    PRIMARY KEY (token)         )',
             'CREATE TABLE IF NOT EXISTS units ( \
                     unit                TEXT, \
-                    href                TEXT         )',
+                    href                TEXT, \
+                    PRIMARY KEY (unit)         )',
             'CREATE TABLE IF NOT EXISTS services ( \
                     publicPath          TEXT, \
                     url                 TEXT, \
@@ -233,7 +235,7 @@ describe('Testing SQLITE database', function () {
     });
 
     describe('Function "addSpecificationRef"', function() {
-        var sentence = 'INSERT INTO units             VALUES ($unit, $href)';
+        var sentence = 'INSERT OR REPLACE INTO units             VALUES ($unit, $href)';
         var unit = 'megabyte';
         var href = 'http://example:999/api';
         var params = { '$unit': unit, '$href': href};

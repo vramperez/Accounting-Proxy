@@ -17,12 +17,14 @@ exports.init = function (callback) {
         db.run('PRAGMA foreign_keys = 1;');
 
         db.run('CREATE TABLE IF NOT EXISTS token ( \
-                    token               TEXT \
+                    token               TEXT, \
+                    PRIMARY KEY (token) \
         )');
 
         db.run('CREATE TABLE IF NOT EXISTS units ( \
                     unit                TEXT, \
-                    href                TEXT \
+                    href                TEXT, \
+                    PRIMARY KEY (unit) \
         )');
 
         db.run('CREATE TABLE IF NOT EXISTS services ( \
@@ -118,7 +120,7 @@ exports.getToken = function (callback) {
  * @param {string}   href     Usage specification URL.
  */
 exports.addSpecificationRef = function (unit, href, callback) {
-    db.run('INSERT INTO units \
+    db.run('INSERT OR REPLACE INTO units \
             VALUES ($unit, $href)', 
             {
                 $unit: unit,

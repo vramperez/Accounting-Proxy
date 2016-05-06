@@ -6,7 +6,7 @@ var config_tests = {};
 config_tests.integration = {
 	
 	// Databases used by integration tests. Possible values: 'sqlite', 'redis'
-	databases: ['redis', 'sql'],
+	databases: ['sql', 'redis'],
 
     // Database used by redis to test.
     redis_database: 15,
@@ -16,7 +16,9 @@ config_tests.integration = {
 
     accounting_CB_port: 9020,
 	accounting_port: 9030,
-    usageAPI_port: 9040
+    usageAPI_port: 9040,
+
+    subscriptionId: '51c0ac9ed714fb3b37d7d5a8'
 };
 
 module.exports = config_tests;

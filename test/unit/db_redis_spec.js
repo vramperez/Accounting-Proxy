@@ -66,7 +66,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "init"', function () {
 
-        it('correct intialization', function (done) {
+        it('should call the callback withour error when db initialization success', function (done) {
             mocker({}, function (db, spies) {
                 db.init(function (err) {
                     assert.equal(err, null);
@@ -79,7 +79,7 @@ describe('Testing REDIS database', function () {
     describe('Function "addToken"', function () {
         var token = 'token';
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails adding the token', function (done) {
             var implementations = {
                 del: function () {},
                 sadd: function () {},
@@ -100,7 +100,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('token added', function (done) {
+        it('should call the callback without error when db adds the new token', function (done) {
             var implementations = {
                 del: function () {},
                 sadd: function () {},
@@ -125,7 +125,7 @@ describe('Testing REDIS database', function () {
     describe('Function "getToken"', function () {
         var token = 'token';
 
-        it('error getting token', function (done) {
+        it('should call the callback with error when db fails getting token', function (done) {
             var implementations = {
                 smembers: function (key, callback) {
                     return callback('Error', null);
@@ -142,7 +142,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no available token', function (done) {
+        it('should call the callback with error when there is not token', function (done) {
             var implementations = {
                 smembers: function (key, callback) {
                     return callback(null, []);
@@ -159,7 +159,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db gets the token', function (done) {
             var implementations = {
                 smembers: function (key, callback) {
                     return callback(null, [token]);
@@ -183,7 +183,7 @@ describe('Testing REDIS database', function () {
         var entry = {};
         entry[unit] = href;
 
-        it('error adding the specification href', function (done) {
+        it('should call the callback with error when db fails adding the usage specification href', function (done) {
             var implementations = {
                 hmset: function (hash, object, callback) {
                     return callback('Error');
@@ -200,7 +200,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db adds the usage specification href', function (done) {
             var implementations = {
                 hmset: function (hash, object, callback) {
                     return callback(null);
@@ -222,7 +222,7 @@ describe('Testing REDIS database', function () {
         var unit = 'megabye';
         var href = 'http://example:999/api';
 
-        it('error getting the href', function (done) {
+        it('should call the callback with error when db fails getting the href', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback('Error', null);
@@ -240,7 +240,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db gets the usage specification href', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, href);
@@ -266,7 +266,7 @@ describe('Testing REDIS database', function () {
         var saddParams = ['services', publicPath];
         var hmsetParams = { url: url, appId: appId};
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails executing the statements', function (done) {
             var implementations = {
                 hmset: function (hash, key, value){},
                 sadd: function (list) {},
@@ -288,7 +288,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db adds the new service', function (done) {
             var implementations = {
                 hmset: function (hash, key, value){},
                 sadd: function (list) {},
@@ -314,7 +314,7 @@ describe('Testing REDIS database', function () {
     describe('Function "deleteService"', function () {
         var publicPath = '/public';
 
-        it('Error getting the api-keys', function (done) {
+        it('should call the callback with error when db fails getting the API keys', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error', null);
@@ -339,7 +339,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting subscriptions', function (done) {
+        it('should call the callback with error when db fails getting subscriptions', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys') {
@@ -371,7 +371,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting the customer', function (done) {
+        it('should call the callback with error when db fails getting the customer', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys') {
@@ -412,7 +412,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error executing the query', function (done) {
+        it('should call the callback with error when db fails executing the query', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     if (hash === publicPath + 'apiKeys' ) {
@@ -463,7 +463,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db deletes the service', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     if (hash === '/public') {
@@ -521,7 +521,7 @@ describe('Testing REDIS database', function () {
             appId: 'appId'
         };
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails executing the statements', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -538,7 +538,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no service available', function (done) {
+        it('should call the callback with error when there is not service', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, null);
@@ -555,7 +555,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db gets the service', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, service);
@@ -588,7 +588,7 @@ describe('Testing REDIS database', function () {
         ];
         var publicPaths = ['/public1', '/public2'];
 
-        it('error in smsmeber', function (done) {
+        it('should call the callback with error when db fails executinng "smsmeber"', function (done) {
             var implementations = {
                 smembers: function (has, callback) {
                     return callback('Error', null);
@@ -605,7 +605,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error in hgetall', function (done) {
+        it('should call the callback with error when db fails executing "hgetall"', function (done) {
             var implementations = {
                 smembers: function (has, callback) {
                     return callback(null, publicPaths);
@@ -629,7 +629,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, return two services', function (done) {
+        it('should call the callback without error when db returns all services', function (done) {
             var implementations = {
                 smembers: function (has, callback) {
                     return callback(null, publicPaths);
@@ -663,7 +663,7 @@ describe('Testing REDIS database', function () {
         var publicPath = '/public';
         var appId = 'appId';
 
-        it('error getting the appId', function (done) {
+        it('should call the callback with error when db fails getting the appId', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback('Error', null);
@@ -681,7 +681,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, return the appId', function (done) {
+        it('should call the callback without error when db returns the appId', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, appId);
@@ -703,7 +703,7 @@ describe('Testing REDIS database', function () {
     describe('Function "addAdmin"', function () {
         var idAdmin = 'idAdmin';
 
-        it('error adding the admin', function (done) {
+        it('should call the callback with error when db fails adding the admin', function (done) {
             var implementations = {
                 sadd: function (list, callback) {
                     return callback('Error');
@@ -719,7 +719,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, added admin', function (done) {
+        it('should call the callback without error when db adds the new administrator', function (done) {
             var implementations = {
                 sadd: function (list, callback) {
                     return callback(null);
@@ -741,7 +741,7 @@ describe('Testing REDIS database', function () {
         var publicPaths = ['/public'];
         var service = {publicPath: '/public1'};
 
-        it('error getting all services', function (done) {
+        it('should call the callback with error when db fails getting all services', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error');
@@ -757,7 +757,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error in the first remove', function (done) {
+        it('should call the callback with error when db fails removing services', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, publicPaths);
@@ -786,7 +786,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error in the second remove', function (done) {
+        it('should call the callback with error when db fails removing administrators', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, publicPaths);
@@ -822,7 +822,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, removed admin', function (done) {
+        it('should call the callback without error when db deletes the admin', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, publicPaths);
@@ -859,7 +859,7 @@ describe('Testing REDIS database', function () {
         var idAdmin = 'idAdmin';
         var publicPath = 'publicPath';
 
-        it('error getting the service', function (done) {
+        it('should call the callback with error when db fails getting the service', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -875,7 +875,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error, invalid public path', function (done) {
+        it('should call the callback with error when the public path is invalid', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, null);
@@ -891,7 +891,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting admins', function (done) {
+        it('should call the callback with error when db fails getting admins', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
@@ -912,7 +912,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error, admin not exists', function (done) {
+        it('should call the callback with error when the admin does not exists', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
@@ -933,7 +933,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error adding the administrator', function (done) {
+        it('should call the callback with error when db fails adding the administrator', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
@@ -960,7 +960,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('new administrator added', function (done) {
+        it('should call the callback with error when db binds the administrator', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
@@ -992,7 +992,7 @@ describe('Testing REDIS database', function () {
         var idAdmin = 'idAdmin';
         var publicPath = '/public';
 
-        it('error unbinding the admin', function (done) {
+        it('should call the callback with error when db fails unbinding the admin', function (done) {
             var implementations = {
                 srem: function (hash, key, callback) {
                     return callback('Error');
@@ -1009,7 +1009,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct unbinding', function (done) {
+        it('should call the callback without error when db unbinds the admin', function (done) {
             var implementations = {
                 srem: function (hash, key, callback) {
                     return callback(null);
@@ -1031,7 +1031,7 @@ describe('Testing REDIS database', function () {
         var publicPath = '/public';
         var admins = ['admin1', 'admin2'];
 
-        it('error getting the admins', function (done) {
+        it('should call the callback with error when db fails getting the admins', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error', null);
@@ -1048,7 +1048,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, return two admins', function (done) {
+        it('should call the callback without error when db returns all admins', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, admins);
@@ -1073,7 +1073,7 @@ describe('Testing REDIS database', function () {
         var publicPath = '/public';
         var url = 'http://example.com/path';
 
-        it('error getting the administrators', function (done) {
+        it('should call the callback with error when db fails getting the administrators', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error', null);
@@ -1090,7 +1090,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error, not an admin', function (done) {
+        it('should call the callback without error when admin id is invalid', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, ['no_admin']);
@@ -1107,7 +1107,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error, getting the url', function (done) {
+        it('should call the callback with error when db fails getting the url', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, [idAdmin, 'otherAdmin']);
@@ -1130,7 +1130,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct, should return the admin url', function (done) {
+        it('should return the admin URL when the admin id is correct', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, [idAdmin, 'otherAdmin']);
@@ -1158,7 +1158,7 @@ describe('Testing REDIS database', function () {
         var publicPath = '/public';
         var services = ['/public','/public2'];
 
-        it('error getting the service', function (done) {
+        it('should call the callback with error when db fails getting the service', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error', null);
@@ -1175,7 +1175,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('invalid url', function (done) {
+        it('should call the callback with error when the URL is invalid', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, ['other_path']);
@@ -1192,7 +1192,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct url', function (done) {
+        it('should call the callback without error when db checks the path', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, services);
@@ -1236,7 +1236,7 @@ describe('Testing REDIS database', function () {
             }
         };
 
-        it('executing error', function (done) {
+        it('should call the callback with error when db fails adding the new buy', function (done) {
             var implementations = {
                 sadd: function (list) {},
                 hmset: function (hash, object) {},
@@ -1260,7 +1260,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct buy', function (done) {
+        it('should call the callback without error when db adds the new service', function (done) {
             var implementations = {
                 sadd: function (list) {},
                 hmset: function (hash, object) {},
@@ -1288,7 +1288,7 @@ describe('Testing REDIS database', function () {
     describe('Function "getApiKeys"', function (done) {
         var keys = ['apiKey1', 'apiKey2'];
 
-        it('error getting user api-keys', function (done) {
+        it('should call the callback with error when db fails getting user API keys', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error', null);
@@ -1304,7 +1304,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no api-keys available', function (done) {
+        it('should call the callback without error when there are not API keys', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, []);
@@ -1321,7 +1321,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting accounting info', function (done) {
+        it('should call the callback with error when db fails getting accounting info', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, ['apiKey1']);
@@ -1343,7 +1343,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db gets the API keys', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, keys);
@@ -1394,7 +1394,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "checkRequest"', function (done) {
 
-        it('error getting accounting information', function (done) {
+        it('should call the callback with error when db fails getting accounting information', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -1412,7 +1412,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no info available', function (done) {
+        it('should call the callback with error when there is not accounting information for the request', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, null);
@@ -1430,7 +1430,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('wrong request', function (done) {
+        it('should return false when the request is not valid', function (done) {
             var customer = '0001';
             var publicPath = 'http://localhost/path';
             var apiKey = 'apiKey1';
@@ -1450,7 +1450,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct request', function (done) {
+        it('should return true when the request is valid', function (done) {
             var customer = '0001';
             var publicPath = 'http://localhost/path';
             var apiKey = 'apiKey1';
@@ -1479,7 +1479,7 @@ describe('Testing REDIS database', function () {
             unit: 'megabyte'
         }
 
-        it('error getting the accounting info', function (done) {
+        it('should call the callback with error when db fails getting the accounting info', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -1496,7 +1496,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no accounting info available', function (done) {
+        it('should call the callback without error when there is not accounting information', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, null);
@@ -1513,7 +1513,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting the url', function (done) {
+        it('should call the callback with error when db fails getting the url', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, accountingInfo);
@@ -1536,7 +1536,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the accounting information', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, accountingInfo);
@@ -1565,7 +1565,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getNotificationInfo"', function () {
 
-        it('error getting apiKeys', function (done) {
+        it('should call the callback with error when db fails getting apiKeys', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback('Error');
@@ -1582,7 +1582,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting accounting information', function (done) {
+        it('should call the callback with error when db fails getting accounting information', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, ['apiKey']);
@@ -1602,7 +1602,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no notification info available', function (done) {
+        it('should call the callback without error when there is no accounting information to notify', function (done) {
             var implementations = {
                 smembers: function (hash, callback) {
                     return callback(null, null);
@@ -1621,7 +1621,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the accounting information to notify', function (done) {
             var notificationInfo1 = {
                 apiKey: 'apiKey1',
                 orderId: 'orderId',
@@ -1664,7 +1664,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "makeAccounting"', function () {
 
-        it('amount less than 0', function (done) {
+        it('should call the callback with error when the amount is less than 0', function (done) {
             mocker({}, function (db, spies) {
                 db.makeAccounting('apikey', -1.3, function (err) {
                     assert.equal(err, 'The aomunt must be greater than 0.');
@@ -1673,7 +1673,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting previous value', function (done) {
+        it('should call the callback with error when db fails getting previous value', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback('Error', null);
@@ -1690,7 +1690,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails making the accounting', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 1);
@@ -1717,7 +1717,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db makes the accounting', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 1);
@@ -1747,7 +1747,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "resetAccounting"', function () {
 
-        it('error getting correlation number', function (done) {
+        it('should call the callback with error when db fails getting correlation number', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback('Error', null);
@@ -1764,7 +1764,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails reseting the accounting value', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 0);
@@ -1792,7 +1792,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db rests the accounting value', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 0);
@@ -1823,7 +1823,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "addCBSubscription"', function () {
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails adding a new CB subscription', function (done) {
             var implementations = {
                 sadd: function (list) {},
                 hmset: function (hash, value) {},
@@ -1845,7 +1845,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db adds the new CB subscription', function (done) {
             var implementations = {
                 sadd: function (list) {},
                 hmset: function (hash, value) {},
@@ -1870,7 +1870,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getCBSubscription"', function () {
 
-        it('error getting subscription info', function (done) {
+        it('should call the callback with error when db fails getting subscription info', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback('Error', null);
@@ -1887,7 +1887,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('no subscription info available', function (done) {
+        it('should call the callback without error when there are not CB subscriptions', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, null);
@@ -1904,7 +1904,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error getting the unit', function (done) {
+        it('should call the callback with error when db fails getting the unit', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {
@@ -1930,7 +1930,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the CB subscriptions', function (done) {
             var implementations = {
                 hgetall: function (hash, callback) {
                     return callback(null, {
@@ -1963,7 +1963,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "deleteCBSubscription"', function () {
 
-        it('error getting the api-key', function (done) {
+        it('should call the callback with error when db fails getting the api-key', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback('Error', null);
@@ -1980,7 +1980,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('error executing', function (done) {
+        it('should call the callback with error when db fails deleting the CB subscription', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 'apiKey');
@@ -2008,7 +2008,7 @@ describe('Testing REDIS database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db deletes the CB subscription', function (done) {
             var implementations = {
                 hget: function (hash, key, callback) {
                     return callback(null, 'apiKey');

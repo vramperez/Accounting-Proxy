@@ -249,12 +249,12 @@ describe('Testing the administration API', function (done) {
                         .expect(415, {error: 'Content-Type must be "application/json"'}, done);
                 });
 
-                it('should fail (400) when the body body is not correct', function (done) {
+                it('should fail (422) when the body body is not correct', function (done) {
                     var url = 'http://localhost:9000/path';
                     request(server.app)
                         .post(mock_config.api.administration_paths.checkUrl)
                         .set('content-type', 'application/json')
-                        .expect(400, {error: 'Invalid body, url undefined'}, done);
+                        .expect(422, {error: 'Url missing'}, done);
                 });
 
                 it('should fail (400) when the body url is not valid', function (done) {

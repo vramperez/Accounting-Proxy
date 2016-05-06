@@ -384,32 +384,33 @@ describe('Testing the accounting API. Generic REST use', function () {
                                 .set('x-auth-token', userProfile.accessToken)
                                 .set('X-API-KEY', apiKey)
                                 .expect(200)
+                                .expect(function (res) {
+                                    db_mock.getNotificationInfo(function (err, accInfo) {
+                                        async.eachSeries(accInfo, function (acc, task_callback) {
+                                            if (acc.apiKey === apiKey) {
+                                                assert.equal(err, null);
+                                                assert.deepEqual(acc, {
+                                                    apiKey: apiKey,
+                                                    correlationNumber: '0',
+                                                    customer: buys[0].customer,
+                                                    orderId: buys[0].orderId,
+                                                    productId: buys[0].productId,
+                                                    recordType: buys[0].recordType,
+                                                    unit: buys[0].unit,
+                                                    value: '1'
+                                                });
+                                                task_callback();
+                                            } else {
+                                                task_callback();
+                                            }
+                                        });
+                                    });
+                                })
                                 .end(function (err, res) {
                                     if (err) {
                                         done(err);
                                     } else {
-                                        db_mock.getNotificationInfo(function (err, accInfo) {
-                                            async.eachSeries(accInfo, function (acc, task_callback) {
-                                                if (acc.apiKey === apiKey) {
-                                                    assert.equal(err, null);
-                                                    assert.deepEqual(acc, {
-                                                        apiKey: apiKey,
-                                                        correlationNumber: '0',
-                                                        customer: buys[0].customer,
-                                                        orderId: buys[0].orderId,
-                                                        productId: buys[0].productId,
-                                                        recordType: buys[0].recordType,
-                                                        unit: buys[0].unit,
-                                                        value: '1'
-                                                    });
-                                                    task_callback();
-                                                } else {
-                                                    task_callback();
-                                                }
-                                            }, function () {
-                                                done();
-                                            });
-                                        });
+                                        done();
                                     }
                                 });
                         }
@@ -440,32 +441,33 @@ describe('Testing the accounting API. Generic REST use', function () {
                                 .set('x-auth-token', userProfile.accessToken)
                                 .set('X-API-KEY', apiKey)
                                 .expect(200)
+                                .expect(function (res) {
+                                    db_mock.getNotificationInfo(function (err, accInfo) {
+                                        async.eachSeries(accInfo, function (acc, task_callback) {
+                                            if (acc.apiKey === apiKey) {
+                                                assert.equal(err, null);
+                                                assert.deepEqual(acc, {
+                                                    apiKey: apiKey,
+                                                    correlationNumber: '0',
+                                                    customer: buys[0].customer,
+                                                    orderId: buys[0].orderId,
+                                                    productId: buys[0].productId,
+                                                    recordType: buys[0].recordType,
+                                                    unit: buys[0].unit,
+                                                    value: '0.16722679138183594'
+                                                });
+                                                task_callback();
+                                            } else {
+                                                task_callback();
+                                            }
+                                        });
+                                    });
+                                })
                                 .end(function (err, res) {
                                     if (err) {
                                         done(err);
                                     } else {
-                                        db_mock.getNotificationInfo(function (err, accInfo) {
-                                            async.eachSeries(accInfo, function (acc, task_callback) {
-                                                if (acc.apiKey === apiKey) {
-                                                    assert.equal(err, null);
-                                                    assert.deepEqual(acc, {
-                                                        apiKey: apiKey,
-                                                        correlationNumber: '0',
-                                                        customer: buys[0].customer,
-                                                        orderId: buys[0].orderId,
-                                                        productId: buys[0].productId,
-                                                        recordType: buys[0].recordType,
-                                                        unit: buys[0].unit,
-                                                        value: '0.16722679138183594'
-                                                    });
-                                                    task_callback();
-                                                } else {
-                                                    task_callback();
-                                                }
-                                            }, function () {
-                                                done();
-                                            });
-                                        });
+                                        done();
                                     }
                                 });
                         }
@@ -496,30 +498,31 @@ describe('Testing the accounting API. Generic REST use', function () {
                                 .set('x-auth-token', userProfile.accessToken)
                                 .set('X-API-KEY', apiKey)
                                 .expect(200)
+                                .expect(function (res) {
+                                    db_mock.getNotificationInfo(function (err, accInfo) {
+                                        async.eachSeries(accInfo, function (acc, task_callback) {
+                                            if (acc.apiKey === apiKey) {
+                                                assert.equal(err, null);
+                                                assert.equal(acc.apiKey, apiKey);
+                                                assert.equal(acc.correlationNumber, '0');
+                                                assert.equal(acc.customer, buys[0].customer);
+                                                assert.equal(acc.orderId, buys[0].orderId);
+                                                assert.equal(acc.productId, buys[0].productId);
+                                                assert.equal(acc.recordType, buys[0].recordType);
+                                                assert.equal(acc.unit, buys[0].unit);
+                                                assert.notEqual(acc.value, 0);
+                                                task_callback();
+                                            } else {
+                                                task_callback();
+                                            }
+                                        });
+                                    });
+                                })
                                 .end(function (err, res) {
                                     if (err) {
                                         done(err);
                                     } else {
-                                        db_mock.getNotificationInfo(function (err, accInfo) {
-                                            async.eachSeries(accInfo, function (acc, task_callback) {
-                                                if (acc.apiKey === apiKey) {
-                                                    assert.equal(err, null);
-                                                    assert.equal(acc.apiKey, apiKey);
-                                                    assert.equal(acc.correlationNumber, '0');
-                                                    assert.equal(acc.customer, buys[0].customer);
-                                                    assert.equal(acc.orderId, buys[0].orderId);
-                                                    assert.equal(acc.productId, buys[0].productId);
-                                                    assert.equal(acc.recordType, buys[0].recordType);
-                                                    assert.equal(acc.unit, buys[0].unit);
-                                                    assert.notEqual(acc.value, 0);
-                                                    task_callback();
-                                                } else {
-                                                    task_callback();
-                                                }
-                                            }, function () {
-                                                done();
-                                            });
-                                        });
+                                        done();
                                     }
                                 });
                         }

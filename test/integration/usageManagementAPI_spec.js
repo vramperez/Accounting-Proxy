@@ -227,7 +227,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     megabyte: 2
                 };
 
-                it('Error notifying the usage specification', function (done) {
+                it('should fail when there is an error notifying the usage specification', function (done) {
                     mock_config.usageAPI = {
                         host: 'wrong',
                         port: '',
@@ -250,7 +250,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('Notify one usage specification (should save the href)', function (done) {
+                it('should save the href when the usage notification success', function (done) {
                     mock_config.modules = {
                         accounting: ['call']
                     };
@@ -275,7 +275,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('Notify two usage specification (should save the hrefs)', function (done) {
+                it('should save the hrefs when the usage specifications success', function (done) {
                     mock_config.modules = {
                         accounting: ['call', 'megabyte']
                     };
@@ -302,7 +302,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('Specification already notified, should not notify', function (done) {
+                it('should not notify usage specification when it has already been notified', function (done) {
                     var unit = 'call';
                     mock_config.modules = {
                         accounting: [unit]
@@ -330,7 +330,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('Specifications already notified, should not notify', function (done) {
+                it('should not notify usage specifications when they have already been notified', function (done) {
                     mock_config.modules = {
                         accounting: ['call', 'megabyte']
                     };
@@ -365,7 +365,7 @@ describe('Testing the usage specification and usage notifications', function () 
 
             describe('Notify usage', function() {
 
-                it('Error notifying the usage', function (done) {
+                it('should fail when there is an error notifying the usage', function (done) {
                     var unit = 'call';
                     mock_config.usageAPI = {
                         host: 'wrong',
@@ -408,7 +408,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('One usage accounting to notify, correct notification', function (done) {
+                it('should reset accounting value when usage notification success', function (done) {
                     var unit = 'call';
                     mock_config.modules = {
                         accounting: [unit]
@@ -444,7 +444,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('Two usage accountings to notify,correct notification', function (done) {
+                it('should reset accounting values when usage notifications success', function (done) {
                     var units = ['call', 'megabyte'];
                     mock_config.modules = {
                         accounting: units
@@ -502,7 +502,7 @@ describe('Testing the usage specification and usage notifications', function () 
                     });
                 });
 
-                it('No usage accounting to notify, should not notify', function (done) {
+                it('should not notify when the accounting value is 0', function (done) {
                     var units = ['call', 'megabyte'];
                     mock_config.modules = {
                         accounting: units

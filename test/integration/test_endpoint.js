@@ -1,11 +1,11 @@
 var express = require('express'),
     bodyParser = require('body-parser'),
+    config_test = require('../config_tests').integration,
     fs = require('fs');
 
 var app = express();
 
-var subscriptionId = "51c0ac9ed714fb3b37d7d5a8";
-
+var subscriptionId = config_test.subscriptionId;
 exports.run = function (port) {
     app.listen(port);
 };
@@ -194,6 +194,8 @@ var usageHandler = function (req, res) {
     res.status(201).send();
 };
 
+app.delete('/v1/contextSubscriptions/' + subscriptionId, unsubscribeContextDelete);
+
 app.use(bodyParser.json());
 app.get('/rest/call*', call_handler);
 app.get('/rest/megabyte*', megabyte_handler);
@@ -203,6 +205,5 @@ app.get('/v1/contextTypes', contextTypes);
 app.post('/v1/subscribeContext', subscribeContext);
 app.post('/v1/unsubscribeContext', unsubscribeContext);
 app.post('/v1/updatecontextsubscription', updateContextSubscription);
-app.delete('/v1/contextSubscriptions/' + subscriptionId, unsubscribeContextDelete);
 app.post('/usageSpecification', usageSpecificationHandler);
 app.post('/usage', usageHandler);

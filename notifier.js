@@ -11,64 +11,53 @@ var acc_modules = {};
  *
  * @param  {string}   unit     Accounting unit.
  */
-var sendSpecification = function (unit, callback) {
+var sendSpecification = function (token, unit, callback) {
 
-    db.getToken(function (err, token) {
-        if (err) {
-            return callback(err);
+    if (acc_modules[unit].getSpecification === undefined) {
+        return callback('Error, function getSpecification undefined for unit ' + unit);
+    } else {
 
-        } else if (!token) {
-            return callback(null);
+        acc_modules[unit].getSpecification(function (specification) {
+            if (specification === undefined) {
+                return callback('Error, specification no available for unit ' + unit);
 
-        } else {
-
-            if (acc_modules[unit].getSpecification === undefined) {
-                return callback('Error, function getSpecification undefined for unit ' + unit);
             } else {
 
-                acc_modules[unit].getSpecification(function (specification) {
-                    if (specification === undefined) {
-                        return callback('Error, specification no available for unit ' + unit);
+                var options = {
+                    url: 'http://' + config.usageAPI.host + ':' + 
+                    config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                    json: true,
+                    method: 'POST',
+                    headers: {
+                        'X-API-KEY': token
+                    },
+                    body: specification
+                };
+
+                logger.info('Sending specification for unit: ' + unit);
+                request(options, function (err, resp, body) {
+
+                    if (err) {
+                        return callback('Error sending the Specification: ' + err.code);
+
+                    } else if (resp.statusCode !== 201) {
+
+                        return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
 
                     } else {
 
-                        var options = {
-                            url: 'http://' + config.usageAPI.host + ':' + 
-                            config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
-                            json: true,
-                            method: 'POST',
-                            headers: {
-                                'X-API-KEY': token
-                            },
-                            body: specification
-                        };
-
-                        logger.info('Sending specification for unit: ' + unit);
-                        request(options, function (err, resp, body) {
-
+                        db.addSpecificationRef(unit, body.href, function (err) {
                             if (err) {
-                                return callback('Error sending the Specification: ' + err.code);
-
-                            } else if (resp.statusCode !== 201) {
-
-                                return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
-
+                                return callback(err);
                             } else {
-
-                                db.addSpecificationRef(unit, body.href, function (err) {
-                                    if (err) {
-                                        return callback(err);
-                                    } else {
-                                        return callback(null);
-                                    }
-                                });
+                                return callback(null);
                             }
                         });
                     }
                 });
             }
-        }
-    });
+        });
+    }
 };
 
 /**
@@ -76,85 +65,75 @@ var sendSpecification = function (unit, callback) {
  *
  * @param  {Object}   accInfo  Accounting information to notify.
  */
-var sendUsage = function (accInfo, callback) {
+var sendUsage = function (token, accInfo, callback) {
 
-    db.getToken( function (err, token) {
+    logger.info('Notifying the accounting...');
+
+    db.getHref(accInfo.unit, function (err, href) {
 
         if (err) {
             return callback(err);
-        } else if (!token) {
-            return callback(null);
         } else {
 
-            logger.info('Notifying the accounting...');
+            var body = {
+                date: (new Date()).toISOString(),
+                type: accInfo.recordType,
+                status: 'Received',
+                usageSpecification: {
+                    href: href,
+                    name: accInfo.unit
+                },
+                usageCharacteristic: [
+                {
+                    name: 'orderId',
+                    value: accInfo.orderId
+                }, {
+                    name: 'productId',
+                    value: accInfo.productId
+                }, {
+                    name: 'correlationNumber',
+                    value: accInfo.correlationNumber
+                }, {
+                    name: 'unit',
+                    value: accInfo.unit
+                }, {
+                    name: 'value',
+                    value: accInfo.value
+                }
+                ],
+                relatedParty: [{
+                    role: 'customer',
+                    id: accInfo.customer,
+                    href: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port +
+                    '/partyManagement/individual/' + accInfo.customer
+                }]
+            };
 
-            db.getHref(accInfo.unit, function (err, href) {
+
+            var options = {
+                url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usage',
+                json: true,
+                method: 'POST',
+                headers: {
+                    'X-API-KEY': token
+                },
+                body: body
+            };
+
+            // Notify usage to the Usage Management API
+            request(options, function (err, resp, body) {
 
                 if (err) {
-                    return callback(err);
+                    return callback('Error notifying usage to the Usage Management API: ' + err.code);
+                } else if (resp.statusCode !== 201){
+                    return callback('Error notifying usage to the Usage Management API: ' + resp.statusCode + ' ' + resp.statusMessage);
                 } else {
 
-                    var body = {
-                        date: (new Date()).toISOString(),
-                        type: accInfo.recordType,
-                        status: 'Received',
-                        usageSpecification: {
-                            href: href,
-                            name: accInfo.unit
-                        },
-                        usageCharacteristic: [
-                            {
-                                name: 'orderId',
-                                value: accInfo.orderId
-                            }, {
-                                name: 'productId',
-                                value: accInfo.productId
-                            }, {
-                                name: 'correlationNumber',
-                                value: accInfo.correlationNumber
-                            }, {
-                                name: 'unit',
-                                value: accInfo.unit
-                            }, {
-                                name: 'value',
-                                value: accInfo.value
-                            }
-                        ],
-                        relatedParty: [{
-                            role: 'customer',
-                            id: accInfo.customer,
-                            href: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port +
-                                '/partyManagement/individual/' + accInfo.customer
-                        }]
-                    };
-
-
-                    var options = {
-                        url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usage',
-                        json: true,
-                        method: 'POST',
-                        headers: {
-                            'X-API-KEY': token
-                        },
-                        body: body
-                    };
-
-                    // Notify usage to the Usage Management API
-                    request(options, function (err, resp, body) {
-                        
+                    db.resetAccounting(accInfo.apiKey, function (err) {
                         if (err) {
-                            return callback('Error notifying usage to the Usage Management API: ' + err.code);
-                        } else if (resp.statusCode !== 201){
-                            return callback('Error notifying usage to the Usage Management API: ' + resp.statusCode + ' ' + resp.statusMessage);
+                            return callback('Error while reseting the accounting after notify the usage');
                         } else {
-
-                            db.resetAccounting(accInfo.apiKey, function (err) {
-                                if (err) {
-                                    return callback('Error while reseting the accounting after notify the usage');
-                                } else {
-                                    return callback(null);
-                                }
-                            });
+                            return callback(null);
                         }
                     });
                 }
@@ -167,7 +146,7 @@ var sendUsage = function (accInfo, callback) {
  * Notify the usage specification for all the accounting units supported by the proxy.
  *
  */
-var notifyUsageSpecification = function (callback) {
+var notifyUsageSpecification = function (token, callback) {
     var units = config.modules.accounting;
 
     async.each(units, function (unit, task_callback) {
@@ -182,7 +161,7 @@ var notifyUsageSpecification = function (callback) {
             } else if (href !== null) {
                 task_callback(null);
             } else {
-                sendSpecification(unit, task_callback);
+                sendSpecification(token, unit, task_callback);
             }
         });
     }, callback);
@@ -193,26 +172,47 @@ var notifyUsageSpecification = function (callback) {
  *
  */
 var notifyUsage = function (callback) {
-    db.getNotificationInfo(function (err, notificationInfo) {
+
+    db.getToken(function (err, token) {
+
         if (err) {
             return callback(err);
-        } else if (notificationInfo === null) { // no info to notify
+        } else if (!token) {
             return callback(null);
         } else {
-            
-            async.each(notificationInfo, function (info, task_callback) {
-                sendUsage(info, function (err) {
-                    if (err) {
-                        task_callback(err);
-                    } else {
-                        task_callback(null);
-                    }
-                });
-            }, callback);
+
+            db.getNotificationInfo(function (err, notificationInfo) {
+
+                if (err) {
+                    return callback(err);
+                } else if (notificationInfo === null) { // no info to notify
+                    return callback(null);
+                } else {
+
+                    // First, Notify the usage specifications
+                    notifyUsageSpecification(token, function (err) {
+
+                        if (err) {
+                            return callback(err);
+
+                        } else {
+                            // Then, notify the usage
+                            async.each(notificationInfo, function (info, task_callback) {
+                                sendUsage(token, info, function (err) {
+                                    if (err) {
+                                        task_callback(err);
+                                    } else {
+                                        task_callback(null);
+                                    }
+                                });
+                            }, callback);
+                        }
+                    });
+                }
+            });
         }
     });
 };
 
-exports.notifyUsageSpecification = notifyUsageSpecification;
 exports.notifyUsage = notifyUsage;
 exports.acc_modules = acc_modules;

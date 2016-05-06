@@ -16,10 +16,10 @@ var crypto = require('crypto'),
  */
 exports.checkUrl = function (req, res) {
     req.setEncoding('utf-8');
-    var body = req.body;
+    var bodyUrl = req.body.url;
 
-    if (body.url === undefined) {
-        res.status(400).json({error: 'Invalid body, url undefined'});
+    if (!bodyUrl) {
+        res.status(422).json({error: 'Url missing'});
 
     } else {
 
@@ -29,27 +29,19 @@ exports.checkUrl = function (req, res) {
             db.addToken(req.get('X-API-KEY'), function (err) {
                 if (err) {
                     logger.error(err);
-                } else {
-
-                    // Send the usage specifications if they have not been notified previously
-                    notifier.notifyUsageSpecification(function (err) {
-                        if (err) {
-                            logger.error(err);
-                        }
-                    });
                 }
             });
         }
 
         // Only check the path because the host and port are the same used for make this request,
         // so they must be correct
-        db.checkPath(url.parse(body.url).pathname, function (err, correct) {
+        db.checkPath(url.parse(bodyUrl).pathname, function (err, correct) {
             if (err) {
                 res.status(500).send();
             } else if (correct) {
                 res.status(200).send();
             } else {
-                res.status(400).json({error: 'Incorrect url ' + body.url});
+                res.status(400).json({error: 'Incorrect url ' + bodyUrl});
             }
         });
     }

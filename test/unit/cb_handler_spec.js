@@ -137,7 +137,7 @@ describe('Testing ContextBroker Handler', function () {
 
     describe('Function "getOperation"', function () {
 
-        it('correct, subscription operation', function (done) {
+        it('should return "subscribe" when the request is a CB subscription', function (done) {
             var path = '/subs_path';
             var subsUrls = [
                 ['DELETE', '/unsubs_path', 'unsubscribe'],
@@ -161,7 +161,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('correct, unsubscription operation', function (done) {
+        it('should return "unsubscribe" when the request is a CB unsubscription', function (done) {
             var path = '/unsubs_path';
             var subsUrls = [
                 ['DELETE', path, 'unsubscribe'],
@@ -185,7 +185,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('correct, administration operation', function (done) {
+        it('should not return the operation when the request is from an administrator', function (done) {
             var path = '/administration';
             var subsUrls = [
                 ['DELETE', '/unsubs_path', 'unsubscribe'],
@@ -212,7 +212,7 @@ describe('Testing ContextBroker Handler', function () {
 
     describe('Function "notificationHandler"', function (done) {
 
-        it('error getting subscription information from databse', function (done) {
+        it('should log the error when db fails getting the subscription information', function (done) {
             var subscriptionId = 'subscriptionId';
             var implementations = {
                 db: {
@@ -243,7 +243,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('error making the accounting', function (done) {
+        it('should log the error when db fails making the accounting', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 subscriptionId: subscriptionId
@@ -293,7 +293,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('error notifying the user', function (done) {
+        it('should return 504 when the notification fails', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 subscriptionId: subscriptionId
@@ -364,7 +364,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('correct notification', function (done) {
+        it('should return 200 when the notification success', function (done) {
             var subscriptionId = 'subscriptionId';
             var body = {
                 subscriptionId: subscriptionId
@@ -436,7 +436,7 @@ describe('Testing ContextBroker Handler', function () {
 
     describe('Function "subscriptionHandler"', function () {
 
-        it('[subscription] error sending request to CB', function (done) {
+        it('should call the callback with error when sending the request to CB fails', function (done) {
             var body = {
                 reference: 'http://reference/path'
             };
@@ -483,7 +483,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('[subscription] error adding the subscription to database', function (done) {
+        it('should call the callback with error wen sending the request to CB fails', function (done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
             var body = {
@@ -560,7 +560,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('[subscription] incorrect subscription', function (done) {
+        it('should call the callback with error when the subscription is invalid', function (done) {
             var subscriptionId = 'subscriptionId';
             var apiKey = 'apiKey';
             var body = {
@@ -618,7 +618,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('[subscription] correct subscription (should not make accounting)', function (done) {
+        it('should not make accounting when the subscription is correct and the accounting unit is "megabyte"', function (done) {
             var subscriptionId = 'subscriptionId';
             var unit = 'megabyte';
             var apiKey = 'apiKey';
@@ -701,7 +701,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('[subscription] error while making the accounting', function (done) {
+        it('should call the callback with errors when db fails making the accounting', function (done) {
             var subscriptionId = 'subscriptionId';
             var unit = 'millisecond';
             var apiKey = 'apiKey';
@@ -796,7 +796,7 @@ describe('Testing ContextBroker Handler', function () {
             });
         });
 
-        it('[subscription] correct subscription (should make accounting)', function (done) {
+        it('should make accounting when the subscription is correct and the accounting unit is "millisecond"', function (done) {
             var subscriptionId = 'subscriptionId';
             var unit = 'millisecond';
             var apiKey = 'apiKey';

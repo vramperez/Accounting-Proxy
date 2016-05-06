@@ -117,7 +117,7 @@ describe('Testing SQLITE database', function () {
         var token = 'token';
         var params = {'$token': 'token'};
 
-        it('error deleting the previous token', function (done) {
+        it('should call the callback with error when db fails deleting the previous token', function (done) {
             var implementations = {
                 run: function (sentence, callback) {
                     return callback('Error');
@@ -133,7 +133,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('error inserting the new token', function (done) {
+        it('should call the callback with error when db fails inserting the new token', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     if (sentence === sentences[0]) {
@@ -155,7 +155,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('token added', function (done) {
+        it('should call the callback without error when db add the token', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     if (sentence === sentences[0]) {
@@ -182,7 +182,7 @@ describe('Testing SQLITE database', function () {
         var sentence = 'SELECT *             FROM token';
         var token = 'token';
 
-        it('error getting the token', function (done) {
+        it('should call the callback with error when db fails getting the token', function (done) {
             var implementations = {
                 get: function (sentence, callback) {
                     return callback('Error', null);
@@ -199,7 +199,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no available token', function (done) {
+        it('should call the callback without error when there is not available token', function (done) {
             var implementations = {
                 get: function (sentence, callback) {
                     return callback(null, undefined);
@@ -216,7 +216,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the token', function (done) {
             var implementations = {
                 get: function (sentence, callback) {
                     return callback(null, {token: token});
@@ -240,7 +240,7 @@ describe('Testing SQLITE database', function () {
         var href = 'http://example:999/api';
         var params = { '$unit': unit, '$href': href};
 
-        it('error adding the specification reference', function (done) {
+        it('should call the callback with error when db fails adding the specification reference', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -257,7 +257,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db adds the specification', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -281,7 +281,7 @@ describe('Testing SQLITE database', function () {
         var href = {href: 'http://example:999/api'};
         var params = {'$unit': unit};
 
-        it('error getting the href', function (done) {
+        it('should call the callback with error when db fails getting the href', function (done) {
             var implementations = {
                 get: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -299,7 +299,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('undefined href', function (done) {
+        it('should call the callback without error when there is not an href', function (done) {
             var implementations = {
                 get: function (sentence, params, callback) {
                     return callback(null, undefined);
@@ -317,7 +317,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the href', function (done) {
             var implementations = {
                 get: function (sentence, params, callback) {
                     return callback(null, href);
@@ -346,7 +346,7 @@ describe('Testing SQLITE database', function () {
             '$url': url,
             '$appId': appId
         }
-        it('error adding the new service', function (done) {
+        it('should call the callback with error when db fails adding the new service', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -363,7 +363,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('service added', function (done) {
+        it('should call the callback without error when db adds the new service', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -388,7 +388,7 @@ describe('Testing SQLITE database', function () {
             '$path': publicPath
         }
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails deleting the service', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -405,7 +405,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db fails', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -432,7 +432,7 @@ describe('Testing SQLITE database', function () {
         var appId = 'appId';
         var params = {'$path': publicPath};
 
-        it('error getting the service', function (done) {
+        it('should call the callback with error when db fails getting the service', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -450,7 +450,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no service available', function (done) {
+        it('should call the callback with error when there is not service', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -468,7 +468,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns the service', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, [{url: url, appId: appId}]);
@@ -502,7 +502,7 @@ describe('Testing SQLITE database', function () {
             }
         ]
 
-        it('error getting all services', function (done) {
+        it('should call the callback with error when db fails getting all services', function (done) {
             var implementations = {
                 all: function (sentence, callback) {
                     return callback('Error', null);
@@ -519,7 +519,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct (get two services)', function (done) {
+        it('should call the callback without error when db returns all services', function (done) {
             var implementations = {
                 all: function (sentence, callback) {
                     return callback(null, services);
@@ -543,7 +543,7 @@ describe('Testing SQLITE database', function () {
         var appId = 'appId';
         var params = { '$publicPath': publicPath};
 
-        it('error getting the appId', function (done) {
+        it('should call the callback with error when db fails getting the appId', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -561,7 +561,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no appId available', function (done) {
+        it('should call the callback withou error when the is not an appId', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -579,7 +579,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct, return the appId', function (done) {
+        it('should call the callback without error when db returns the appId', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, appId);
@@ -603,7 +603,7 @@ describe('Testing SQLITE database', function () {
         var idAdmin = 'admin';
         var params = {'$idAdmin': idAdmin};
 
-        it('error adding the new administrator', function (done) {
+        it('should call the callback with error when db fails adding the new administrator', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -620,7 +620,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct, added new admin', function (done) {
+        it('should call the callback without error when db adds the new admin', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -643,7 +643,7 @@ describe('Testing SQLITE database', function () {
         var idAdmin = 'idAdmin';
         var params = {'$idAdmin': idAdmin};
 
-        it('error deleting the administrator', function (done) {
+        it('should call the callback with error when db fails deleting the administrator', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -660,7 +660,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct, deleted administrator', function (done) {
+        it('should call the callback with error when db deletes the admin', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -687,7 +687,7 @@ describe('Testing SQLITE database', function () {
             '$publicPath': publicPath
         };
 
-        it('error binding the admin with the service', function (done) {
+        it('should call the callback with error when db fails binding the admin with the service', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -704,7 +704,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct binding', function (done) {
+        it('should call the callback without error when db bind the admin with the service', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -731,7 +731,7 @@ describe('Testing SQLITE database', function () {
             '$publicPath': publicPath
         };
 
-        it('error unbinding the admin', function (done) {
+        it('should call the callback with error when db fails unbinding the admin', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -748,7 +748,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct unbinding', function (done) {
+        it('should call the callback without error when db unbinds the admin', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -779,7 +779,7 @@ describe('Testing SQLITE database', function () {
             }
         ];
 
-        it('error getting admins', function (done) {
+        it('should call the callback with error when db fails getting admins', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null)
@@ -797,7 +797,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no admins available', function (done) {
+        it('should call the callback without error when there is not an admin', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, null)
@@ -815,7 +815,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct, return admins', function (done) {
+        it('should call the callback without error when db returns all the admins', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, admins)
@@ -847,7 +847,7 @@ describe('Testing SQLITE database', function () {
             '$publicPath': publicPath
         };
 
-        it('error getting the admin url', function (done) {
+        it('should call the callback with error when db fails getting the admin url', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -865,7 +865,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('admin not valid for the service (should return null)', function (done) {
+        it('should call the callback without error when there are not admins for the service specified', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -883,7 +883,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct, return the url of the service', function (done) {
+        it('should call the callback without error when db returns the URL', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, [{url: url}]);
@@ -908,7 +908,7 @@ describe('Testing SQLITE database', function () {
             WHERE publicPath=$publicPath';
         var params = {'$publicPath': '/path'}
 
-        it('error checking the url', function (done) {
+        it('should call the callback with error when db fails checking the url', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -926,7 +926,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no services available', function (done) {
+        it('should call the callback without error when there are not services', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -944,7 +944,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when there is no error checking the path', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, [{url: 'url'}]);
@@ -986,7 +986,7 @@ describe('Testing SQLITE database', function () {
             "$unit": "call",
             "$value": 0
         }
-        it('error adding the new buy information', function (done) {
+        it('should call the callback with error when db fails adding the new buy information', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -1003,7 +1003,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('new buy information added', function (done) {
+        it('should call the callback without error when db adds new buy information', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -1027,7 +1027,7 @@ describe('Testing SQLITE database', function () {
             WHERE customer=$user';
         var params = {'$user': '0001'};
 
-        it('error getting the api-keys', function (done) {
+        it('should call the callback with error when db fails getting the api-keys', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error');
@@ -1045,7 +1045,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no api-keys available', function (done) {
+        it('should call the callback without error when there are not api-keys', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -1063,7 +1063,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db returns all the API keys', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, ['apiKey1', 'apiKey2']);
@@ -1090,7 +1090,7 @@ describe('Testing SQLITE database', function () {
         var apiKey = 'apiKey1';
         var params = {'$apiKey': apiKey, '$publicPath': publicPath}
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails checking the request', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error');
@@ -1108,7 +1108,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no information available', function (done) {
+        it('should call the callback with error when there is not information available', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -1126,7 +1126,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('customer not associated with api-key', function (done) {
+        it('should call the callback without error when there is not customer associated with api-key', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, [{cutomer: '0007'}]);
@@ -1144,7 +1144,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct (customer associated with api-key', function (done) {
+        it('should call the callback without error when there is not an error checking the request ', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, [{customer: '0001'}]);
@@ -1169,7 +1169,7 @@ describe('Testing SQLITE database', function () {
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey';
         var params = { '$apiKey': 'apiKey'};
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails getting the accounting info', function (done) {
             var implementations = {
                 all: function (sentences, params, callback) {
                     return callback('Error', null);
@@ -1187,7 +1187,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no accounting info available', function (done) {
+        it('should call the callback without error when there is not accounting information', function (done) {
             var implementations = {
                 all: function (sentences, params, callback) {
                     return callback(null, []);
@@ -1205,7 +1205,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback with error when db failsgetting the accounting information', function (done) {
             var accInfo = {
                 unit: 'call', 
                 url: 'url', 
@@ -1234,7 +1234,7 @@ describe('Testing SQLITE database', function () {
             FROM accounting \
             WHERE value!=0';
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails getting notification info', function (done) {
             var implementations = {
                 all: function (sentence, callback) {
                     return callback('Error', null);
@@ -1251,7 +1251,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no info available', function (done) {
+        it('should call the callback without error when there is not information to notify', function (done) {
             var implementations = {
                 all: function (sentence, callback) {
                     return callback(null, []);
@@ -1268,7 +1268,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db return the information to notify', function (done) {
             var notifInfo = {
                 apiKey: 'apiKey',
                 orderId: 'orderId',
@@ -1305,7 +1305,7 @@ describe('Testing SQLITE database', function () {
             '$amount': '1.5'
         };
 
-        it('amount less than 0', function (done) {
+        it('should call the callback with error when the amount is less than 0', function (done) {
             mocker({}, function (db, spies) {
                 db.makeAccounting('apiKey', - 1.3, function (err) {
                     assert.equal(err, 'The aomunt must be greater than 0.');
@@ -1314,7 +1314,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('error in begin transaction', function (done) {
+        it('should call the callback with error when db fails beginning transaction', function (done) {
             var implementations = {
                 beginTransaction: function (callback) {
                     return callback('Error', null);
@@ -1329,7 +1329,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails making the accounting', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -1356,7 +1356,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('commit error', function (done) {
+        it('should call the callback with error when db fails committing', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -1385,7 +1385,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db makes the accounting', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -1423,7 +1423,7 @@ describe('Testing SQLITE database', function () {
             '$apiKey': 'apiKey'
         };
 
-        it('error begin transaction', function (done) {
+        it('should call the callback with error when db fails beginning the transaction', function (done) {
             var implementations = {
                 beginTransaction: function (callback) {
                     return callback('Error', null);
@@ -1438,7 +1438,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails reseting the accounting value', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -1465,7 +1465,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('commit error', function (done) {
+        it('should call the callback with error when db fails committing', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -1494,7 +1494,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db resets the accounting value', function (done) {
             var transaction = {
                 run: function (sentence, params, callback) {
                     return callback(null);
@@ -1533,7 +1533,7 @@ describe('Testing SQLITE database', function () {
             '$notificationUrl': 'http://notification/url'
         };
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails adding the new CB subscription', function (done) {
             var implementations = {
                 run: function (sentences, params, callback) {
                     return callback('Error');
@@ -1550,7 +1550,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db adds the new CB subscription', function (done) {
             var implementations = {
                 run: function (sentences, params, callback) {
                     return callback(null);
@@ -1576,7 +1576,7 @@ describe('Testing SQLITE database', function () {
             '$subscriptionId': 'subscriptionId'
         }
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails getting the CB subscription', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback('Error', null);
@@ -1594,7 +1594,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('no subscription available', function (done) {
+        it('should call the callback without error when there are not subscriptions', function (done) {
             var implementations = {
                 all: function (sentence, params, callback) {
                     return callback(null, []);
@@ -1612,7 +1612,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback without error when db gets the CB subscription', function (done) {
             var subsInfo = {
                 apiKey: 'apiKey',
                 notificationUrl: 'http://notification/url',
@@ -1643,7 +1643,7 @@ describe('Testing SQLITE database', function () {
             '$subscriptionId': 'subscriptionId'
         };
 
-        it('query error', function (done) {
+        it('should call the callback with error when db fails deleting the CB subscription', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback('Error');
@@ -1660,7 +1660,7 @@ describe('Testing SQLITE database', function () {
             });
         });
 
-        it('correct', function (done) {
+        it('should call the callback with error when db deletes the CB subscription', function (done) {
             var implementations = {
                 run: function (sentence, params, callback) {
                     return callback(null);

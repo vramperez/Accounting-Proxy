@@ -84,7 +84,7 @@ describe('Testing APIServer', function() {
 
     describe('Function "getUnits"', function() {
 
-        it('correct (200)', function() {
+        it('should return 200 when the response contains the accounting units supported', function() {
             var modules = ['cal', 'megabyte'];
             var implementations = {
                 app: {
@@ -119,7 +119,7 @@ describe('Testing APIServer', function() {
 
     describe('Function "getApiKeys"', function() {
 
-        it('error getting the apiKeys from DB', function(done) {
+        it('should return 500 when db fails getting the API keys', function(done) {
             var user = '0001';
             var implementations = {
                 req: {
@@ -151,7 +151,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('no apiKeys available', function(done) {
+        it('should return 404 when there is not API keys for the user specified', function(done) {
             var user = '0001';
             var implementations = {
                 req: {
@@ -183,7 +183,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('apiKeys avilable', function(done) {
+        it('should return 200 when the response contains the user API keys', function(done) {
             var user = '0001';
             var apiKeys = ['apiKey1', 'apiKey1'];
             var implementations = {
@@ -220,7 +220,7 @@ describe('Testing APIServer', function() {
 
     describe('Function "checkUrl"', function() {
 
-        it('undefined URL in body', function(done) {
+        it('should return 422 when the body is not valid', function(done) {
             var implementations = {
                 req: {
                     setEncoding: function(encoding) {},
@@ -236,14 +236,14 @@ describe('Testing APIServer', function() {
             mocker(implementations, function(api, spies) {
                 api.checkUrl(implementations.req, implementations.res);
                 assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0] , 400);
+                assert.equal(spies.res.status.getCall(0).args[0] , 422);
                 assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Invalid body, url undefined'});
+                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Url missing'});
                 done();
             });
         });
 
-        it('error checking the url', function(done) {
+        it('should return 500 when db fails checking the path', function(done) {
             var token = 'token';
             var path = '/path';
             var url = 'http://example.com' + path;
@@ -297,7 +297,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('invalid url', function(done) {
+        it('should return 400 when the URL is not valid', function(done) {
             var token = 'token';
             var path = '/path';
             var url = 'http://example.com' + path;
@@ -360,7 +360,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('correct url', function(done) {
+        it('should return 200 when the URL is valid', function(done) {
             var token = 'token';
             var path = '/path';
             var url = 'http://example.com' + path;
@@ -417,7 +417,7 @@ describe('Testing APIServer', function() {
 
     describe('Function "newBuy"', function() {
 
-        it('invalid json', function(done) {
+        it('should return 400 when the JSON is not valid', function(done) {
             var implementations = {
                 req: {
                     setEncoding: function(encoding) {},
@@ -448,7 +448,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('error adding the information to db', function(done) {
+        it('should return 400 when db fails adding the new buy', function(done) {
             var path = '/path';
             var body = {
                 orderID: 'orderId',
@@ -511,7 +511,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('correct', function(done) {
+        it('should return 201 when the new buy is correct', function(done) {
             var path = '/path';
             var body = {
                 orderID: 'orderId',
@@ -578,7 +578,7 @@ describe('Testing APIServer', function() {
 
     describe('Function "isJSON"', function() {
 
-        it('no "application/json"', function(done) {
+        it('should return 415 when the content-type is not "application/json"', function(done) {
             var implementations = {
                 req: {
                     is: function(type) {
@@ -604,7 +604,7 @@ describe('Testing APIServer', function() {
             });
         });
 
-        it('correct "application/json"', function(done) {
+        it('should call the callback without error when the content-type is "application/json"', function(done) {
             var implementations = {
                 req: {
                     is: function(type) {

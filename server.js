@@ -28,9 +28,6 @@ exports.init = function (callback) {
             db.init(callback);
         },
         function (callback) {
-            notifier.notifyUsageSpecification(callback);
-        },
-        function (callback) {
             notifier.notifyUsage(callback);
         }
     ], function (err) {

@@ -7,7 +7,7 @@ describe('Testing "Accounter"', function () {
 
     describe('Function "count"', function () {
 
-        it('Invalid accounting unit, should return an error', function (done) {
+        it('should return an error when the accounting unit is not valid', function (done) {
             var unit = 'wrongUnit';
             var notifierStub = {
                 acc_modules: {
@@ -23,7 +23,7 @@ describe('Testing "Accounter"', function () {
             });
         });
 
-        it('Accounting module should return an error', function (done) {
+        it('should call the callback with error when the accounting module fails', function (done) {
             var unit = 'unit1';
             var countFunction = 'count';
             var notifierStub = {
@@ -47,7 +47,7 @@ describe('Testing "Accounter"', function () {
             });
         });
 
-        it('Database should return an error when making the accounting', function (done) {
+        it('should call the callback with error when db fails making the accounting', function (done) {
             var apiKey = 'apiKey';
             var unit = 'unit1';
             var countFunction = 'count';
@@ -88,7 +88,7 @@ describe('Testing "Accounter"', function () {
             });
         });
 
-        it('Should not return an error, correct accounting', function (done) {
+        it('should call the callback without error when the db makes the accounting', function (done) {
             var apiKey = 'apiKey';
             var unit = 'unit1';
             var countFunction = 'count';

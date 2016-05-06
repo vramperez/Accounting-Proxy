@@ -29,14 +29,6 @@ exports.checkUrl = function (req, res) {
             db.addToken(req.get('X-API-KEY'), function (err) {
                 if (err) {
                     logger.error(err);
-                } else {
-
-                    // Send the usage specifications if they have not been notified previously
-                    notifier.notifyUsageSpecification(function (err) {
-                        if (err) {
-                            logger.error(err);
-                        }
-                    });
                 }
             });
         }

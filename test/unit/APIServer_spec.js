@@ -331,11 +331,6 @@ describe('Testing APIServer', function() {
                             pathname: path
                         }
                     }
-                },
-                notifier: {
-                    notifyUsageSpecification: function (callback) {
-                        return callback('Error');
-                    }
                 }
             }
             mocker(implementations, function(api, spies) {
@@ -349,9 +344,6 @@ describe('Testing APIServer', function() {
                 assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
                 assert.equal(spies.db.addToken.callCount, 1);
                 assert.equal(spies.db.addToken.getCall(0).args[0], token);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
-                assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
                 assert.equal(spies.url.parse.callCount, 1);
                 assert.equal(spies.url.parse.getCall(0).args[0], url);
                 assert.equal(spies.db.checkPath.callCount, 1);

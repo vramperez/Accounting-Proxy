@@ -17,46 +17,46 @@ var sendSpecification = function (token, unit, callback) {
         return callback('Error, function getSpecification undefined for unit ' + unit);
     } else {
 
-        acc_modules[unit].getSpecification(function (specification) {
-            if (specification === undefined) {
-                return callback('Error, specification no available for unit ' + unit);
+        var specification = acc_modules[unit].getSpecification();
 
-            } else {
+        if (specification === undefined) {
+            return callback('Error, specification no available for unit ' + unit);
 
-                var options = {
-                    url: 'http://' + config.usageAPI.host + ':' + 
-                    config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
-                    json: true,
-                    method: 'POST',
-                    headers: {
-                        'X-API-KEY': token
-                    },
-                    body: specification
-                };
+        } else {
 
-                logger.info('Sending specification for unit: ' + unit);
-                request(options, function (err, resp, body) {
+            var options = {
+                url: 'http://' + config.usageAPI.host + ':' + 
+                config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                json: true,
+                method: 'POST',
+                headers: {
+                    'X-API-KEY': token
+                },
+                body: specification
+            };
 
-                    if (err) {
-                        return callback('Error sending the Specification: ' + err.code);
+            logger.info('Sending specification for unit: ' + unit);
+            request(options, function (err, resp, body) {
 
-                    } else if (resp.statusCode !== 201) {
+                if (err) {
+                    return callback('Error sending the Specification: ' + err.code);
 
-                        return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
+                } else if (resp.statusCode !== 201) {
 
-                    } else {
+                    return callback('Error, ' + resp.statusCode + ' ' + resp.statusMessage);
 
-                        db.addSpecificationRef(unit, body.href, function (err) {
-                            if (err) {
-                                return callback(err);
-                            } else {
-                                return callback(null);
-                            }
-                        });
-                    }
-                });
-            }
-        });
+                } else {
+
+                    db.addSpecificationRef(unit, body.href, function (err) {
+                        if (err) {
+                            return callback(err);
+                        } else {
+                            return callback(null);
+                        }
+                    });
+                }
+            });
+        }
     }
 };
 
@@ -109,7 +109,6 @@ var sendUsage = function (token, accInfo, callback) {
                 }]
             };
 
-
             var options = {
                 url: 'http://' + config.usageAPI.host + ':' + config.usageAPI.port + config.usageAPI.path + '/usage',
                 json: true,
@@ -150,11 +149,13 @@ var notifyUsageSpecification = function (token, callback) {
     var units = config.modules.accounting;
 
     async.each(units, function (unit, task_callback) {
+
         try {
             acc_modules[unit] = require('./acc_modules/' + unit);
         } catch (e) {
             return callback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
         }
+
         db.getHref(unit, function (err, href) {
             if (err) {
                 task_callback(err);

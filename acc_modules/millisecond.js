@@ -74,8 +74,8 @@ var subscriptionCount = function (countInfo, callback) {
     return callback(null, moment.duration(countInfo.request.duration).asMilliseconds());
 };
 
-var getSpecification = function (callback) {
-    return callback(specification);
+var getSpecification = function () {
+    return specification;
 };
 
 exports.count = count;

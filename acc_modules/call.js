@@ -65,8 +65,8 @@ var count = function (countInfo, callback) {
     return callback(null, 1);
 };
 
-var getSpecification = function (callback) {
-    return callback(specification);
+var getSpecification = function () {
+    return specification;
 };
 
 exports.count = count;

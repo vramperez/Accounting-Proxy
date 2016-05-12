@@ -77,9 +77,11 @@ exports.init = function (callback) {
  * Save the token to notify the WStore.
  */
 exports.addToken = function (token, callback) {
+    var error = 'Error adding the acces token "' + token + '" .';
+
     db.run('DELETE FROM token', function (err) {
         if (err) {
-            return callback('Error adding the acces token "' + token + '" .');
+            return callback(error);
         } else {
             db.run('INSERT OR REPLACE INTO token \
                 VALUES ($token)',
@@ -87,7 +89,7 @@ exports.addToken = function (token, callback) {
                     $token: token
                 }, function (err) {
                     if (err) {  
-                        return callback('Error adding the acces token "' + token + '" .');
+                        return callback(error);
                     } else {
                         return callback(null);
                     }
@@ -105,7 +107,7 @@ exports.getToken = function (callback) {
         function (err, token) {
             if (err) {
                 return callback('Error getting the access token.', null);
-            } else if (token === undefined) {
+            } else if (!token) {
                 return callback(null, null);
             } else {
                 return callback(null, token.token);
@@ -148,7 +150,7 @@ exports.getHref = function (unit, callback) {
             }, function(err, href) {
                 if (err) {
                     return callback('Error getting the href for unit "' + unit + '" .', null);
-                } else if (href === undefined) {
+                } else if (!href) {
                     return callback(null, null);
                 } else {
                     return callback(null, href.href);
@@ -203,17 +205,17 @@ exports.deleteService = function (publicPath, callback) {
  * @param  {string} publicPath      Service public path.
  */
 exports.getService = function (publicPath, callback) {
-    db.all('SELECT url, appId \
+    db.get('SELECT url, appId \
             FROM services \
             WHERE publicPath=$path', {
                 $path: publicPath
             }, function (err, service) {
                 if (err) {
                     return callback('Error in database getting the service.', null);
-                } else if (service.length ===  0) {
+                } else if (!service) {
                     return callback(null, null);
                 } else {
-                    return callback(null, {url: service[0].url, appId: service[0].appId} );
+                    return callback(null, service);
                 }
     });
 };
@@ -238,7 +240,7 @@ exports.getAllServices = function (callback) {
  * @param  {string}   publicPath Service public path.
  */
 exports.getAppId = function (publicPath, callback) {
-    db.all('SELECT appId \
+    db.get('SELECT appId \
             FROM services \
             WHERE $publicPath=publicPath',
             {
@@ -246,10 +248,10 @@ exports.getAppId = function (publicPath, callback) {
             }, function (err, appId) {
                 if (err) {
                     return callback('Error in database getting the appId.', null);
-                } else if (appId.length === 0) {
+                } else if (!appId) {
                     return callback(null, null);
                 } else {
-                    return callback(null, appId[0].appId);
+                    return callback(null, appId.appId);
                 }
     });
 };
@@ -327,7 +329,7 @@ exports.unbindAdmin = function (idAdmin, publicPath, callback) {
                 $publicPath: publicPath
             }, function (err) {
                 if (err) {
-                    return callback('Error in database unbinding the administrator.');
+                    return callback('Error in database unbinding the administrator "' + idAdmin + '".');
                 } else {
                     return callback(null);
                 }
@@ -361,7 +363,7 @@ exports.getAdmins = function (publicPath, callback) {
  * @param  {string}   publicPath Public path of the service.
  */
 exports.getAdminUrl = function (idAdmin, publicPath, callback) {
-    db.all('SELECT services.url \
+    db.get('SELECT services.url \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
                 administer.idAdmin=$idAdmin AND services.publicPath=$publicPath',
@@ -371,10 +373,10 @@ exports.getAdminUrl = function (idAdmin, publicPath, callback) {
             }, function (err, result) {
                 if (err) {
                     return callback('Error getting the admin url.', null);
-                } else if (result.length === 0) {
+                } else if (!result) {
                     return callback(null, null);
                 } else {
-                    return callback(null, result[0].url);
+                    return callback(null, result.url);
                 }
     });
 };
@@ -385,14 +387,14 @@ exports.getAdminUrl = function (idAdmin, publicPath, callback) {
  * @param  {string} publicPath         Path to check.
  */
 exports.checkPath = function (publicPath, callback) {
-    db.all('SELECT * \
+    db.get('SELECT * \
             FROM services \
             WHERE publicPath=$publicPath', {
                 $publicPath: publicPath
-            }, function (err, services) {
+            }, function (err, service) {
                 if (err) {
                     return callback('Error checking the path.', false);
-                } else if (services.length === 0) {
+                } else if (!service) {
                     return callback(null, false);
                 } else {
                     return callback(null, true);
@@ -458,7 +460,7 @@ exports.getApiKeys = function (user, callback) {
  * @param  {string} apiKey      Identifies the product.
  */
 exports.checkRequest = function (customer, apiKey, publicPath, callback) {
-    db.all('SELECT customer \
+    db.get('SELECT customer \
             FROM accounting \
             WHERE apiKey=$apiKey AND publicPath=$publicPath',
             {
@@ -467,9 +469,9 @@ exports.checkRequest = function (customer, apiKey, publicPath, callback) {
             }, function (err, user) {
                 if (err) {
                     return callback('Error in database checking the request.', false);
-                } else if (user.length === 0) {
+                } else if (!user) {
                     return callback(null, false);
-                } else if (user[0].customer !== customer) {
+                } else if (user.customer !== customer) {
                     return callback(null, false);
                 } else {
                     return callback(null, true);
@@ -483,7 +485,7 @@ exports.checkRequest = function (customer, apiKey, publicPath, callback) {
  * @param  {string}   apiKey   Product identifier.
  */
 exports.getAccountingInfo = function (apiKey, callback) {
-    db.all('SELECT accounting.unit, services.url \
+    db.get('SELECT accounting.unit, services.url \
             FROM accounting , services \
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey', 
             {
@@ -491,10 +493,10 @@ exports.getAccountingInfo = function (apiKey, callback) {
             }, function (err, accountingInfo) {
                 if (err) {
                     return callback('Error in database getting the accounting info.', null);
-                } else if (accountingInfo.length === 0) {
+                } else if (!accountingInfo) {
                     return callback(null, null);
                 } else {
-                    return callback(null, accountingInfo[0]);
+                    return callback(null, accountingInfo);
                 }
     });
 };
@@ -624,7 +626,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.getCBSubscription = function (subscriptionId, callback) {
-    db.all('SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
+    db.get('SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId',
             {
@@ -632,10 +634,10 @@ exports.getCBSubscription = function (subscriptionId, callback) {
             }, function (err, subscriptionInfo) {
                 if (err) {
                     return callback('Error getting the subscription.', null);
-                } else if (subscriptionInfo.length === 0) {
+                } else if (!subscriptionInfo) {
                     return callback(null, null);
                 } else {
-                    return callback(null, subscriptionInfo[0]);
+                    return callback(null, subscriptionInfo);
                 }
     });
 };

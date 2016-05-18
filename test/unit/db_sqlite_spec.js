@@ -106,7 +106,7 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "addToken"', function () {
 
-        var sentences = ['DELETE FROM token', 'INSERT OR REPLACE INTO token                 VALUES ($token)'];
+        var sentences = ['DELETE FROM token', 'INSERT INTO token                 VALUES ($token)'];
         var params = {'$token': data.DEFAULT_TOKEN};
 
         var testAddToken = function (params, runRes1, runRes2, errMsg, done) {

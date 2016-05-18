@@ -83,7 +83,7 @@ exports.addToken = function (token, callback) {
         if (err) {
             return callback(error);
         } else {
-            db.run('INSERT OR REPLACE INTO token \
+            db.run('INSERT INTO token \
                 VALUES ($token)',
                 {
                     $token: token

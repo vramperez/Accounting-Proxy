@@ -16,7 +16,9 @@ var crypto = require('crypto'),
  */
 exports.checkUrl = function (req, res) {
     req.setEncoding('utf-8');
+
     var bodyUrl = req.body.url;
+    var apiKey = req.get('X-API-KEY');
 
     if (!bodyUrl) {
         res.status(422).json({error: 'Url missing'});
@@ -24,9 +26,9 @@ exports.checkUrl = function (req, res) {
     } else {
 
         //Save the token to notify the WStore
-        if (req.get('X-API-KEY') !== undefined) {
+        if (apiKey) {
 
-            db.addToken(req.get('X-API-KEY'), function (err) {
+            db.addToken(apiKey, function (err) {
                 if (err) {
                     logger.error(err);
                 }
@@ -94,7 +96,7 @@ exports.getApiKeys = function (req, res) {
     db.getApiKeys(user, function (err, apiKeysInfo) {
         if (err) {
             res.status(500).send();
-        } else if (apiKeysInfo === null) {
+        } else if (!apiKeysInfo) {
             res.status(404).json({error: 'No api-keys available for the user ' + user});
         } else {
             res.status(200).json(apiKeysInfo);

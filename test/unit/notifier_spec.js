@@ -1,21 +1,8 @@
-var proxyquire = require('proxyquire'),
+var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     async = require('async'),
-    sinon = require('sinon');
-
-var DEFAULT_UNIT = 'call';
-var DEFAULT_NOTIFICATION_INFO = [
-    {
-        recordType: 'calls',
-        unit: 'call',
-        orderId: '1',
-        productId: '1',
-        correlationNumber: '0',
-        value: '2'
-    }
-];
-var DEFAULT_SPECIFICATION = {};
-var DEFAULT_HREF = 'http://localhost/DSUsageManagement/1';
+    sinon = require('sinon'),
+    data = require('../data');
 
 /**
  * Return an object with the mocked dependencies and object with the neecessary spies specified in implementations.
@@ -23,66 +10,38 @@ var DEFAULT_HREF = 'http://localhost/DSUsageManagement/1';
  * @param  {Object}   implementations     Dependencies to mock and spy.
  */
 var mocker = function (implementations, callback) {
-    var mock, spies;
 
-    mock = {
-        logger: {
-            info: function (msg) {}
-        },
-        requester: {
-            request: function () {}
-        },
-        async: {
-            each: async.each
-        },
-        db:{},
-        config: {},
-        accModule: {}
-    };
+    var spies = {};
 
-    spies = {
-        logger: {
-            info: sinon.spy(mock.logger, 'info')
-        },
-        requester: {
-            request: sinon.spy(mock.requester, 'request')
-        },
-        async: {
-            each: sinon.spy(mock.async, 'each')
-        },
-        db: {},
-        accModule: {}
-    };
+    // Create spies for the mock functions
+    async.forEachOf(implementations, function (value, key, task_callback1) {
 
-    async.each(Object.keys(implementations), function (obj, task_callback1) {
-        mock[obj] = implementations[obj];
-        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
-            if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
-                spies[obj][implem.toString()] = sinon.spy(mock[obj], implem.toString());
-                task_callback2();
-            } else {
-                task_callback2();
+        spies[key] = {};
+
+        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
+
+            if (typeof implementations[key][functionName] == 'function') {
+                spies[key][functionName] = sinon.spy(implementations[key], functionName);
             }
-        }, function () {
-            return task_callback1();
-        });
+
+            task_callback2();
+        }, task_callback1);
     }, function () {
 
-        mock.config.database = {
+        var config = implementations.config ? implementations.config : {};
+        config.database = {
             type: './db'
         };
 
-        var accModulePath = './acc_modules/' + DEFAULT_UNIT;
-
-        // Mocking dependencies
-        notifier = proxyquire('../../notifier', {
-            './db': mock.db,
-            './config': mock.config,
-            async: mock.async,
-            request: mock.requester.request,
-            winston: mock.logger,
-            './acc_modules/call': mock.accModule
+        // Mock dependencies
+        var notifier = proxyquire('../../notifier', {
+            './config': config,
+            './db': implementations.db ? implementations.db : {},
+            request: implementations.requester ? implementations.requester.request : {},
+            winston: implementations.logger ? implementations.logger : {},
+            './acc_modules/megabyte': implementations.accModule ? implementations.accModule : {},
         });
+
         return callback(notifier, spies);
     });
 };
@@ -92,6 +51,7 @@ describe('Testing Notifier', function () {
     describe('Function "notifyUsage"', function () {
 
         var testGetToken = function (errMsg, token, done) {
+
             var db = { 
                 getToken: function (callback) {
                     return callback(errMsg, token);
@@ -103,9 +63,12 @@ describe('Testing Notifier', function () {
             };
 
             mocker(implementations, function (notifier, spies) {
+
                 notifier.notifyUsage(function (err) {
+
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
+
                     done();
                 });
             });
@@ -154,14 +117,12 @@ describe('Testing Notifier', function () {
 
         var testGetHref = function (unit, errMsg, hrefErr, href, done) {
 
-            var unit = unit;
-
             var db = {
                 getToken: function (callback) {
-                    return callback(null, 'token');
+                    return callback(null, data.DEFAULT_TOKEN);
                 },
                 getNotificationInfo: function (callback) {
-                    return callback(null, DEFAULT_NOTIFICATION_INFO);
+                    return callback(null, data.DEFAULT_NOTIFICATION_INFO);
                 },
                 getHref: function (unit, callback) {
                     return callback(hrefErr, href);
@@ -185,13 +146,14 @@ describe('Testing Notifier', function () {
             };
 
             mocker(implementations, function (notifier, spies) {
+
                 notifier.notifyUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
                     assert(spies.db.getNotificationInfo.calledOnce);
 
-                    if (unit === DEFAULT_UNIT) {
+                    if (unit === data.DEFAULT_UNIT) {
                         assert(spies.db.getHref.calledOnce);
                         assert(spies.db.getHref.calledWith(unit));
                     }
@@ -211,24 +173,25 @@ describe('Testing Notifier', function () {
         it('should call the callback with error when db fails getting the href', function (done) {
             var errMsg = 'Error';
 
-            testGetHref(DEFAULT_UNIT, errMsg, errMsg, null, done);
+            testGetHref(data.DEFAULT_UNIT, errMsg, errMsg, null, done);
         });
 
         it('should call the callback with error when the function "getSpecification" is not defined in a required accounting module', function (done) {
-            var errMsg = 'Error, function getSpecification undefined for unit ' + DEFAULT_UNIT;
+            var errMsg = 'Error, function getSpecification undefined for unit ' + data.DEFAULT_UNIT;
 
-            testGetHref(DEFAULT_UNIT, errMsg, null, null, done);
+            testGetHref(data.DEFAULT_UNIT, errMsg, null, null, done);
         });
 
         var testSendSpecification = function (specification, errMsg, requestResponse, addHrefResult, done) {
-            var token = 'token';
+
+            var token = data.DEFAULT_TOKEN;
 
             var db = {
                 getToken: function (callback) {
-                    return callback(null, token);
+                    return callback(null, data.DEFAULT_TOKEN);
                 },
                 getNotificationInfo: function (callback) {
-                    return callback(null, DEFAULT_NOTIFICATION_INFO);
+                    return callback(null, []);
                 },
                 getHref: function (unit, callback) {
                     return callback(null, null);
@@ -240,7 +203,7 @@ describe('Testing Notifier', function () {
 
             var config = {
                 modules: {
-                    accounting: [DEFAULT_UNIT]
+                    accounting: [data.DEFAULT_UNIT]
                 },
                 usageAPI: {
                     host: 'localhost',
@@ -259,18 +222,23 @@ describe('Testing Notifier', function () {
                 request: function (options, callback) {
                     return callback(requestResponse.error, requestResponse.resp, requestResponse.body);
                 }
-            }
+            };
+
+            var logger = {
+                info: function (msg) {}
+            };
 
             var implementations = {
                 db: db,
                 config: config,
                 accModule: accModule,
-                requester: requester
+                requester: requester,
+                logger: logger
             };
 
             var options = {
                 url: 'http://' + config.usageAPI.host + ':' + 
-                config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
+                    config.usageAPI.port + config.usageAPI.path + '/usageSpecification',
                 json: true,
                 method: 'POST',
                 headers: {
@@ -280,12 +248,13 @@ describe('Testing Notifier', function () {
             };
 
             mocker(implementations, function (notifier, spies) {
+
                 notifier.notifyUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
                     assert(spies.db.getNotificationInfo.calledOnce);
-                    assert(spies.db.getHref.calledWith(DEFAULT_UNIT));
+                    assert(spies.db.getHref.calledWith(data.DEFAULT_UNIT));
                     assert(spies.accModule.getSpecification.calledOnce);
 
                     if (requestResponse) {
@@ -293,7 +262,7 @@ describe('Testing Notifier', function () {
                     }
 
                     if (addHrefResult) {
-                        assert(spies.db.addSpecificationRef.calledWith(DEFAULT_UNIT, DEFAULT_HREF));
+                        assert(spies.db.addSpecificationRef.calledWith(data.DEFAULT_UNIT, data.DEFAULT_HREF));
                     }
 
                     done();
@@ -302,8 +271,7 @@ describe('Testing Notifier', function () {
         };
 
         it('should call the callback with error when the usage specification is undefined', function (done) {
-
-            testSendSpecification(undefined, 'Error, specification no available for unit ' + DEFAULT_UNIT, null, null, done);
+            testSendSpecification(undefined, 'Error, specification no available for unit ' + data.DEFAULT_UNIT, null, null, done);
         });
 
         it('should call the callback with error when there is an error sending the specification', function (done) {
@@ -314,7 +282,7 @@ describe('Testing Notifier', function () {
             };
             var errMsg = 'Error sending the Specification: ' + requestResponse.error.code;
 
-            testSendSpecification(DEFAULT_SPECIFICATION, errMsg, requestResponse, null, done);
+            testSendSpecification({}, errMsg, requestResponse, null, done);
         });
 
         it('should call the callback with error if the usage specification response is not 201', function (done) {
@@ -327,7 +295,7 @@ describe('Testing Notifier', function () {
             };
             var errMsg = 'Error, ' + requestResponse.resp.statusCode + ' ' + requestResponse.resp.statusMessage;
 
-            testSendSpecification(DEFAULT_SPECIFICATION, errMsg, requestResponse, null, done);
+            testSendSpecification({}, errMsg, requestResponse, null, done);
         });
 
         it('should call the callback with error when db fails adding the specification ref', function (done) {
@@ -337,12 +305,12 @@ describe('Testing Notifier', function () {
                     statusCode: 201,
                 },
                 body: {
-                    href: DEFAULT_HREF
+                    href: data.DEFAULT_HREF
                 }
             };
             var errMsg = 'Error';
 
-            testSendSpecification(DEFAULT_SPECIFICATION, errMsg, requestResponse, errMsg, done);
+            testSendSpecification({}, errMsg, requestResponse, errMsg, done);
         });
 
         it('should call the callback without error when the specifications have been sent', function (done) {
@@ -352,30 +320,31 @@ describe('Testing Notifier', function () {
                     statusCode: 201,
                 },
                 body: {
-                    href: DEFAULT_HREF
+                    href: data.DEFAULT_HREF
                 }
             };
 
-            testSendSpecification(DEFAULT_SPECIFICATION, null, requestResponse, null, done);
+            testSendSpecification({}, null, requestResponse, null, done);
         });
 
         var testSendUsage = function (errMsg, getHrefErr, requestResp, resetErr, done) {
+
             var getHrefCallCount = 0;
-            var token = 'token';
+            var token = data.DEFAULT_TOKEN;
 
             var db = {
                 getToken: function (callback) {
                     return callback(null, token);
                 },
                 getNotificationInfo: function (callback) {
-                    return callback(null, DEFAULT_NOTIFICATION_INFO);
+                    return callback(null, data.DEFAULT_NOTIFICATION_INFO);
                 },
                 getHref: function (unit, callback) {
                     if (getHrefCallCount !== 0) {
-                        return callback(getHrefErr, DEFAULT_HREF);
+                        return callback(getHrefErr, data.DEFAULT_HREF);
                     } else {
                         getHrefCallCount ++;
-                        return callback(null, DEFAULT_HREF);
+                        return callback(null, data.DEFAULT_HREF);
                     }
                 },
                 resetAccounting: function (apiKey, callback) {
@@ -385,7 +354,7 @@ describe('Testing Notifier', function () {
 
             var config = {
                 modules: {
-                    accounting: [DEFAULT_UNIT]
+                    accounting: [data.DEFAULT_UNIT]
                 },
                 usageAPI: {
                     host: 'localhost',
@@ -400,10 +369,15 @@ describe('Testing Notifier', function () {
                 }
             };
 
+            var logger = {
+                info: function (msg) {}
+            };
+
             var implementations = {
                 db: db,
                 config: config,
-                requester: requester
+                requester: requester,
+                logger: logger
             };
 
             var options = {
@@ -423,14 +397,14 @@ describe('Testing Notifier', function () {
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
                     assert(spies.db.getNotificationInfo.calledOnce);
-                    assert(spies.db.getHref.calledWith(DEFAULT_UNIT));
+                    assert(spies.db.getHref.calledWith(data.DEFAULT_UNIT));
 
                     if (requestResp) {
                         assert(spies.requester.request.calledOnce);
                     }
 
                     if (resetErr !== undefined) {
-                        assert(spies.db.resetAccounting.calledWith(DEFAULT_NOTIFICATION_INFO.apiKey));
+                        assert(spies.db.resetAccounting.calledWith(data.DEFAULT_NOTIFICATION_INFO.apiKey));
                     }
 
                     done();

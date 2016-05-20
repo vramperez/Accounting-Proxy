@@ -49,7 +49,7 @@ describe('Testing APIServer', function() {
 
         it('should return 200 when the response contains the accounting units supported', function(done) {
 
-            var modules = ['cal', 'megabyte'];
+            var modules = ['call', 'megabyte'];
 
             var implementations = {
                 res: {

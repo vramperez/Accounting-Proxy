@@ -65,8 +65,8 @@ var count = function (countInfo, callback) {
     return callback(null, Buffer.byteLength(countInfo.response.body, 'utf8') / Math.pow(1024, 2));
 };
 
-var getSpecification = function (callback) {
-    return callback(specification);
+var getSpecification = function () {
+    return specification;
 };
 
 exports.count = count;

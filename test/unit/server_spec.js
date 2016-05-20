@@ -170,7 +170,7 @@ describe('Testing Server', function () {
                     }
                 },
                 notifier: {
-                    notifyUsageSpecification: function (callback) {
+                    notifyUsage: function (callback) {
                         return callback('Error');
                     }
                 }
@@ -180,7 +180,7 @@ describe('Testing Server', function () {
                     assert.equal(err, 'Error starting the accounting-proxy. Error');
                     assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
+                    assert.equal(spies.notifier.notifyUsage.callCount, 1);
                     done();
                 });
             });
@@ -194,9 +194,6 @@ describe('Testing Server', function () {
                     }
                 },
                 notifier: {
-                    notifyUsageSpecification: function (callback) {
-                        return callback(null);
-                    },
                     notifyUsage: function (callback) {
                         return callback('Error');
                     }
@@ -207,7 +204,6 @@ describe('Testing Server', function () {
                     assert.equal(err, 'Error starting the accounting-proxy. Error');
                     assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
                     assert.equal(spies.notifier.notifyUsage.callCount, 1);
                     done();
                 });
@@ -224,9 +220,6 @@ describe('Testing Server', function () {
                     }
                 },
                 notifier: {
-                    notifyUsageSpecification: function (callback) {
-                        return callback(null);
-                    },
                     notifyUsage: function (callback) {
                         if (cron) {
                             cron = false;
@@ -265,7 +258,6 @@ describe('Testing Server', function () {
                     assert.equal(err, null);
                     assert.equal(spies.async.series.callCount, 1);
                     assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
                     assert.equal(spies.notifier.notifyUsage.callCount, 2);
                     assert.equal(spies.cron.scheduleJob.callCount, 1);
                     assert.equal(spies.cron.scheduleJob.getCall(0).args[0], implementations.config.usageAPI.schedule);

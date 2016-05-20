@@ -3,7 +3,8 @@ var assert = require('assert'),
     usageAPI_mock = require('./test_endpoint'),
     async = require('async'),
     test_config = require('../config_tests').integration,
-    prepare_test = require('./prepareDatabase');
+    prepare_test = require('./prepareDatabase'),
+    data = require('../data');
 
 var server, db_mock, notifier_mock;
 var databaseName = 'testDB_usageAPI.sqlite';
@@ -157,34 +158,13 @@ var mocker = function (database, done) {
             }
         ]);
     }
+
     db_mock.init(function (err) {
         if (err) {
             console.log('Error initializing the database');
             process.exit(1);
         } else {
             return done();
-        }
-    });
-};
-
-var checkUsageNotifications = function (apiKey, value, correlationNumber, callback) {
-    db_mock.getNotificationInfo(function (err, allAccInfo) {
-        if (err) {
-            console.log('Error checking the accounting');
-            return callback();
-        } else if (allAccInfo === null) {
-            assert.equal(value, 0);
-            return callback();
-        } else {
-            async.eachSeries(allAccInfo, function (accInfo, task_callback) {
-                if(accInfo.apiKey === apiKey) {
-                    assert.equal(accInfo.value, value);
-                    assert.equal(accInfo.correlationNumber, correlationNumber);
-                    return callback();
-                } else {
-                    task_callback();
-                }
-            });
         }
     });
 };
@@ -196,10 +176,9 @@ after(function (done) {
     prepare_test.removeDatabase(databaseName, done);
 });
 
-describe('Testing the usage specification and usage notifications', function () {
+describe('Testing the usage notifier', function () {
 
     async.eachSeries(test_config.databases, function (database, task_callback) {
-
         describe('with database ' + database, function () {
 
             before(function (done) {
@@ -221,343 +200,115 @@ describe('Testing the usage specification and usage notifications', function () 
                 task_callback();
             });
 
-            describe('Notify usage specification', function() {
-                var unitIds = {
-                    call: 1,
-                    megabyte: 2
+            it('should not send notifications when there is no API Key for notifications available', function (done) {
+
+                var units = ['call'];
+
+                mock_config.modules = {
+                    accounting: units
                 };
 
-                it('should fail when there is an error notifying the usage specification', function (done) {
-                    mock_config.usageAPI = {
-                        host: 'wrong',
-                        port: '',
-                        path: ''
-                    };
-                    mock_config.modules = {
-                        accounting: ['call']
-                    };
+                server.init(function (err) {
 
-                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
+                    db_mock.getHref('call', function (err, href) {
                         if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
+                            throw new Error('Error getting the Href ' + href);
                         } else {
-                            server.init( function (err) {
-                                assert.equal(err, 'Error starting the accounting-proxy. Error sending the Specification: ENOTFOUND');
-                                done();
-                            });
-                        }
-                    });
-                });
-
-                it('should save the href when the usage notification success', function (done) {
-                    mock_config.modules = {
-                        accounting: ['call']
-                    };
-                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init( function (err) {
-                                assert.equal(err, null);
-                                db_mock.getHref(mock_config.modules.accounting[0], function (err, href) {
-                                    if (err) {
-                                        console.log('Error getting the href for unit: ' + mock_config.modules.accounting[0]);
-                                        process.exit(1);
-                                    } else {
-                                        assert.equal(href, 'http://localhost:9040/usageSpecification/1');
-                                        done();
-                                    }
-                                });
-                            });
-                        }
-                    });
-                });
-
-                it('should save the hrefs when the usage specifications success', function (done) {
-                    mock_config.modules = {
-                        accounting: ['call', 'megabyte']
-                    };
-                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [], 'token', function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init( function (err) {
-                                assert.equal(err, null);
-                                async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
-                                    db_mock.getHref(unit, function (err, href) {
-                                        if (err) {
-                                            console.log('Error getting the href for unit: ' + unit);
-                                            process.exit(1);
-                                        } else {
-                                            assert.equal(href, 'http://localhost:9040/usageSpecification/' + unitIds[unit]);
-                                            task_callback();
-                                        }
-                                    });
-                                }, done);
-                            });
-                        }
-                    });
-                });
-
-                it('should not notify usage specification when it has already been notified', function (done) {
-                    var unit = 'call';
-                    mock_config.modules = {
-                        accounting: [unit]
-                    };
-                    var href = 'http://example:3333/usageSpecification/Id';
-                    prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], null, function (err) {
-                        if (err) {
-                            console.log('Error preparing test');
-                            process.exit(1);
-                            done();
-                        } else {
-                            server.init(function (err) {
-                                assert.equal(err, null);
-                                db_mock.getHref(mock_config.modules.accounting[0], function (err, res) {
-                                    if (err) {
-                                        console.log('Error getting the href for unit: ' + mock_config.modules.accounting[0]);
-                                        process.exit(1);
-                                    } else {
-                                        assert.equal(res, href);
-                                        done();
-                                    }
-                                });
-                            });
-                        }
-                    });
-                });
-
-                it('should not notify usage specifications when they have already been notified', function (done) {
-                    mock_config.modules = {
-                        accounting: ['call', 'megabyte']
-                    };
-                    var href = 'http://example:4444/usageSpecification/Id';
-                    async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
-                        prepare_test.addToDatabase(db_mock, [], [], [], [], [], [{unit: unit, href: href}], null, function (err) {
-                            if (err) {
-                                console.log('Error preparing test');
-                                process.exit(1);
-                            } else {
-                                task_callback();
-                            }
-                        });
-                    }, function () {
-                        server.init(function (err) {
+                            assert.equal(href, null);
                             assert.equal(err, null);
-                            async.eachSeries(mock_config.modules.accounting, function (unit, task_callback) {
-                                db_mock.getHref(unit, function (err, res) {
-                                    if (err) {
-                                        console.log('Error getting the href for unit: ' + unit);
-                                        process.exit(1);
-                                    } else {
-                                        assert.equal(res, href);
-                                        task_callback();
-                                    }
-                                });
-                            }, done);
-                        });
+
+                            done();
+                        }
                     });
                 });
             });
 
-            describe('Notify usage', function() {
+            it('should call the callback with error when there is an error notifying specifications', function (done) {
 
-                it('should fail when there is an error notifying the usage', function (done) {
-                    var unit = 'call';
-                    mock_config.usageAPI = {
-                        host: 'wrong',
-                        port: '',
-                        path: ''
-                    };
-                    mock_config.modules = {
-                        accounting: [unit]
-                    };
-                    var publicPath = '/public1';
-                    var apiKey = 'apiKey1';
-                    var services = [{publicPath: publicPath, url: 'http://example/path', appId: 'appId'}];
-                    var buys = [{
-                        apiKey: apiKey,
-                        publicPath: publicPath,
-                        orderId: 'orderId1',
-                        productId: 'productId1',
-                        customer: 'user1',
-                        unit: unit,
-                        recordType: 'typeUsage'
-                    }];
-                    var accountings = [{
-                        apiKey: apiKey,
-                        value: 2
-                    }];
-                    var specifications = [{
-                        unit: unit,
-                        href: 'http://example/usageSpecification/Id'
-                    }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, 'token', function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init(function (err) {
-                                assert.equal(err, 'Error starting the accounting-proxy. Error notifying usage to the Usage Management API: ENOTFOUND');
-                                done();
-                            });
-                        }
-                    });
+                var unit = 'call';
+
+                mock_config.modules = {
+                    accounting: [unit]
+                };
+
+                mock_config.usageAPI = {
+                    host: 'wrong',
+                    port: '',
+                    path: ''
+                };
+
+                var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                var apiKey = data.DEFAULT_API_KEYS[0];
+                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}];
+                var buys = data.DEFAULT_BUY_INFORMATION;
+                var accountings = [{
+                    apiKey: apiKey,
+                    value: 2
+                }];
+
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
+                    if (err) {
+                        throw new Error('Error preparing database');
+                    } else {
+                        server.init(function (err) {
+
+                            assert.equal(err, 'Error starting the accounting-proxy. Error sending the Specification: ENOTFOUND');
+                            done();
+                        });
+                    }
                 });
+            });
 
-                it('should reset accounting value when usage notification success', function (done) {
-                    var unit = 'call';
-                    mock_config.modules = {
-                        accounting: [unit]
-                    };
-                    var publicPath = '/public2';
-                    var apiKey = 'apiKey2';
-                    var services = [{publicPath: publicPath, url:'http://example/path', appId: 'appId'}];
-                    var buys = [{
-                        apiKey: apiKey,
-                        publicPath: publicPath,
-                        orderId: 'orderId2',
-                        productId: 'productId2',
-                        customer: 'user2',
-                        unit: unit,
-                        recordType: 'typeUsage'
-                    }];
-                    var accountings = [{
-                        apiKey: apiKey,
-                        value: 2
-                    }];
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init(function (err) {
-                                assert.equal(err, null);
-                                checkUsageNotifications(apiKey, 0, 1, function () {
-                                    done();
-                                });
-                            });
-                        }
-                    });
-                });
+            it('should notify the usage specifications and the usage when they have not been notified and there is an available token', function (done) {
 
-                it('should reset accounting values when usage notifications success', function (done) {
-                    var units = ['call', 'megabyte'];
-                    mock_config.modules = {
-                        accounting: units
-                    };
-                    var href = 'http://example/usageSpecification/Id';
-                    var publicPath = '/public3';
-                    var apiKeys = ['apiKey1', 'apiKey2'];
-                    var services = [{publicPath: publicPath, url: 'http://example/path', appId: 'appId'}];
-                    var buys = [{
-                        apiKey: apiKeys[0],
-                        publicPath: publicPath,
-                        orderId: 'orderId3',
-                        productId: 'productId3',
-                        customer: 'user3',
-                        unit: units[0],
-                        recordType: 'typeUsage'
-                    }, {
-                        apiKey: apiKeys[1],
-                        publicPath: publicPath,
-                        orderId: 'orderId4',
-                        productId: 'productId4',
-                        customer: 'user4',
-                        unit: units[1],
-                        recordType: 'typeUsage'
-                    }];
-                    var accountings = [{
-                        apiKey: apiKeys[0],
-                        value: 2
-                    }, {
-                        apiKey: apiKeys[1],
-                        value: 2
-                    }];
-                    var specifications = [{
-                        unit: units[0],
-                        href: href
-                    }, {
-                        unit: units[1],
-                        href: href
-                    }];
+                var unit = data.DEFAULT_UNIT;
 
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, 'token', function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init(function (err) {
-                                assert.equal(err, null);
-                                async.eachSeries(apiKeys, function (apiKey, task_callback) {
-                                    checkUsageNotifications(apiKey, 0, 1, function () {
-                                        task_callback();
+                mock_config.modules = {
+                    accounting: [unit]
+                };
+
+                var publicPath = data.DEFAULT_PUBLIC_PATHS[1];
+                var apiKey = data.DEFAULT_API_KEYS[1];
+                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[1], appId: data.DEFAULT_APP_IDS[1]}];
+                var buys = [{
+                    apiKey: apiKey,
+                    publicPath: publicPath,
+                    orderId: data.DEFAULT_ORDER_IDS[1],
+                    productId: data.DEFAULT_PRODUCT_IDS[1],
+                    customer: 'user2',
+                    unit: unit,
+                    recordType: data.DEFAULT_RECORD_TYPE
+                }];
+                var accountings = [{
+                    apiKey: apiKey,
+                    value: 2
+                }];
+
+                prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
+                    if (err) {
+                        throw new Error('Error preparing database');
+                    } else {
+                        server.init(function (err) {
+
+                            assert.equal(err, null);
+
+                            db_mock.getHref(unit, function (err, href) {
+                                if (err) {
+                                    throw new Error ('Error getting the href');
+                                } else {
+                                    assert.equal(href, 'http://localhost:9040/usageSpecification/1');
+                                    db_mock.getNotificationInfo(function (err, notificationInfo) {
+                                        if (err) {
+                                            throw new Error ('Error getting the href');    
+                                        } else {
+                                            assert.equal(notificationInfo, null);
+                                            done();
+                                        }
                                     });
-                                }, done);
+                                }
                             });
-                        }
-                    });
-                });
-
-                it('should not notify when the accounting value is 0', function (done) {
-                    var units = ['call', 'megabyte'];
-                    mock_config.modules = {
-                        accounting: units
-                    };
-                    var href = 'http://example/usageSpecification/Id';
-                    var publicPath = '/public3';
-                    var apiKeys = ['apiKey1', 'apiKey2'];
-                    var services = [{publicPath: publicPath, url: 'http://example/path', appId: 'appId'}];
-                    var buys = [{
-                        apiKey: apiKeys[0],
-                        publicPath: publicPath,
-                        orderId: 'orderId3',
-                        productId: 'productId3',
-                        customer: 'user3',
-                        unit: units[0],
-                        recordType: 'typeUsage'
-                    }, {
-                        apiKey: apiKeys[1],
-                        publicPath: publicPath,
-                        orderId: 'orderId4',
-                        productId: 'productId4',
-                        customer: 'user4',
-                        unit: units[1],
-                        recordType: 'typeUsage'
-                    }];
-                    var accountings = [{
-                        apiKey: apiKeys[0],
-                        value: 0
-                    }, {
-                        apiKey: apiKeys[1],
-                        value: 0
-                    }];
-                    var specifications = [{
-                        unit: units[0],
-                        href: href
-                    }, {
-                        unit: units[1],
-                        href: href
-                    }];
-
-                    prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, specifications, null, function (err) {
-                        if (err) {
-                            console.log('Error preparing the database');
-                            process.exit(1);
-                        } else {
-                            server.init(function (err) {
-                                assert.equal(err, null);
-                                async.eachSeries(apiKeys, function (apiKey, task_callback) {
-                                    checkUsageNotifications(apiKey, 0, 0, function () {
-                                        task_callback();
-                                    });
-                                }, done);
-                            });
-                        }
-                    });
+                        });
+                    }
                 });
             });
         });

@@ -1,70 +1,55 @@
 var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     async = require('async'),
-    sinon = require('sinon');
+    sinon = require('sinon'),
+    data = require('../data');
 
 var mocker = function (implementations, callback) {
-    var mocks = {
-        passport: {
-            OAuth2Strategy: function (options, callback) {
-                return callback('', '', {}, function (){});
-            }
-        },
-        config: {},
-        db: {},
-        req: {},
-        res: {},
-        logger: {
-            warn: function (msg) {},
-            error: function (msg) {}
+
+    var defaultPassport = {
+        OAuth2Strategy: function (options, callback) {
+            return callback('', '', {}, function (){});
         }
     };
 
-    var spies = {
-        passport: {},
-        db: {},
-        req: {},
-        res: {},
-        logger: {
-            warn: sinon.spy(mocks.logger, 'warn'),
-            error: sinon.spy(mocks.logger, 'error')
-        }
-    };
+    var spies = {};
 
-    mocks.config.database = {
-        type: './db'
-    };
+    // Create spies for the mock functions
+    async.forEachOf(implementations, function (value, key, task_callback1) {
 
-    async.each(Object.keys(implementations), function (obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
-            mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
-            if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
-                if (obj == 'req' || obj == 'res') {
-                    spies[obj][implem.toString()] = sinon.spy(implementations[obj], implem.toString());
-                } else {
-                    spies[obj][implem.toString()] = sinon.spy(mocks[obj], implem.toString());
-                }
-                task_callback2();
-            } else {
-                task_callback2();
+        spies[key] = {};
+
+        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
+
+            if (typeof implementations[key][functionName] == 'function') {
+                spies[key][functionName] = sinon.spy(implementations[key], functionName);
             }
-        }, function () {
-            return task_callback1();
-        });
-    }, function () {
+
+            task_callback2();
+
+        }, task_callback1);
+    }, function () { 
+
+        var config = implementations.config ? implementations.config : {};
+        config.database = {
+            type: './db'
+        };
+
         var authentication = proxyquire('../../OAuth2_authentication', {
-            './config': mocks.config,
-            winston: mocks.logger,
-            './db': mocks.db,
-            'passport-fiware-oauth': mocks.passport
+            './config': config,
+            winston: implementations.logger ? implementations.logger : {},
+            './db': implementations.db ? implementations.db : {},
+            'passport-fiware-oauth': implementations.passport ? implementations.passport : defaultPassport 
         });
+
         return callback(authentication, spies);
     });
 };
 
 describe('Testing "OAuth2_authentication"', function () {
 
-    describe('Function "getAuthToken"', function () {
+    describe('Function "headerAuthentication"', function () {
+
         var tokenType = 'Bearer';
         var token = 'token';
         var userProfile = {
@@ -76,57 +61,72 @@ describe('Testing "OAuth2_authentication"', function () {
         };
         var path = '/request/path';
 
-        it('error, no authorization header (should throw an exception)', function (done) {
+        var testGetAuthToken = function (headers, tokenType, done) {
+
             var implementations = {
                 req: {
-                    headers: {}
+                    headers: headers
                 },
                 res: {
                     status: function (code) {
                         return this;
                     },
                     json: function (msg) {}
+                },
+                logger: {
+                    warn: function (msg) {}
                 }
             };
+
             mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Auth-token not found in request headers'});
-                done();
+
+                auth.headerAuthentication(implementations.req, implementations.res, function () {});
+
+                if (!tokenType) {
+
+                    assert(spies.res.status.calledWith(401));
+                    assert(spies.res.json.calledWith({error: 'Auth-token not found in request headers'}));
+
+                } else if (tokenType !== 'bearer') {
+
+                    assert(spies.logger.warn.calledWith('Invalid Auth-Token type (' + tokenType.toLowerCase() + ')'));
+                    assert(spies.res.status.calledWith(401));
+                    assert(spies.res.json.calledWith({error: 'Invalid Auth-Token type (' + tokenType.toLowerCase() + ')'}));
+
+                }
+
+                done();       
             });
+        };
+
+        it('error, no authorization header (should throw an exception)', function (done) {
+            testGetAuthToken({}, undefined, done);
         });
 
         it('error, invalid Auth-Token type', function (done) {
-            var implementations = {
-                req: {
-                    headers: {
-                        authorization:  'wrong' + ' ' + 'token'
-                    }
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    json: function (msg) {}
-                }
+            var tokenType = 'wrongType';
+
+            var headers = {
+                'authorization': tokenType + ' ' + data.DEFAULT_TOKEN
             };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Invalid Auth-Token type (wrong)'});
-                done();
-            });
+
+           testGetAuthToken(headers, tokenType, done);
         });
 
         it('error, creating the user profile', function (done) {
+
+            var token = data.DEFAULT_TOKEN;
+
+            var aux = {
+                userProfile: function (token, callback) {
+                    return callback('Error', null);
+                }
+            };
+
             var implementations = {
                 req: {
                     headers: {
-                        authorization:  tokenType + ' ' + token
+                        'authorization':  'bearer ' + token
                     }
                 },
                 res: {
@@ -137,366 +137,192 @@ describe('Testing "OAuth2_authentication"', function () {
                 },
                 passport: {
                     OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback('Error', null);
-                            }
-                        }
-                    }
-                },
-            };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Invalid Auth-Token'});
-                assert.equal(spies.logger.warn.callCount, 1);
-                assert.equal(spies.logger.warn.getCall(0).args[0], 'Token ' + token + ' invalid');
-                done();
-            });
-        });
-
-        it('should permit requests for retreive  API Keys', function (done) {
-            var apiKeysPath = '/accounting_proxy/keys';
-            var implementations = {
-                req: {
-                    headers: {
-                        'authorization':  tokenType + ' ' + token
+                        return aux;
                     },
-                    path: apiKeysPath
+                    userProfile: aux.userProfile
                 },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    send: function () {}
-                },
-                passport: {
-                    OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
-                },
-                config: {
-                    api: {
-                        administration_paths: {
-                            keys: apiKeysPath
-                        }
-                    },
-                    oauth2: {
-                        roles: {
-                            admin: 'admin',
-                            customer: '',
-                            seller: ''
-                        }
-                    }
+                logger: {
+                    warn: function (msg) {}
                 }
             };
+
+            var userProfileSpy = sinon.spy(aux, 'userProfile');
+
             mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function () {});
-                assert.deepEqual(implementations.req.user, { 
-                    appId: userProfile.appId,
-                    id: userProfile.id,
-                    emails: userProfile.emails,
-                    displayName: userProfile.displayName,
-                    roles: userProfile.roles,
-                    accessToken: token
-                });
-                assert.deepEqual(implementations.req.headers, { 
-                    authorization: tokenType + ' ' + token,
-                    'Authorization': tokenType + ' ' + token,
-                    'X-Nick-Name': userProfile.id,
-                    'X-Email': userProfile.emails[0].value,
-                    'X-Display-Name': userProfile.displayName,
-                    'X-Roles': 'admin,'
-                });
+
+                auth.headerAuthentication(implementations.req, implementations.res, function (){});
+                
+                assert(userProfileSpy.calledWith(token));
+                assert(spies.res.status.calledWith(401));
+                assert(spies.res.json.calledWith({error: 'Invalid Auth-Token'}));
+                assert(spies.logger.warn.calledWith('Token ' + token + ' invalid'))
+
                 done();
             });
         });
 
-        it('error verifying the appId (short publicPath)', function (done) {
+        var validRequestAssertions = function (req) {
+
+            assert.deepEqual(req.headers, {
+                'x-auth-token': data.DEFAULT_TOKEN,
+                Authorization: 'Bearer ' + data.DEFAULT_TOKEN,
+                'X-Nick-Name': data.DEFAULT_USER_ID,
+                'X-Email': data.DEFAULT_USER_PROFILE.emails[0].value,
+                'X-Display-Name': data.DEFAULT_USER_PROFILE.displayName,
+                'X-Roles': data.DEFAULT_ROLES.customer + ','
+            });
+
+            var userInfoExpected = data.DEFAULT_USER_PROFILE;
+            userInfoExpected.accessToken = data.DEFAULT_TOKEN;
+
+            assert.deepEqual(req.user, userInfoExpected);
+        };
+
+        var errorGettingAppIdAssertions = function (spies, error) {
+
+            assert(spies.res.status.calledWith(500));
+            assert(spies.res.send.calledOnce);
+            assert(spies.logger.error.calledWith(error));
+        };
+
+        var testVerifyAppId = function (getAppIdErr1, getAppIdErr2, appId1, appId2, reqPath, done) {
+
+            var token = data.DEFAULT_TOKEN;
+            var getAppIdCall = 0;
+
+            var aux = {
+                userProfile: function (token, callback) {
+                    return callback(null, data.DEFAULT_USER_PROFILE);
+                }
+            };
+
             var implementations = {
                 req: {
                     headers: {
-                        'authorization':  tokenType + ' ' + token
+                        'x-auth-token':  token
                     },
-                    path: path
+                    path: reqPath
                 },
                 res: {
                     status: function (code) {
                         return this;
                     },
+                    json: function (msg) {},
                     send: function () {}
                 },
                 passport: {
                     OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
+                        return aux;
+                    },
+                    userProfile: aux.userProfile
+                },
+                logger: {
+                    error: function (msg) {},
+                    warn: function (msg) {}
                 },
                 db: {
                     getAppId: function (path, callback) {
-                        return callback('Error', null);
+
+                        getAppIdCall += 1;
+
+                        if (getAppIdCall == 1) {
+                            return callback(getAppIdErr1, appId1);
+                        } else {
+                            return callback(getAppIdErr2, appId2);
+                        }
                     }
                 },
                 config: {
                     api: {
                         administration_paths: {
-                            keys: '/accounting_proxy/keys'
+                            keys: data.DEFAULT_ADMINISTRATION_PATHS.keys
                         }
+                    },
+                    oauth2: {
+                        roles: data.DEFAULT_ROLES
                     }
                 }
             };
+
+            var userProfileSpy = sinon.spy(aux, 'userProfile');
+            var next = sinon.stub();
+
             mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.db.getAppId.callCount, 1);
-                assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
+
+                auth.headerAuthentication(implementations.req, implementations.res, next);
+
+                assert(userProfileSpy.calledWith(token));
+
+                if (reqPath === data.DEFAULT_ADMINISTRATION_PATHS.keys) {
+
+                    assert(next.calledOnce);
+                    validRequestAssertions(implementations.req);
+
+                } else {
+
+                    assert(spies.db.getAppId.calledWith(reqPath));
+
+                    if (getAppIdErr1) {
+
+                        errorGettingAppIdAssertions(spies, getAppIdErr1);
+
+                    } else {
+
+                        if (appId1 === data.DEFAULT_APP_IDS[0]) {
+
+                            validRequestAssertions(implementations.req);
+                            assert(next.calledOnce);
+
+                        } else {
+
+                            assert(spies.db.getAppId.calledWith('/' + reqPath.split('/')[1]));
+
+                            if (appId2 === data.DEFAULT_APP_IDS[0]) {
+
+                                validRequestAssertions(implementations.req);
+                                assert(next.calledOnce);
+
+                            } else  if (getAppIdErr2) {
+
+                                errorGettingAppIdAssertions(spies, getAppIdErr2);
+
+                            } else if (appId1 !== data.DEFAULT_APP_IDS[0] && appId2 !== data.DEFAULT_APP_IDS[0]) {
+
+                                assert(spies.res.status.calledWith(401));
+                                assert(spies.res.json.calledWith({error: 'The auth-token scope is not valid for the current application'}));
+                                assert(spies.logger.warn.calledWith('Token ' + token + ' is from a different app'));
+
+                            }
+                        }
+                    }
+                }
+
                 done();
             });
+        }
+
+        it('error verifying the appId (short publicPath)', function (done) {
+            testVerifyAppId(true, false, null, null, data.DEFAULT_REQ_PATH, done);
         });
 
         it('error verifying the appId (whole publicPath)', function (done) {
-            var implementations = {
-                req: {
-                    headers: {
-                        'authorization':  tokenType + ' ' + token
-                    },
-                    path: path
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    send: function () {}
-                },
-                passport: {
-                    OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
-                },
-                db: {
-                    getAppId: function (reqPath, callback) {
-                        if (reqPath === path) {
-                            return callback(null, 'wrongAppId');
-                        } else {
-                            return callback('Error', null);
-                        }
-                    }
-                },
-                config: {
-                    api: {
-                        administration_paths: {
-                            keys: '/accounting_proxy/keys'
-                        }
-                    }
-                }
-            };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                    assert.equal(spies.db.getAppId.callCount, 2);
-                    assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                    assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], 500);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.equal(spies.logger.error.callCount, 1);
-                    assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
-                    done();
-            });
+           testVerifyAppId(false, true, null, null, data.DEFAULT_REQ_PATH, done);
         });
 
         it('authToken from a different app', function (done) {
-            var implementations = {
-                req: {
-                    headers: {
-                        'authorization':  tokenType + ' ' + token
-                    },
-                    path: path
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    json: function (msg) {}
-                },
-                passport: {
-                    OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
-                },
-                db: {
-                    getAppId: function (reqPath, callback) {
-                        if (reqPath === path) {
-                            return callback(null, 'wrongAppId');
-                        } else {
-                            return callback(null, 'wrongAppId');
-                        }
-                    }
-                },
-                config: {
-                    api: {
-                        administration_paths: {
-                            keys: '/accounting_proxy/keys'
-                        }
-                    }
-                }
-            };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function (){});
-                assert.equal(spies.db.getAppId.callCount, 2);
-                assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'The auth-token scope is not valid for the current application'});
-                assert.equal(spies.logger.warn.callCount, 1);
-                assert.equal(spies.logger.warn.getCall(0).args[0], 'Token ' + token + ' is from a different app');
-                done();
-            });
+           testVerifyAppId(false, false, 'wrong', 'wrong', data.DEFAULT_REQ_PATH, done); 
+        });
+
+        it('should permit requests for retreive  API Keys', function (done) {
+            testVerifyAppId(false, false, data.DEFAULT_APP_IDS[0], null, data.DEFAULT_ADMINISTRATION_PATHS.keys, done);
         });
 
         it('correct authentication (short path)', function (done) {
-            var implementations = {
-                req: {
-                    headers: {
-                        'authorization':  tokenType + ' ' + token
-                    },
-                    path: path
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    json: function (msg) {}
-                },
-                passport: {
-                    OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
-                },
-                db: {
-                    getAppId: function (reqPath, callback) {
-                        return callback(null, userProfile.appId)
-                    }
-                },
-                config: {
-                    oauth2: {
-                        roles: {
-                            admin: 'admin',
-                            customer: '',
-                            seller: ''
-                        }
-                    },
-                    api: {
-                        administration_paths: {
-                            keys: '/accounting_proxy/keys'
-                        }
-                    }
-                }
-            };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function () {});
-                assert.equal(spies.db.getAppId.callCount, 1);
-                assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.deepEqual(implementations.req.headers, { 
-                    authorization: tokenType + ' ' + token,
-                    'Authorization': tokenType + ' ' + token,
-                    'X-Nick-Name': userProfile.id,
-                    'X-Email': userProfile.emails[0].value,
-                    'X-Display-Name': userProfile.displayName,
-                    'X-Roles': 'admin,'
-                });
-                done();
-            });
+            testVerifyAppId(false, false, data.DEFAULT_APP_IDS[0], null, data.DEFAULT_REQ_PATH, done);
         });
 
         it('correct authentication (whole path)', function (done) {
-            var implementations = {
-                req: {
-                    headers: {
-                        'authorization':  tokenType + ' ' + token
-                    },
-                    path: path
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    json: function (msg) {}
-                },
-                passport: {
-                    OAuth2Strategy: function (options, callback) {
-                        return {
-                            userProfile: function (authToken, callback) {
-                                return callback(null, userProfile);
-                            }
-                        }
-                    }
-                },
-                db: {
-                    getAppId: function (reqPath, callback) {
-                        if (reqPath === path) {
-                            return callback(null, 'wrongAppId');
-                        } else {
-                            return callback(null, userProfile.appId);
-                        }
-                    }
-                },
-                config: {
-                    oauth2: {
-                        roles: {
-                            admin: 'admin',
-                            customer: '',
-                            seller: ''
-                        }
-                    },
-                    api: {
-                        administration_paths: {
-                            keys: '/accounting_proxy/keys'
-                        }
-                    }
-                }
-            };
-            mocker(implementations, function (auth, spies) {
-                auth.headerAuthentication(implementations.req, implementations.res, function () {});
-                assert.equal(spies.db.getAppId.callCount, 2);
-                assert.equal(spies.db.getAppId.getCall(0).args[0], path);
-                assert.equal(spies.db.getAppId.getCall(1).args[0], '/' + path.split('/')[1]);
-                assert.deepEqual(implementations.req.headers, { 
-                    authorization: tokenType + ' ' + token,
-                    'Authorization': tokenType + ' ' + token,
-                    'X-Nick-Name': userProfile.id,
-                    'X-Email': userProfile.emails[0].value,
-                    'X-Display-Name': userProfile.displayName,
-                    'X-Roles': 'admin,'
-                });
-                done();
-            });
+            testVerifyAppId(false, false, 'wrong', data.DEFAULT_APP_IDS[0], data.DEFAULT_REQ_PATH, done);
         });
     });
 });

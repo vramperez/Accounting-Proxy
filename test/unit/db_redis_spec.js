@@ -1,64 +1,34 @@
 var proxyquire = require('proxyquire'),
     assert = require('assert'),
     sinon = require('sinon'),
-    async = require('async');
+    async = require('async'),
+    data = require('../data');
 
 /**
  * Return an object database with the mocked dependencies and object with the neecessary spies specified in implementations.
  *
  * @param  {Object}   implementations Dependencies to mock and spy.
  */
-var mocker = function (implementations, callback) {
+var getDb = function (implementations) {
 
-    var config_mock = {
-        database: {
-            name: 15
-        }
-    };
-    var db_mock = {
-        multi: function () {
-            return this;
-        },
-        sadd: implementations.sadd,
-        srem: implementations.srem,
-        smembers: implementations.smembers,
-        hmset: implementations.hmset,
-        hget: implementations.hget,
-        hgetall: implementations.hgetall,
-        hdel: implementations.hdel,
-        del: implementations.del,
-        exec: implementations.exec,
-        select: function (database) {},
+    implementations.select = function (db) {};
 
-    };
     var redis_stub = {
         createClient: function () {
-            return db_mock;
+            return implementations;
         }
     };
+
     var async_stub = {
         each: async.each,
         waterfall: async.waterfall,
         apply: async.apply,
         forEachOf: async.forEachOf
     };
-    // Create necessary spies
-    var spies = {
-        each: sinon.spy(async_stub, 'each'),
-        apply: sinon.spy(async_stub, 'apply'),
-        waterfall: sinon.spy(async_stub, 'waterfall'),
-        forEachOf: sinon.spy(async_stub, 'forEachOf')
-    };
-    async.forEachOf(implementations, function (implementation, method, task_callback) {
-        spies[method.toString()] = sinon.spy(db_mock, method.toString());
-        task_callback();
-    }, function () {
-        var db = proxyquire('../../db_Redis', {
-            redis: redis_stub,
-            './config': config_mock,
-            async: async_stub
-        });
-        return callback(db, spies);
+
+    return proxyquire('../../db_Redis', {
+        redis: redis_stub,
+        async: async_stub
     });
 };
 
@@ -67,1973 +37,1635 @@ describe('Testing REDIS database', function () {
     describe('Function "init"', function () {
 
         it('should call the callback withour error when db initialization success', function (done) {
-            mocker({}, function (db, spies) {
-                db.init(function (err) {
-                    assert.equal(err, null);
-                    done();
-                });
+            
+            var db = getDb({});
+
+            db.init(function (err) {
+
+                assert.equal(err, null);
+                done();
             });
         });
     });
 
     describe('Function "addToken"', function () {
-        var token = 'token';
+
+        var testAddToken = function (error, done) {
+
+            var del = sinon.stub();
+            var sadd = sinon.stub();
+            var exec = function (callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                del: del,
+                sadd: sadd,
+                exec: exec
+            };
+
+            var multi = sinon.stub().returns(implementations);
+
+            var execSpy = sinon.spy(implementations, 'exec');
+
+            var db = getDb({multi: multi});
+
+            db.addToken(data.DEFAULT_TOKEN, function (err) {
+
+                assert(multi.calledOnce);
+                assert(del.calledWith(data.DEFAULT_TOKEN));
+                assert(sadd.calledWith(['token', data.DEFAULT_TOKEN]));
+                assert(execSpy.calledOnce);
+
+                if (error) {
+                    assert.equal(err, 'Error adding the acces token "' + data.DEFAULT_TOKEN + '" .');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails adding the token', function (done) {
-            var implementations = {
-                del: function () {},
-                sadd: function () {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addToken(token, function (err) {
-                    assert.equal(err, 'Error adding the acces token "' + token + '" .');
-                    assert.equal(spies.del.callCount, 1);
-                    assert.equal(spies.del.getCall(0).args[0], token);
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['token', token]);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testAddToken(true, done);
         });
 
         it('should call the callback without error when db adds the new token', function (done) {
-            var implementations = {
-                del: function () {},
-                sadd: function () {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addToken(token, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.del.callCount, 1);
-                    assert.equal(spies.del.getCall(0).args[0], token);
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['token', token]);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+           testAddToken(false, done); 
         });
     });
 
     describe('Function "getToken"', function () {
-        var token = 'token';
+
+        var testGetToken = function (error, tokens, done) {
+
+            var smembers = function (hash, callback) {
+                return callback(error, tokens);
+            };
+
+            var implementations = {
+                smembers: smembers
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+
+            var db = getDb(implementations);
+
+            db.getToken(function (err, res) {
+
+                assert(smembersSpy.calledWith('token'));
+
+                if (error) {
+                    assert.equal(err, 'Error getting the access token.');
+                    assert.equal(res, null);
+                } else {
+
+                    assert.equal(err, null);
+
+                    if (tokens.length === 0) {
+                        assert.equal(res, null);
+                    } else {
+                        assert.equal(res, tokens[0]);
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting token', function (done) {
-            var implementations = {
-                smembers: function (key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getToken(function (err, token) {
-                    assert.equal(err, 'Error getting the access token.');
-                    assert.equal(token, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'token');
-                    done();
-                });
-            });
+            testGetToken(true, null, done);
         });
 
         it('should call the callback with error when there is not token', function (done) {
-            var implementations = {
-                smembers: function (key, callback) {
-                    return callback(null, []);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getToken(function (err, token) {
-                    assert.equal(err, null);
-                    assert.equal(token, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'token');
-                    done();
-                });
-            });
+            testGetToken(false, [], done);
         });
 
         it('should call the callback without error when db gets the token', function (done) {
-            var implementations = {
-                smembers: function (key, callback) {
-                    return callback(null, [token]);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getToken(function (err, token) {
-                    assert.equal(err, null);
-                    assert.equal(token, token);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'token');
-                    done();
-                });
-            });
+           testGetToken(false, [data.DEFAULT_TOKEN], done); 
         });
     });
 
     describe('Functoin "addSpecificationRef"', function () {
-        var unit = 'megabyte';
-        var href = 'http://example:999/api';
-        var entry = {};
-        entry[unit] = href;
+        
+        var testAddSpecificationRef = function (error, done) {
+
+            var hmset = function (hash, value, callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                hmset: hmset
+            };
+
+            var hmsetSpy = sinon.spy(implementations, 'hmset');
+
+            var db = getDb(implementations);
+
+            db.addSpecificationRef(data.DEFAULT_UNIT, data.DEFAULT_HREF, function (err) {
+
+                var toAdd = {};
+                toAdd[data.DEFAULT_UNIT.toString()] = data.DEFAULT_HREF;
+
+                assert(hmsetSpy.calledWith('units', toAdd));
+
+                if (error) {
+                    assert.equal(err, 'Error adding the href specification: "' + data.DEFAULT_HREF + '" to unit "' + data.DEFAULT_UNIT + '" .');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails adding the usage specification href', function (done) {
-            var implementations = {
-                hmset: function (hash, object, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addSpecificationRef(unit, href, function (err) {
-                    assert.equal(err, 'Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], 'units');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], entry);
-                    done();
-                });
-            });
+            testAddSpecificationRef(true, done);
         });
 
         it('should call the callback without error when db adds the usage specification href', function (done) {
-            var implementations = {
-                hmset: function (hash, object, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addSpecificationRef(unit, href, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], 'units');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], entry);
-                    done();
-                });
-            });
+            testAddSpecificationRef(false, done);
         });
     });
 
     describe('Function "getHref"', function () {
-        var unit = 'megabye';
-        var href = 'http://example:999/api';
+
+        var testGetHref = function (error, href, done) {
+
+            var hget = function (hash, key, callback) {
+                return callback(error, href);
+            };
+
+            var implementations = {
+                hget: hget
+            };
+
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.getHref(data.DEFAULT_UNIT, function (err, res) {
+
+                assert(hgetSpy.calledWith('units', data.DEFAULT_UNIT));
+
+                if (error) {
+                    assert.equal(err, 'Error getting the href for unit "' + data.DEFAULT_UNIT + '" .');
+                    assert.equal(res, null);
+                } else {
+                    assert.equal(err, null);
+                    assert.equal(res, href);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the href', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getHref(unit, function (err, href) {
-                    assert.equal(err, 'Error getting the href for unit "' + unit + '" .');
-                    assert.equal(href, null);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], 'units');
-                    assert.equal(spies.hget.getCall(0).args[1], unit);
-                    done();
-                });
-            });
+            testGetHref(true, null, done);
         });
 
         it('should call the callback without error when db gets the usage specification href', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, href);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getHref(unit, function (err, res) {
-                    assert.equal(err, null);
-                    assert.equal(res, href);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], 'units');
-                    assert.equal(spies.hget.getCall(0).args[1], unit);
-                    done();
-                });
-            });
+            testGetHref(false, data.DEFAULT_HREF, done); 
         });
     });
 
     describe('Function "newService"', function () {
-        var publicPath = '/public';
-        var appId = 'appId';
-        var url = 'http://example.com/path';
-        var saddParams = ['services', publicPath];
-        var hmsetParams = { url: url, appId: appId};
+
+        var testNewService = function (error, done) {
+
+            var sadd = sinon.stub();
+            var hmset = sinon.stub();
+            var exec = function (callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                sadd: sadd,
+                hmset: hmset,
+                exec: exec
+            };
+
+            var multi = sinon.stub().returns(implementations);
+            var execSpy = sinon.spy(implementations, 'exec');
+
+            var db = getDb({multi: multi});
+
+            db.newService(data.DEFAULT_PUBLIC_PATHS[0], data.DEFAULT_URLS[0], data.DEFAULT_APP_IDS[0], function (err) {
+
+                assert(multi.calledOnce);
+                assert(sadd.calledWith(['services', data.DEFAULT_PUBLIC_PATHS[0]]));
+                assert(hmset.calledWith(data.DEFAULT_PUBLIC_PATHS[0], {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}));;
+                assert(execSpy.calledOnce);
+
+                if (error) {
+                    assert.equal(err, 'Error in database adding the new service.');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails executing the statements', function (done) {
-            var implementations = {
-                hmset: function (hash, key, value){},
-                sadd: function (list) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.newService(publicPath, url, appId, function (err) {
-                    assert.equal(err, 'Error in database adding the new service.');
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], saddParams);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], publicPath);
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], hmsetParams);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testNewService(true, done);
         });
 
         it('should call the callback without error when db adds the new service', function (done) {
-            var implementations = {
-                hmset: function (hash, key, value){},
-                sadd: function (list) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.newService(publicPath, url, appId, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], saddParams);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], publicPath);
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], hmsetParams);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testNewService(false, done);
         });
     });
 
     describe('Function "deleteService"', function () {
-        var publicPath = '/public';
+
+        var testDeleteService = function(getApiKeysErr, getSubscriptionsErr, hgetErr, subscriptions, execErr, done) {
+
+            var errMsg = 'Error in database deleting the service.';
+
+            var srem = sinon.stub();
+            var del = sinon.stub();
+            var exec = function (callback) {
+                return callback(execErr);
+            };
+
+            var multiImplementations = {
+                srem: srem,
+                del: del,
+                exec: exec
+            };
+
+            var smembers = function (hash, callback) {
+                if (hash === data.DEFAULT_PUBLIC_PATHS[0] + 'apiKeys') {
+                    return callback(getApiKeysErr, [data.DEFAULT_API_KEYS[0]]);
+                } else {
+                    return callback(getSubscriptionsErr, subscriptions);
+                }
+            };
+
+            var hget = function (hash, key, callback) {
+                return callback(hgetErr, data.DEFAULT_USER);
+            };
+
+            var multi = sinon.stub().returns(multiImplementations);
+
+            var implementations = {
+                multi: multi,
+                smembers: smembers,
+                hget: hget
+            };
+
+            var execSpy = sinon.spy(multiImplementations, 'exec');
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.deleteService(data.DEFAULT_PUBLIC_PATHS[0], function (err) {
+
+                assert(multi.calledOnce);
+                assert(srem.calledWith('services', data.DEFAULT_PUBLIC_PATHS[0]));
+                assert(del.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
+                assert(del.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'apiKeys'));
+                assert(del.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
+                assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'apiKeys'));
+
+                if (getApiKeysErr) {
+                    assert.equal(err, errMsg);
+                } else {
+
+                    assert(smembersSpy.calledWith(data.DEFAULT_API_KEYS[0] + 'subs'));
+
+                    if (getSubscriptionsErr) {
+
+                        assert.equal(err, errMsg);
+
+                    } else {
+
+                        if (hgetErr) {
+
+                            assert.equal(err, errMsg);
+
+                        } else {
+
+                            assert(hgetSpy.calledWith(subscriptions[0], 'customer'));
+                            assert(srem.calledWith(data.DEFAULT_USER, subscriptions[0]));
+                            assert(del.calledWith(subscriptions[0]));
+                            assert(del.calledWith(subscriptions[0] + 'subs'));
+                            assert(srem.calledWith('apiKeys', subscriptions[0]));
+
+                            execErr ? assert.equal(err, errMsg) : assert.equal(err, null);
+                        }
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the API keys', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                },
-                srem: function (hash, key) {},
-                del: function (hash) {}
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], 'services');
-                    assert.equal(spies.del.callCount, 3);
-                    assert.equal(spies.del.getCall(0).args[0] , publicPath);
-                    assert.equal(spies.del.getCall(1).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.del.getCall(2).args[0] , publicPath + 'admins');
-                    assert.equal(spies.waterfall.callCount, 1);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    done();
-                });
-            });
+            testDeleteService(true, false, false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting subscriptions', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    if (hash === publicPath + 'apiKeys') {
-                        return callback(null, ['apiKey1']);
-                    } else {
-                        return callback('Error');
-                    }
-                },
-                srem: function (hash, key) {},
-                del: function (hash) {}
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], 'services');
-                    assert.equal(spies.del.callCount, 3);
-                    assert.equal(spies.del.getCall(0).args[0] , publicPath);
-                    assert.equal(spies.del.getCall(1).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.del.getCall(2).args[0] , publicPath + 'admins');
-                    assert.equal(spies.waterfall.callCount, 1);
-                    assert.equal(spies.each.callCount, 1);
-                    assert.deepEqual(spies.each.getCall(0).args[0] , ['apiKey1']);
-                    assert.equal(spies.smembers.callCount, 2);
-                    assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.smembers.getCall(1).args[0] , 'apiKey1subs');
-                    done();
-                });
-            });
+            testDeleteService(false, true, false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting the customer', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    if (hash === publicPath + 'apiKeys') {
-                        return callback(null, ['apiKey1', 'apiKey2']);
-                    } else if (hash === 'apiKey1subs'){
-                        return callback(null, null);
-                    } else {
-                        return callback(null, ['subs1']);
-                    }
-                },
-                srem: function (hash, key) {},
-                hdel: function (hash, value) {},
-                del: function (hash) {},
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], 'services');
-                    assert.equal(spies.del.callCount, 3);
-                    assert.equal(spies.del.getCall(0).args[0] , publicPath);
-                    assert.equal(spies.del.getCall(1).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.del.getCall(2).args[0] , publicPath + 'admins');
-                    assert.equal(spies.waterfall.callCount, 1);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(1).args[0] , ['apiKey1', 'apiKey2', 'subs1']);
-                    assert.equal(spies.smembers.callCount, 3);
-                    assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.smembers.getCall(1).args[0] , 'apiKey1subs');
-                    assert.equal(spies.smembers.getCall(2).args[0] , 'apiKey2subs');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey1');
-                    done();
-                });
-            });
+           testDeleteService(false, false, true, null, false, done);
         });
 
         it('should call the callback with error when db fails executing the query', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    if (hash === publicPath + 'apiKeys' ) {
-                        return callback(null, ['apiKey1', 'apiKey2']);
-                    } else if (hash === 'apiKey1subs'){
-                        return callback(null, null);
-                    } else {
-                        return callback(null, ['subs1']);
-                    }
-                },
-                del: function (hash) {},
-                hget: function (hash, key, callback) {
-                    return callback(null, '0001');
-                },
-                srem: function (hash, key) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            var del_args = [publicPath, publicPath + 'apiKeys', publicPath + 'admins', 'apiKey1', 'apiKey1subs', 'apiKey2', 'apiKey2subs', 'subs1', 'subs1subs'];
-            var hget_args = ['apiKey1', 'apiKey2', 'subs1'];
-            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys', '0001', 'apiKeys'];
-            mocker(implementations, function (db, spies) {
-                db.deleteService('/public', function (err) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                    assert.equal(spies.del.callCount, 9);
-                    assert.equal(spies.del.getCall(0).args[0] , '/public');
-                    async.forEachOf(del_args, function (arg, i, task_callback) {
-                        assert.equal(spies.del.getCall(i).args[0] , arg);
-                    });
-                    assert.equal(spies.waterfall.callCount, 1);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(1).args[0] , ['apiKey1', 'apiKey2', 'subs1']);
-                    assert.equal(spies.smembers.callCount, 3);
-                    assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.smembers.getCall(1).args[0] , 'apiKey1subs');
-                    assert.equal(spies.smembers.getCall(2).args[0] , 'apiKey2subs');
-                    assert.equal(spies.hget.callCount, 3);
-                    async.forEachOf(hget_args, function (arg, i, task_callback) {
-                        assert.equal(spies.hget.getCall(i).args[0] , arg);
-                    });
-                    assert.equal(spies.srem.callCount, 7);
-                    async.forEachOf(srem_args, function (arg, i, task_callback) {
-                        assert.equal(spies.srem.getCall(i).args[0] , arg);
-                    });
-                    done();
-                });
-            });
+           testDeleteService(false, false, false, [data.DEFAULT_API_KEYS[0]], true, done);
         });
 
         it('should call the callback without error when db deletes the service', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    if (hash === '/public') {
-                        return callback(null, ['apiKey1', 'apiKey2']);
-                    } else if (hash === 'apiKey1subs'){
-                        return callback(null, null);
-                    } else {
-                        return callback(null, ['subs1']);
-                    }
-                },
-                del: function (hash) {},
-                hget: function (hash, key, callback) {
-                    return callback(null, '0001');
-                },
-                srem: function (hash, key) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            var del_args = [publicPath, publicPath + 'apiKeys', publicPath + 'admins',  'subs1', 'subs1subs', 'subs1', 'subs1subs'];
-            var hget_args = ['subs1', 'subs1'];
-            var srem_args = ['services', '0001', 'apiKeys', '0001', 'apiKeys'];
-            mocker(implementations, function (db, spies) {
-                db.deleteService('/public', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.del.callCount, 7);
-                    assert.equal(spies.del.getCall(0).args[0] , '/public');
-                    async.forEachOf(del_args, function (arg, i, task_callback) {
-                        assert.equal(spies.del.getCall(i).args[0] , arg);
-                    });
-                    assert.equal(spies.waterfall.callCount, 1);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(1).args[0] , ['subs1', 'subs1']);
-                    assert.equal(spies.smembers.callCount, 2);
-                    assert.equal(spies.smembers.getCall(0).args[0] , publicPath + 'apiKeys');
-                    assert.equal(spies.smembers.getCall(1).args[0] , 'subs1subs');
-                    assert.equal(spies.hget.callCount, 2);
-                    async.forEachOf(hget_args, function (arg, i, task_callback) {
-                        assert.equal(spies.hget.getCall(i).args[0] , arg);
-                    });
-                    assert.equal(spies.srem.callCount, 5);
-                    async.forEachOf(srem_args, function (arg, i, task_callback) {
-                        assert.equal(spies.srem.getCall(i).args[0] , arg);
-                    });
-                    done();
-                });
-            });
+            testDeleteService(false, false, false, [data.DEFAULT_API_KEYS[0]], false, done);
         });
     });
 
     describe('Function "getService"', function () {
-        var hgetallArgs = ['/public'];
-        var service = {
-            url: 'http://example.com/url',
-            appId: 'appId'
+
+        var testGetService = function (error, service, done) {
+
+            var hgetall = function (hash, callback) {
+                return callback(error, service);
+            };
+
+            var implementations = {
+                hgetall: hgetall
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getService(data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+
+                assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
+
+                if (error) {
+                    assert.equal(err, 'Error in database getting the service.');
+                    assert.equal(res, null);
+                } else {
+
+                    assert.equal(err, null);
+
+                    if(!service) {
+                        assert.equal(res, null);
+                    } else {
+                        assert.equal(res, service);
+                    }
+                }
+
+                done();
+            });
         };
 
         it('should call the callback with error when db fails executing the statements', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getService('/public', function (err, service) {
-                    assert.equal(err, 'Error in database getting the service.');
-                    assert.equal(service, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], hgetallArgs[0]);
-                    done();
-                });
-            });
+            testGetService(true, null, done);
         });
 
         it('should call the callback with error when there is not service', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, null);
-                }
-            }
-            mocker(implementations, function (db, spies) {
-                db.getService('/public', function (err, service) {
-                    assert.equal(err, null);
-                    assert.equal(service, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], hgetallArgs[0]);
-                    done();
-                });
-            });
+            testGetService(false, null, done);
         });
 
         it('should call the callback without error when db gets the service', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, service);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getService('/public', function (err, result) {
-                    assert.equal(err, null);
-                    assert.equal(result, service);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], hgetallArgs[0]);
-                    done();
-                });
-            });
+            testGetService(null, {}, done);
         });
     });
 
     describe('Function "getAllServices"', function () {
-        var services = [
-            {
-                publicPath: '/public1',
-                url: 'http://example.com/path',
-                appId: 'appId1'
-            },
-            {
-                publicPath: '/public2',
-                url: 'http://example.com/path',
-                appId: 'appId2'
-            }
-        ];
-        var publicPaths = ['/public1', '/public2'];
 
-        it('should call the callback with error when db fails executinng "smsmeber"', function (done) {
-            var implementations = {
-                smembers: function (has, callback) {
-                    return callback('Error', null);
+        var testGetAllServices = function (smembersErr, hgetallErr, done) {
+
+            var errMsg = 'Error in database getting the services.';
+            var hgetallFirstCall = true;
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, data.DEFAULT_PUBLIC_PATHS);
+            };
+
+            var hgetall = function (hash, callback) {
+
+                if (hgetallFirstCall) {
+                    hgetallFirstCall = false;
+                    return callback(hgetallErr, data.DEFAULT_SERVICES[0]);
+                } else {
+                    return callback(hgetallErr, data.DEFAULT_SERVICES[1]);
                 }
             };
-            mocker(implementations, function (db, spies) {
-                db.getAllServices(function (err, services) {
-                    assert.equal(err, 'Error in database getting the services.');
-                    assert.equal(services, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    done();
-                });
+
+            var implementations = {
+                smembers: smembers,
+                hgetall: hgetall
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getAllServices(function (err, res) {
+
+                assert(smembersSpy.calledWith('services'));
+
+                if (smembersErr) {
+
+                    assert.equal(err, errMsg);
+                    assert.equal(res, null);
+
+                } else if (hgetallErr) {
+
+                    assert(hgetallSpy.calledOnce);
+                    assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
+                    assert.equal(err, errMsg);
+                    assert.equal(res, null);
+
+                } else {
+
+                    assert(hgetallSpy.calledTwice);
+                    assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
+                    assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[1]));
+                    assert.equal(err, null);
+                    assert.deepEqual(res, data.DEFAULT_SERVICES);
+                }
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails executinng "smsmeber"', function (done) {
+            testGetAllServices(true, false, done);
         });
 
         it('should call the callback with error when db fails executing "hgetall"', function (done) {
-            var implementations = {
-                smembers: function (has, callback) {
-                    return callback(null, publicPaths);
-                },
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAllServices(function (err, services) {
-                    assert.equal(err, 'Error in database getting the services.');
-                    assert.deepEqual(services, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], publicPaths);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPaths[0]);
-                    done();
-                });
-            });
+           testGetAllServices(false, true, done); 
         });
 
         it('should call the callback without error when db returns all services', function (done) {
-            var implementations = {
-                smembers: function (has, callback) {
-                    return callback(null, publicPaths);
-                },
-                hgetall: function (hash, callback) {
-                    if (hash === publicPaths[0]) {
-                        return callback(null, { url: services[0].url, appId: services[0].appId});
-                    } else {
-                        return callback(null, { url: services[1].url, appId: services[1].appId});
-                    }
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAllServices(function (err, result) {
-                    assert.equal(err, null);
-                    assert.deepEqual(result, services);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], publicPaths);
-                    assert.equal(spies.hgetall.callCount, 2);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPaths[0]);
-                    assert.equal(spies.hgetall.getCall(1).args[0], publicPaths[1]);
-                    done();
-                });
-            });
+            testGetAllServices(false, false, done);
         });
     });
 
     describe('Function "getAppId"', function () {
-        var publicPath = '/public';
-        var appId = 'appId';
+
+        var testGetAppId = function (error, done) {
+
+            var hget = function (hash, key, callback) {
+                return callback(error, data.DEFAULT_APP_IDS[0]);
+            };
+
+            var implementations = {
+                hget: hget
+            };
+
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.getAppId(data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+
+                assert(hgetSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0], 'appId'));
+
+                if (error) {
+                    assert.equal(err, 'Error in database getting the appId.');
+                    assert.equal(res, null);
+                } else {
+                    assert.equal(err, null);
+                    assert.equal(res, data.DEFAULT_APP_IDS[0]);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the appId', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAppId(publicPath, function (err, appId) {
-                    assert.equal(err, 'Error in database getting the appId.');
-                    assert.equal(appId, null);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1], 'appId');
-                    done();
-                });
-            });
+            testGetAppId(true, done);
         });
 
         it('should call the callback without error when db returns the appId', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, appId);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAppId(publicPath, function (err, appId) {
-                    assert.equal(err, null);
-                    assert.equal(appId, appId);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1], 'appId');
-                    done();
-                });
-            });
+            testGetAppId(false, done);
         });
     });
 
     describe('Function "addAdmin"', function () {
-        var idAdmin = 'idAdmin';
+
+        var testAddAdmin = function (error, done) {
+
+            var sadd = function (list, callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                sadd: sadd
+            };
+
+            var saddSpy = sinon.spy(implementations, 'sadd');
+
+            var db = getDb(implementations);
+
+            db.addAdmin(data.DEFAULT_ID_ADMIN, function (err) {
+
+                assert(saddSpy.calledWith(['admins', data.DEFAULT_ID_ADMIN]));
+
+                if (error) {
+                    assert.equal(err, 'Error in database adding admin: "' + data.DEFAULT_ID_ADMIN + '" .');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails adding the admin', function (done) {
-            var implementations = {
-                sadd: function (list, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error in database adding admin: "' + idAdmin + '" .');
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['admins', idAdmin]);
-                    done();
-                });
-            });
+            testAddAdmin(true, done);
         });
 
         it('should call the callback without error when db adds the new administrator', function (done) {
-            var implementations = {
-                sadd: function (list, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addAdmin(idAdmin, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['admins', idAdmin]);
-                    done();
-                });
-            });
+            testAddAdmin(false, done);
         });
     });
 
     describe('Function "deleteAdmin"', function () {
-        var idAdmin = 'idAdmin';
-        var publicPaths = ['/public'];
-        var service = {publicPath: '/public1'};
+
+        var testDeleteAdmin = function (smembersErr, sremErr1, sremErr2, done) {
+
+            var sremCall = 0;
+            var hgetallCall = 0;
+            var errMsg = 'Error in database removing admin: "' + data.DEFAULT_ID_ADMIN + '" .';
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, data.DEFAULT_PUBLIC_PATHS);
+            };
+
+            var hgetall = function (hash, callback) {
+                callback(null, data.DEFAULT_SERVICES[hgetallCall]);
+                hgetallCall = hgetallCall + 1; 
+                return;
+            };
+
+            var srem = function (hash, key, callback) {
+
+                var err;
+
+                if (sremCall == 0 || sremCall == 1)  {
+                    err = sremErr1;
+                } else {
+                    err = sremErr2;
+                }
+
+                sremCall = sremCall + 1;
+
+                return callback(err);
+            };
+
+            var implementations = {
+                hgetall: hgetall,
+                smembers: smembers,
+                srem: srem
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var sremSpy = sinon.spy(implementations, 'srem');
+
+            var db = getDb(implementations);
+
+            db.deleteAdmin(data.DEFAULT_ID_ADMIN, function (err, res) {
+
+                assert(smembersSpy.calledWith('services'));
+
+                if (smembersErr) {
+                    assert.equal(err, errMsg);
+                } else {
+                    assert(sremSpy.calledWith(data.DEFAULT_SERVICES[0].publicPath + 'admins'));
+
+                    if (sremErr1) { 
+                        assert.equal(err, errMsg);
+                    } else {
+                        assert(sremSpy.calledWith('admins', data.DEFAULT_ID_ADMIN));
+
+                        if (sremErr2) {
+                            assert.equal(err, errMsg);
+                        } else {
+                            assert.equal(err, null);
+                        }
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting all services', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    done();
-                });
-            });
+            testDeleteAdmin(true, false, false, done);
         });
 
         it('should call the callback with error when db fails removing services', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, publicPaths);
-                },
-                hgetall: function (hash, callback) {
-                    return callback(null, service);
-                },
-                srem: function (hash, key, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPaths[0]);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(0).args[0], publicPaths);
-                    assert.deepEqual(spies.each.getCall(1).args[0], [service]);
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], service.publicPath + 'admins');
-                    done();
-                });
-            });
+            testDeleteAdmin(false, true, false, done); 
         });
 
         it('should call the callback with error when db fails removing administrators', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, publicPaths);
-                },
-                hgetall: function (hash, callback) {
-                    return callback(null, service);
-                },
-                srem: function (hash, key, callback) {
-                    if (hash === 'admins') {
-                        return callback('Error');
-                    } else {
-                        return callback(null);
-                    }
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, 'Error in database removing admin: "' + idAdmin + '" .');
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPaths[0]);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(0).args[0], publicPaths);
-                    assert.deepEqual(spies.each.getCall(1).args[0], [service]);
-                    assert.equal(spies.srem.callCount, 2);
-                    assert.equal(spies.srem.getCall(0).args[0], service.publicPath + 'admins');
-                    assert.equal(spies.srem.getCall(0).args[1], idAdmin);
-                    assert.equal(spies.srem.getCall(1).args[0], 'admins');
-                    assert.equal(spies.srem.getCall(1).args[1], idAdmin);
-                    done();
-                });
-            });
+            testDeleteAdmin(false, false, true, done);
         });
 
         it('should call the callback without error when db deletes the admin', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, publicPaths);
-                },
-                hgetall: function (hash, callback) {
-                    return callback(null, service);
-                },
-                srem: function (hash, key, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteAdmin(idAdmin, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPaths[0]);
-                    assert.equal(spies.each.callCount, 2);
-                    assert.deepEqual(spies.each.getCall(0).args[0], publicPaths);
-                    assert.deepEqual(spies.each.getCall(1).args[0], [service]);
-                    assert.equal(spies.srem.callCount, 2);
-                    assert.equal(spies.srem.getCall(0).args[0], service.publicPath + 'admins');
-                    assert.equal(spies.srem.getCall(0).args[1], idAdmin);
-                    assert.equal(spies.srem.getCall(1).args[0], 'admins');
-                    assert.equal(spies.srem.getCall(1).args[1], idAdmin);
-                    done();
-                });
-            });
+            testDeleteAdmin(false, false, false, done);
         });
     });
 
     describe('Function "bindAdmin"', function () {
-        var idAdmin = 'idAdmin';
-        var publicPath = 'publicPath';
+
+        var testBindAdmin = function (hgetallErr, service, smembersErr, admins, saddErr, done) {
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, service);
+            };
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, admins);
+            };
+
+            var sadd = function (hash, value, callback) {
+                return callback(saddErr);
+            };
+
+            var implementations = {
+                hgetall: hgetall,
+                smembers: smembers,
+                sadd: sadd
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var saddSpy = sinon.spy(implementations, 'sadd');
+
+            var db = getDb(implementations);
+
+            db.bindAdmin(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err) {
+
+                assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
+
+                if (hgetallErr) {
+                    assert.equal(err, 'Error in database binding the admin to the service.');
+                } else if (!service) {
+                    assert.equal(err, 'Invalid public path.');
+                } else {
+                    assert(smembersSpy.calledWith('admins'));
+
+                    if (smembersErr) {
+                        assert.equal(err, 'Error in database binding the admin to the service.');
+                    } else if (admins.indexOf(data.DEFAULT_ID_ADMIN) === -1) {
+                        assert.equal(err, 'Admin: "' + data.DEFAULT_ID_ADMIN + '" not exists. Admin must be added before binding it.');
+                    } else {
+                        assert(saddSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
+
+                        if (saddErr) {
+                            assert.equal(err, 'Error in database binding the admin to the service.');
+                        } else {
+                            assert.equal(null);
+                        }
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the service', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error in database binding the admin to the service.');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    done();
-                });
-            });
+            testBindAdmin(true, null, false, null, false, done);
         });
 
         it('should call the callback with error when the public path is invalid', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Invalid public path.');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    done();
-                });
-            });
+            testBindAdmin(false, null, false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting admins', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
-                },
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error in database binding the admin to the service.');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'admins');
-                    done();
-                });
-            });
+            testBindAdmin(false, {}, true, {}, false, done);
         });
 
         it('should call the callback with error when the admin does not exists', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
-                },
-                smembers: function (hash, callback) {
-                    return callback(null, ['other']);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Admin: "' + idAdmin + '" not exists. Admin must be added before binding it.');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'admins');
-                    done();
-                });
-            });
+            testBindAdmin(false, {}, false, [], false, done);
         });
 
         it('should call the callback with error when db fails adding the administrator', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
-                },
-                smembers: function (hash, callback) {
-                    return callback(null, [idAdmin]);
-                },
-                sadd: function (hash, key, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error in database binding the admin to the service.');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'admins');
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.equal(spies.sadd.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.sadd.getCall(0).args[1], idAdmin);
-                    done();
-                });
-            });
+            testBindAdmin(false, {}, false, [data.DEFAULT_ID_ADMIN], true, done);
         });
 
         it('should call the callback with error when db binds the administrator', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {url: 'http://example.com/path', publicPath: '/public', appId: 'appId'});
-                },
-                smembers: function (hash, callback) {
-                    return callback(null, [idAdmin]);
-                },
-                sadd: function (hash, key, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.bindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], publicPath);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'admins');
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.equal(spies.sadd.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.sadd.getCall(0).args[1], idAdmin);
-                    done();
-                });
-            });
+            testBindAdmin(false, {}, false, [data.DEFAULT_ID_ADMIN], false, done);
         });
     });
 
     describe('Function "unbindAdmin"', function () {
-        var idAdmin = 'idAdmin';
-        var publicPath = '/public';
+
+        var testUnbindAdmin = function (error, done) {
+
+            var srem = function (hash, key, callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                srem: srem
+            };
+
+            var sremSpy = sinon.spy(implementations, 'srem');
+
+            var db = getDb(implementations);
+
+            db.unbindAdmin(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err) {
+
+                assert(sremSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins', data.DEFAULT_ID_ADMIN));
+
+                if (error) {
+                    assert.equal(err, 'Error in database unbinding the administrator "' + data.DEFAULT_ID_ADMIN + '".');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails unbinding the admin', function (done) {
-            var implementations = {
-                srem: function (hash, key, callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, 'Error in database unbinding the administrator.');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.srem.getCall(0).args[1], idAdmin);
-                    done();
-                });
-            });
+            testUnbindAdmin(true, done);
         });
 
         it('should call the callback without error when db unbinds the admin', function (done) {
-            var implementations = {
-                srem: function (hash, key, callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.unbindAdmin(idAdmin, publicPath, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.srem.getCall(0).args[1], idAdmin);
-                    done();
-                });
-            });
+            testUnbindAdmin(false, done);
         });
     });
 
     describe('Function "getAdmins"', function () {
-        var publicPath = '/public';
-        var admins = ['admin1', 'admin2'];
+
+        var testGetAdmins = function (error, admins, result, done) {
+
+            var smembers = function (hash, callback) {
+                return callback(error, admins);
+            };
+
+            var implementations = {
+                smembers: smembers
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+
+            var db = getDb(implementations);
+
+            db.getAdmins(data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+
+                assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
+
+                if (error) {
+                    assert.equal(err, 'Error in database getting the administrators.');
+                    assert.equal(res, null);
+                } else {
+                    assert.equal(err, null);
+                    assert.deepEqual(res, result);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the admins', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdmins(publicPath, function (err, admins) {
-                    assert.equal(err, 'Error in database getting the administrators.');
-                    assert.equal(admins, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    done();
-                });
-            });
+            testGetAdmins(true, null, null, done);
         });
 
         it('should call the callback without error when db returns all admins', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, admins);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdmins(publicPath, function (err, result) {
-                    assert.equal(err, null);
-                    assert.deepEqual(result,[{idAdmin: admins[0]}, {idAdmin: admins[1]}]);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], admins);
-                    done();
-                });
-            });
+            testGetAdmins(false, ['admin1', 'admin2'], [{idAdmin: 'admin1'}, {idAdmin: 'admin2'}], done);
         });
     });
 
     describe('FUnction "getAdminUrl"', function () {
-        var idAdmin = 'idAdmin';
-        var publicPath = '/public';
-        var url = 'http://example.com/path';
+
+        var testGetAdminUrl = function (smembersErr, admins, hgetErr, done) {
+
+            var errMsg = 'Error getting the admin url.';
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, admins);
+            };
+
+            var hget = function (hash, key, callback) {
+                return callback(hgetErr, data.DEFAULT_URLS[0]);
+            };
+
+            var implementations = {
+                smembers: smembers,
+                hget: hget
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.getAdminUrl(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+
+                assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
+
+                if (smembersErr) {
+                    assert.equal(err, errMsg);
+                    assert.equal(res, null);
+                } else if (admins.indexOf(data.DEFAULT_ID_ADMIN) === -1) {
+                    assert.equal(err, null);
+                    assert.equal(res, null);
+                } else {
+                    assert(hgetSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0], 'url'));
+
+                    if (hgetErr) {
+                        assert.equal(err, errMsg);
+                        assert.equal(res, null);
+                    } else {
+                        assert.equal(err, null);
+                        assert.equal(res, data.DEFAULT_URLS[0]);
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the administrators', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, 'Error getting the admin url.');
-                    assert.equal(adminUrl, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    done();
-                });
-            });
+            testGetAdminUrl(true, null, false, done);
         });
 
         it('should call the callback without error when admin id is invalid', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, ['no_admin']);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, null);
-                    assert.equal(adminUrl, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    done();
-                });
-            });
+            testGetAdminUrl(false, [], false, done);
         });
 
         it('should call the callback with error when db fails getting the url', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, [idAdmin, 'otherAdmin']);
-                },
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, 'Error getting the admin url.');
-                    assert.equal(adminUrl, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1], 'url');
-                    done();
-                });
-            });
+            testGetAdminUrl(false, [data.DEFAULT_ID_ADMIN], true, done);
         });
 
         it('should return the admin URL when the admin id is correct', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, [idAdmin, 'otherAdmin']);
-                },
-                hget: function (hash, key, callback) {
-                    return callback(null, url);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAdminUrl(idAdmin, publicPath, function (err, adminUrl) {
-                    assert.equal(err, null);
-                    assert.equal(adminUrl, url);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], publicPath + 'admins');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1], 'url');
-                    done();
-                });
-            });
+            testGetAdminUrl(false, [data.DEFAULT_ID_ADMIN], false, done);
         });
     });
 
     describe('Function "checkPath"', function (done) {
-        var publicPath = '/public';
-        var services = ['/public','/public2'];
+
+        var testCheckPath = function (error, publicPaths, done) {
+
+            var smembers = function (hash, callback) {
+                return callback(error, publicPaths);
+            };
+
+            var implementations = {
+                smembers: smembers
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+
+            var db = getDb(implementations);
+
+            db.checkPath(data.DEFAULT_PUBLIC_PATHS[0], function(err, res) {
+
+                assert(smembersSpy.calledWith('services'));
+
+                if (error) {
+
+                    assert.equal(err, 'Error checking the path.');
+                    assert.equal(res, false);
+
+                } else if (publicPaths.indexOf(data.DEFAULT_PUBLIC_PATHS[0]) === -1) {
+
+                    assert.equal(err, null);
+                    assert.equal(res, false);
+
+                } else {
+
+                    assert.equal(err, null);
+                    assert.equal(res, true);
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the service', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.checkPath(publicPath, function (err, check) {
-                    assert.equal(err, 'Error checking the path.');
-                    assert.equal(check, false);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    done();
-                });
-            });
+            testCheckPath(true, null, done);
         });
 
         it('should call the callback with error when the URL is invalid', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, ['other_path']);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.checkPath(publicPath, function (err, check) {
-                    assert.equal(err, null);
-                    assert.equal(check, false);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    done();
-                });
-            });
+            testCheckPath(false, [], done);
         });
 
         it('should call the callback without error when db checks the path', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, services);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.checkPath(publicPath, function (err, check) {
-                    assert.equal(err, null);
-                    assert.equal(check, true);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], 'services');
-                    done();
-                });
-            });
+            testCheckPath(false, [data.DEFAULT_PUBLIC_PATHS[0]], done);
         });
     });
 
     describe('Function "newBuy"', function () {
-        var buyInfo = {
-            apiKey: 'apiKey',
-            publicPath: '/public',
-            orderId: 'orderId',
-            productId: 'productId',
-            customer: '0001',
-            unit: 'call',
-            recordType: 'callUsage'
+
+        var hmsetArg = {
+            publicPath: data.DEFAULT_BUY_INFORMATION.publicPath,
+            orderId: data.DEFAULT_BUY_INFORMATION.orderId,
+            productId: data.DEFAULT_BUY_INFORMATION.productId,
+            customer: data.DEFAULT_BUY_INFORMATION.customer,
+            unit: data.DEFAULT_BUY_INFORMATION.unit,
+            value: 0,
+            recordType: data.DEFAULT_BUY_INFORMATION.recordType,
+            correlationNumber: 0
         };
-        var args = {
-            sadd: [ ['apiKeys', buyInfo.apiKey],
-                    [buyInfo.publicPath, buyInfo.apiKey],
-                    [buyInfo.customer, buyInfo.apiKey]],
-            hmset: {
-                publicPath: buyInfo.publicPath,
-                orderId: buyInfo.orderId,
-                productId: buyInfo.productId,
-                customer: buyInfo.customer,
-                unit: buyInfo.unit,
-                value: 0,
-                recordType: buyInfo.recordType,
-                correlationNumber: 0
-            }
+
+        var testNewBuy = function (error, done) {
+
+            var sadd = sinon.stub();
+            var hmset = sinon.stub();
+
+            var exec = function (callback) {
+                return callback(error);
+            };
+
+            var implementations = {
+                sadd: sadd,
+                hmset: hmset,
+                exec: exec
+            };
+
+            var execSpy = sinon.spy(implementations, 'exec');
+
+            var multi = sinon.stub().returns(implementations);
+
+            var db = getDb({multi: multi});
+
+            db.newBuy(data.DEFAULT_BUY_INFORMATION, function (err) {
+
+                assert(multi.calledOnce);
+                assert(sadd.calledThrice);
+                assert(sadd.calledWith(['apiKeys', data.DEFAULT_BUY_INFORMATION.apiKey]));
+                assert(sadd.calledWith([data.DEFAULT_BUY_INFORMATION.publicPath, data.DEFAULT_BUY_INFORMATION.apiKey]));
+                assert(sadd.calledWith([data.DEFAULT_BUY_INFORMATION.customer, data.DEFAULT_BUY_INFORMATION.apiKey]));
+                assert(hmset.calledWith(data.DEFAULT_BUY_INFORMATION.apiKey, hmsetArg));
+                assert(execSpy.calledOnce);
+
+                if (error) {
+                    assert.equal(err, 'Error in database adding the new buy.');
+                } else {
+                    assert.equal(err, null);
+                }
+
+                done();
+            });
         };
 
         it('should call the callback with error when db fails adding the new buy', function (done) {
-            var implementations = {
-                sadd: function (list) {},
-                hmset: function (hash, object) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.newBuy(buyInfo, function (err) {
-                    assert.equal(err, 'Error in database adding the new buy.');
-                    assert.equal(spies.sadd.callCount, 3);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], args.sadd[0]);
-                    assert.deepEqual(spies.sadd.getCall(1).args[0], args.sadd[1]);
-                    assert.deepEqual(spies.sadd.getCall(2).args[0], args.sadd[2]);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], buyInfo.apiKey);
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], args.hmset);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testNewBuy(true, done);
         });
 
         it('should call the callback without error when db adds the new service', function (done) {
-            var implementations = {
-                sadd: function (list) {},
-                hmset: function (hash, object) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.newBuy(buyInfo, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.sadd.callCount, 3);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], args.sadd[0]);
-                    assert.deepEqual(spies.sadd.getCall(1).args[0], args.sadd[1]);
-                    assert.deepEqual(spies.sadd.getCall(2).args[0], args.sadd[2]);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0], buyInfo.apiKey);
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], args.hmset);
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testNewBuy(false, done);
         });
     });
 
     describe('Function "getApiKeys"', function (done) {
-        var keys = ['apiKey1', 'apiKey2'];
+
+        var apiKeysInfo = {};
+        apiKeysInfo[data.DEFAULT_API_KEYS[0]] = {productId: data.DEFAULT_PRODUCT_IDS[0], orderId: data.DEFAULT_ORDER_IDS[0]};
+        apiKeysInfo[data.DEFAULT_API_KEYS[1]] = {productId: data.DEFAULT_PRODUCT_IDS[1], orderId: data.DEFAULT_ORDER_IDS[1]};
+
+        var testGetApiKeys = function (smembersErr, apiKeys, hgetallErr, resultExpected, done) {
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, apiKeys);
+            };
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, apiKeysInfo[hash]);
+            };
+
+            var implementations = {
+                smembers: smembers,
+                hgetall: hgetall
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getApiKeys(data.DEFAULT_USER, function (err, res) {
+
+                assert(smembersSpy.calledWith(data.DEFAULT_USER));
+
+                if (smembersErr) {
+
+                    assert.equal(err, 'Error in databse getting api-keys.');
+                    assert.equal(res, resultExpected);
+
+                } else if (apiKeys.length === 0) {
+
+                    assert.equal(err, null);
+                    assert.equal(res, resultExpected);
+
+                } else {
+
+                    assert(hgetallSpy.calledWith(apiKeys[0]));
+
+                    if (hgetallErr) {
+
+                        assert.equal(err, 'Error in databse getting api-keys.');
+                        assert.equal(res, resultExpected);
+
+                    } else {
+
+                        assert(hgetallSpy.calledWith(apiKeys[1]));
+                        assert.equal(err, null);
+                        assert.deepEqual(res, resultExpected);
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting user API keys', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, 'Error in databse getting api-keys.');
-                    assert.equal(apiKeys, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    done();
-                });
-            });
+            testGetApiKeys(true, null, false, null, done);
         });
 
         it('should call the callback without error when there are not API keys', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, []);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, null);
-                    assert.equal(apiKeys, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], '0001');
-                    done();
-                });
-            });
+           testGetApiKeys(false, [], false, null, done); 
         });
 
         it('should call the callback with error when db fails getting accounting info', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, ['apiKey1']);
-                },
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, 'Error in databse getting api-keys.');
-                    assert.equal(apiKeys, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], '0001');
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], 'apiKey1');
-                    done();
-                });
-            });
+            testGetApiKeys(false, data.DEFAULT_API_KEYS, true, null, done);
         });
 
         it('should call the callback without error when db gets the API keys', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, keys);
-                },
-                hgetall: function (hash, callback) {
-                    if(hash === keys[0]) {
-                        return callback(null, {
-                            apiKey: hash,
-                            productId: 'productId1',
-                            orderId: 'orderId1'
-                        });
-                    } else {
-                        return callback(null, {
-                            apiKey: hash,
-                            productId: 'productId2',
-                            orderId: 'orderId2',
-                        });
-                    }
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getApiKeys('0001', function (err, apiKeys) {
-                    assert.equal(err, null);
-                    assert.deepEqual(apiKeys, [
-                    {
-                        apiKey: 'apiKey1',
-                        productId: 'productId1',
-                        orderId: 'orderId1'
-                    },
-                    {
-                        apiKey: 'apiKey2',
-                        productId: 'productId2',
-                        orderId: 'orderId2'
-                    }
-                    ]);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0], '0001');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.deepEqual(spies.each.getCall(0).args[0] , keys);
-                    assert.equal(spies.hgetall.callCount, 2);
-                    assert.equal(spies.hgetall.getCall(0).args[0], keys[0]);
-                    assert.equal(spies.hgetall.getCall(1).args[0], keys[1]);
-                    done();
-                });
-            });
+            var resultExpected = [{
+                apiKey : data.DEFAULT_API_KEYS[0],
+                productId: data.DEFAULT_PRODUCT_IDS[0],
+                orderId: data.DEFAULT_ORDER_IDS[0],
+            }, {
+                apiKey : data.DEFAULT_API_KEYS[1],
+                productId: data.DEFAULT_PRODUCT_IDS[1],
+                orderId: data.DEFAULT_ORDER_IDS[1],
+            }];
+
+           testGetApiKeys(false, data.DEFAULT_API_KEYS, false, resultExpected, done); 
         });
     });
 
     describe('Function "checkRequest"', function (done) {
 
-        it('should call the callback with error when db fails getting accounting information', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
+        var testCheckRequest = function (error, accountingInfo, done) {
+
+            var hgetall = function (hash, callback) {
+                return callback(error, accountingInfo);
             };
-            var apiKey = 'apiKey1';
-            mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', apiKey, 'http://localhost/path', function (err, check) {
+
+            var implementations = {
+                hgetall: hgetall
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.checkRequest(data.DEFAULT_USER, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+
+                assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[0]));
+
+                if (error) {
                     assert.equal(err, 'Error in database checking the request.');
-                    assert.equal(check, false);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
-                    done();
-                });
+                    assert.equal(res, false);
+                } else {
+
+                    assert.equal(err, null);
+
+                    if (!accountingInfo) {
+                        assert.equal(res, false);
+                    } else {
+                        assert.equal(res, accountingInfo.customer === data.DEFAULT_USER && accountingInfo.publicPath === data.DEFAULT_PUBLIC_PATHS[0]);
+                    }
+                }
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails getting accounting information', function (done) {
+            testCheckRequest(true, null, done);
         });
 
         it('should call the callback with error when there is not accounting information for the request', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, null);
-                }
-            };
-            var apiKey = 'apiKey1';
-            mocker(implementations, function (db, spies) {
-                db.checkRequest('0001', apiKey, 'http://localhost/path', function (err, check) {
-                    assert.equal(err, null);
-                    assert.equal(check, false);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
-                    done();
-                });
-            });
+            testCheckRequest(false, null, done);
         });
 
         it('should return false when the request is not valid', function (done) {
-            var customer = '0001';
-            var publicPath = 'http://localhost/path';
-            var apiKey = 'apiKey1';
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {customer: 'wrong', publicPath: publicPath});
-                }
+            var accountingInfo = {
+                customer: 'wrong',
+                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
             };
-            mocker(implementations, function (db, spies) {
-                db.checkRequest(customer, apiKey, publicPath, function (err, check) {
-                    assert.equal(err, null);
-                    assert.equal(check, false);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
-                    done();
-                });
-            });
+
+            testCheckRequest(false, accountingInfo, done);
         });
 
         it('should return true when the request is valid', function (done) {
-            var customer = '0001';
-            var publicPath = 'http://localhost/path';
-            var apiKey = 'apiKey1';
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {customer: customer, publicPath: publicPath});
-                }
+           var accountingInfo = {
+                customer:  data.DEFAULT_USER,
+                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
             };
-            mocker(implementations, function (db, spies) {
-                db.checkRequest(customer, apiKey, publicPath, function (err, check) {
-                    assert.equal(err, null);
-                    assert.equal(check, true);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], apiKey);
-                    done();
-                });
-            });
+
+            testCheckRequest(false, accountingInfo, done); 
         });
     });
 
     describe('Function "getAccountingInfo"', function (done) {
-        var apiKey = 'apiKey';
+
         var accountingInfo = {
-            url: 'http://example.com/path',
-            publicPath: '/public',
-            unit: 'megabyte'
-        }
+            url: data.DEFAULT_URLS[0],
+            publicPath: data.DEFAULT_PUBLIC_PATHS[0],
+            unit: data.DEFAULT_UNIT
+        };
+
+        var testGetAccountingInfo = function (hgetallErr, accountingInfo, hgetErr, done) {
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, accountingInfo);
+            };
+
+            var hget = function (hash, key, callback) {
+                return callback(hgetErr, data.DEFAULT_URLS[0]);
+            };
+
+            var implementations = {
+                hgetall: hgetall,
+                hget: hget
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.getAccountingInfo(data.DEFAULT_API_KEYS[0], function (err, res) {
+
+                assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[0]));
+
+                if (hgetallErr) {
+
+                    assert.equal(err, 'Error in database getting the accounting info.');
+                    assert.equal(res, null);
+
+                } else if (!accountingInfo) {
+
+                    assert.equal(err, null);
+                    assert.equal(res, null);
+
+                } else {
+
+                    assert(hgetSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0], 'url'));
+
+                    if (hgetErr) {
+
+                        assert.equal(err, 'Error in database getting the accounting info.');
+                        assert.equal(res, null);
+
+                    } else {
+
+                        assert.equal(err, null);
+                        assert.deepEqual(res, {
+                            unit: data.DEFAULT_UNIT,
+                            url: data.DEFAULT_URLS[0]
+                        });
+                    }
+                }
+
+                done();
+            });
+        };
 
         it('should call the callback with error when db fails getting the accounting info', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, 'Error in database getting the accounting info.');
-                    assert.equal(accInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
-                    done();
-                });
-            });
+            testGetAccountingInfo(true, null, false, done);
         });
 
         it('should call the callback without error when there is not accounting information', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, null);
-                    assert.equal(accInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
-                    done();
-                });
-            });
+            testGetAccountingInfo(false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting the url', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, accountingInfo);
-                },
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, 'Error in database getting the accounting info.');
-                    assert.equal(accInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , accountingInfo.publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1] , 'url');
-                    done();
-                });
-            });
+            testGetAccountingInfo(false, accountingInfo, true, done);
         });
 
         it('should call the callback without error when db returns the accounting information', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, accountingInfo);
-                },
-                hget: function (hash, key, callback) {
-                    return callback(null, accountingInfo.url);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getAccountingInfo(apiKey, function (err, accInfo) {
-                    assert.equal(err, null);
-                    assert.deepEqual(accInfo, {
-                        unit: accountingInfo.unit,
-                        url: accountingInfo.url
-                    });
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0] , apiKey);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , accountingInfo.publicPath);
-                    assert.equal(spies.hget.getCall(0).args[1] , 'url');
-                    done();
-                });
-            });
+            testGetAccountingInfo(false, accountingInfo, false, done);
         });
     });
 
     describe('Function "getNotificationInfo"', function () {
 
-        it('should call the callback with error when db fails getting apiKeys', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback('Error');
+        var testGetNotificatoinInfo = function (smembersErr, hgetallErr, accountingInfo, notificationInfo, done) {
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, data.DEFAULT_API_KEYS);
+            };
+
+            var hgetall = function (hash, callback) {
+                if (!accountingInfo) {
+                    return callback(hgetallErr, null);    
+                } else {
+                    return callback(hgetallErr, accountingInfo[hash]);
                 }
             };
-            mocker(implementations, function (db, spies) {
-                db.getNotificationInfo(function (err, notificationInfo) {
+
+            var implementations = {
+                smembers: smembers,
+                hgetall: hgetall
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getNotificationInfo(function (err, res) {
+
+                assert(smembersSpy.calledWith('apiKeys'));
+
+                if (smembersErr) {
+
                     assert.equal(err, 'Error in database getting the notification information.');
-                    assert.equal(notificationInfo, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
-                    done();
-                });
+                    assert.equal(res, null);
+
+                } else {
+
+                    assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[0]));
+
+                    if (hgetallErr) {
+
+                        assert.equal(err, 'Error in database getting the notification information.');
+                        assert.equal(res, null);
+
+                    } else {
+
+                        assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[1]));
+                        assert.equal(err, null);
+                        assert.deepEqual(res, notificationInfo);
+                    }
+                }
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails getting apiKeys', function (done) {
+            testGetNotificatoinInfo(true, false, null, null, done);
         });
 
         it('should call the callback with error when db fails getting accounting information', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, ['apiKey']);
-                },
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);25
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, 'Error in database getting the notification information.');
-                    assert.equal(notificationInfo, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
-                    done();
-                });
-            });
+            testGetNotificatoinInfo(false, true, null, null, done);
         });
 
         it('should call the callback without error when there is no accounting information to notify', function (done) {
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, null);
-                    assert.equal(notificationInfo, null);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
-                    assert.equal(spies.each.callCount, 1);
-                    assert.equal(spies.each.getCall(0).args[0], null);
-                    done();
-                });
-            });
+            var accountingInfo = {};
+            accountingInfo[data.DEFAULT_API_KEYS[0]] = {value: 0};
+            accountingInfo[data.DEFAULT_API_KEYS[1]] = {value: 0};
+
+            testGetNotificatoinInfo(false, false, accountingInfo, null, done);
         });
 
         it('should call the callback without error when db returns the accounting information to notify', function (done) {
-            var notificationInfo1 = {
-                apiKey: 'apiKey1',
-                orderId: 'orderId',
-                productId: 'productId',
-                customer: '0001',
-                value: 1.5,
-                correlationNumber: 2,
-                recordType: 'callUsage',
-                unit: 'call'
+            var accountingInfo = {};
+            accountingInfo[data.DEFAULT_API_KEYS[0]] = {
+                apiKey: data.DEFAULT_API_KEYS[0],
+                value: 1.3,
+                orderId: data.DEFAULT_ORDER_IDS[0],
+                productId: data.DEFAULT_PRODUCT_IDS[0],
+                customer: data.DEFAULT_USER,
+                correlationNumber: 0,
+                recordType: data.DEFAULT_RECORD_TYPE,
+                unit: data.DEFAULT_UNIT
             };
-            var notificationInfo2 = {
-                value: 0
+            accountingInfo[data.DEFAULT_API_KEYS[1]] = {
+                apiKey: data.DEFAULT_API_KEYS[1],
+                value: 1.3,
+                orderId: data.DEFAULT_ORDER_IDS[1],
+                productId: data.DEFAULT_PRODUCT_IDS[1],
+                customer: data.DEFAULT_USER,
+                correlationNumber: 0,
+                recordType: data.DEFAULT_RECORD_TYPE,
+                unit: data.DEFAULT_UNIT
             };
-            var implementations = {
-                smembers: function (hash, callback) {
-                    return callback(null, ['apiKey1', 'apiKey2']);
-                },
-                hgetall: function (hash, callback) {
-                    if (hash === 'apiKey1') {
-                        return callback(null, notificationInfo1);
-                    } else {
-                        return callback(null, notificationInfo2);
-                    }
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getNotificationInfo(function (err, notificationInfo) {
-                    assert.equal(err, null);
-                    assert.deepEqual(notificationInfo, [notificationInfo1]);
-                    assert.equal(spies.smembers.callCount, 1);
-                    assert.equal(spies.smembers.getCall(0).args[0] , 'apiKeys');
-                    assert.equal(spies.hgetall.callCount, 2);
-                    assert.equal(spies.hgetall.getCall(0).args[0] , 'apiKey1');
-                    assert.equal(spies.hgetall.getCall(1).args[0] , 'apiKey2');
-                    done();
-                });
-            });
+
+            testGetNotificatoinInfo(false, false, accountingInfo, [accountingInfo[data.DEFAULT_API_KEYS[0]], accountingInfo[data.DEFAULT_API_KEYS[1]]], done);
         });
     });
+
+    var testAccounting = function (amount, hgetErr, num, execErr, done) {
+
+        var errMakeAccounting = 'Error making the accounting.';
+        var errResetAccounting = 'Error reseting the accounting.';
+
+        var hget = function (hash, key, callback) {
+            return callback(hgetErr, num);
+        };
+
+        var hmset = sinon.stub();
+
+        var exec = function (callback) {
+            return callback(execErr);
+        };
+
+        var multiImplementations = {
+            hmset: hmset,
+            exec: exec
+        };
+
+        var multi = sinon.stub().returns(multiImplementations);
+
+        var implementations = {
+            multi: multi,
+            hget: hget
+        };
+
+        var hgetSpy = sinon.spy(implementations, 'hget');
+        var execSpy = sinon.spy(multiImplementations, 'exec');
+
+        var db = getDb(implementations);
+
+        if (amount) {
+
+            db.makeAccounting(data.DEFAULT_API_KEYS[0], amount, function (err) {
+
+                assert(multi.calledOnce);
+
+                if (amount < 0) {
+
+                    assert.equal(err, 'The aomunt must be greater than 0.');
+
+                } else {
+
+                    assert(hgetSpy.calledWith(data.DEFAULT_API_KEYS[0], 'value'));
+
+                    if (hgetErr) {
+
+                        assert.equal(err, errMakeAccounting);
+
+                    } else {
+
+                        assert(hmset.calledWith(data.DEFAULT_API_KEYS[0], {value: amount + num}));
+                        assert(execSpy.calledOnce);
+
+                        execErr ? assert.equal(err, errMakeAccounting) : assert.equal(err, null);
+                    }
+                }
+            });
+
+        } else {
+
+            db.resetAccounting(data.DEFAULT_API_KEYS[0], function (err) {
+
+                assert(multi.calledOnce);
+                assert(hgetSpy.calledWith(data.DEFAULT_API_KEYS[0], 'correlationNumber'));
+
+                if (hgetErr) {
+                    assert.equal(err, errResetAccounting);
+                } else {
+
+                    assert(hmset.calledWith(data.DEFAULT_API_KEYS[0], {correlationNumber: num + 1, value: '0'}));
+                    assert(execSpy.calledOnce);
+
+                    execErr ? assert.equal(err, errResetAccounting) : assert.equal(err, null);
+                }
+            });
+        }
+
+        done();
+    };
 
     describe('Function "makeAccounting"', function () {
 
         it('should call the callback with error when the amount is less than 0', function (done) {
-            mocker({}, function (db, spies) {
-                db.makeAccounting('apikey', -1.3, function (err) {
-                    assert.equal(err, 'The aomunt must be greater than 0.');
-                    done();
-                });
-            });
+            testAccounting(-1.3, false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting previous value', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, 'Error making the accounting.');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'value');
-                    done();
-                });
-            });
+            testAccounting(1.3, true, null, false, done);
         });
 
         it('should call the callback with error when db fails making the accounting', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 1);
-                },
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, 'Error making the accounting.');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'value');
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0] , 'apiKey');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1] , {
-                        value: 2.3
-                    });
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testAccounting(1.3, false, 2, true, done);
         });
 
         it('should call the callback without error when db makes the accounting', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 1);
-                },
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.makeAccounting('apiKey', 1.3, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'value');
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0] , 'apiKey');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1] , {
-                        value: 2.3
-                    });
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testAccounting(1.3, false, 2, false, done);
         });
     });
 
     describe('Function "resetAccounting"', function () {
 
         it('should call the callback with error when db fails getting correlation number', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error reseting the accounting.');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'correlationNumber');
-                    done();
-                });
-            });
+            testAccounting(null, true, null, false, done);
         });
 
         it('should call the callback with error when db fails reseting the accounting value', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 0);
-                },
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            }
-            mocker(implementations, function (db, spies) {
-                db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, 'Error reseting the accounting.');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'correlationNumber');
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0] , 'apiKey');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1] , {
-                        correlationNumber: 1,
-                        value: '0'
-                    });
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testAccounting(null, false, 0, true, done);
         });
 
         it('should call the callback without error when db rests the accounting value', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 0);
-                },
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.resetAccounting('apiKey', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'correlationNumber');
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.equal(spies.hmset.getCall(0).args[0] , 'apiKey');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1] , {
-                        correlationNumber: 1,
-                        value: '0'
-                    });
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testAccounting(null, false, 0, false, done);
         });
     });
 
     describe('Function "addCBSubscription"', function () {
 
-        it('should call the callback with error when db fails adding a new CB subscription', function (done) {
-            var implementations = {
-                sadd: function (list) {},
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
+        var testAddCBSubscription = function (error, done) {
+
+            var sadd = sinon.stub();
+            var hmset = sinon.stub();
+            var exec = function (callback) {
+                return callback(error);
             };
-            mocker(implementations, function (db, spies) {
-                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function (err) {
-                    assert.equal(err, 'Error in database adding the subscription "subsId" .');
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['apiKeysubs', 'subsId']);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.deepEqual(spies.hmset.getCall(0).args[0], 'subsId');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], { apiKey: 'apiKey', notificationUrl: 'http://example.com/url'});
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
+
+            var implementations = {
+                sadd: sadd,
+                hmset: hmset,
+                exec: exec
+            };
+
+            var execSpy = sinon.spy(implementations, 'exec');
+
+            var multi = sinon.stub().returns(implementations);
+
+            var db = getDb({multi: multi});
+
+            db.addCBSubscription(data.DEFAULT_API_KEYS[0], data.DEFAULT_SUBSCRIPTION_ID, data.DEFAULT_NOTIFICATION_URL, function (err) {
+
+                assert(multi.calledOnce);
+                assert(sadd.calledWith([data.DEFAULT_API_KEYS[0] + 'subs', data.DEFAULT_SUBSCRIPTION_ID]));
+                assert(hmset.calledWith(data.DEFAULT_SUBSCRIPTION_ID, {apiKey: data.DEFAULT_API_KEYS[0], notificationUrl: data.DEFAULT_NOTIFICATION_URL}));
+                assert(execSpy.calledOnce);
+
+                error ? (err, 'Error in database adding the subscription "' + data.DEFAULT_SUBSCRIPTION_ID + '" .') : assert.equal(err, null);
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails adding a new CB subscription', function (done) {
+            testAddCBSubscription(true, done);
         });
 
         it('should call the callback without error when db adds the new CB subscription', function (done) {
-            var implementations = {
-                sadd: function (list) {},
-                hmset: function (hash, value) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.addCBSubscription('apiKey', 'subsId', 'http://example.com/url', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.sadd.callCount, 1);
-                    assert.deepEqual(spies.sadd.getCall(0).args[0], ['apiKeysubs', 'subsId']);
-                    assert.equal(spies.hmset.callCount, 1);
-                    assert.deepEqual(spies.hmset.getCall(0).args[0], 'subsId');
-                    assert.deepEqual(spies.hmset.getCall(0).args[1], { apiKey: 'apiKey', notificationUrl: 'http://example.com/url'});
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+           testAddCBSubscription(false, done); 
         });
     });
 
     describe('Function "getCBSubscription"', function () {
 
-        it('should call the callback with error when db fails getting subscription info', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback('Error', null);
-                }
+        var subscriptionInfo = {
+            apiKey: data.DEFAULT_API_KEYS[0],
+            notificationUrl: data.DEFAULT_NOTIFICATION_URL
+        };
+
+        var testGetCBSubscription = function (hgetallErr, subscriptionInfo, hgetErr, done) {
+
+            var errMsg = 'Error getting the subscription.';
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, subscriptionInfo);
             };
-            mocker(implementations, function (db, spies) {
-                db.getCBSubscription('subsId', function (err, subsInfo) {
+
+            var hget = function (hash, key, callback) {
+                return callback(hgetErr, data.DEFAULT_UNIT);
+            };
+
+            var implementations = {
+                hgetall: hgetall,
+                hget: hget
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.getCBSubscription(data.DEFAULT_SUBSCRIPTION_ID, function (err, res) {
+
+                assert(hgetallSpy.calledWith(data.DEFAULT_SUBSCRIPTION_ID));
+
+                if (hgetallErr) {
+
                     assert.equal(err, 'Error getting the subscription.');
-                    assert.equal(subsInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
-                    done();
-                });
+                    assert.equal(res, null);
+
+                } else if (!subscriptionInfo) {
+
+                    assert.equal(err, null);
+                    assert.equal(res, null);
+
+                } else {
+
+                    assert(hgetSpy.calledWith(data.DEFAULT_API_KEYS[0], 'unit'));
+
+                    if (hgetErr) {
+
+                        assert.equal(err, errMsg);
+                        assert.equal(res, null);
+
+                    } else {
+
+                        assert.equal(err, null);
+                        assert.deepEqual(res, {
+                            apiKey: subscriptionInfo.apiKey,
+                            notificationUrl: subscriptionInfo.notificationUrl,
+                            unit: data.DEFAULT_UNIT
+                        });
+
+                    }
+                }
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails getting subscription info', function (done) {
+            testGetCBSubscription(true, null, false, done);
         });
 
         it('should call the callback without error when there are not CB subscriptions', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getCBSubscription('subsId', function (err, subsInfo) {
-                    assert.equal(err, null);
-                    assert.equal(subsInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
-                    done();
-                });
-            });
+            testGetCBSubscription(false, null, false, done);
         });
 
         it('should call the callback with error when db fails getting the unit', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {
-                        apiKey: 'apiKey',
-                        notificationUrl: 'http://example.com/url'
-                    });
-                },
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getCBSubscription('subsId', function (err, subsInfo) {
-                    assert.equal(err, 'Error getting the subscription.');
-                    assert.equal(subsInfo, null);
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1], 'unit');
-                    done();
-                });
-            });
+            testGetCBSubscription(false, subscriptionInfo, true, done);
         });
 
         it('should call the callback without error when db returns the CB subscriptions', function (done) {
-            var implementations = {
-                hgetall: function (hash, callback) {
-                    return callback(null, {
-                        apiKey: 'apiKey',
-                        notificationUrl: 'http://example.com/url'
-                    });
-                },
-                hget: function (hash, key, callback) {
-                    return callback(null, 'call');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.getCBSubscription('subsId', function (err, subsInfo) {
-                    assert.equal(err, null);
-                    assert.deepEqual(subsInfo, {
-                        apiKey: 'apiKey',
-                        notificationUrl: 'http://example.com/url',
-                        unit: 'call'
-                    });
-                    assert.equal(spies.hgetall.callCount, 1);
-                    assert.equal(spies.hgetall.getCall(0).args[0], 'subsId');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0], 'apiKey');
-                    assert.equal(spies.hget.getCall(0).args[1], 'unit');
-                    done();
-                });
-            });
+            testGetCBSubscription(false, subscriptionInfo, false, done);
         });
     });
 
     describe('Function "deleteCBSubscription"', function () {
 
-        it('should call the callback with error when db fails getting the api-key', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback('Error', null);
-                }
+        var testDeleteCBSubscription = function (hgetErr, execErr, done) {
+
+            var errMsg = 'Error deleting the subscription "' + data.DEFAULT_SUBSCRIPTION_ID + '" .';
+
+            var hget = function (hash, key, callback) {
+                return callback(hgetErr, data.DEFAULT_API_KEYS[0]);
             };
-            mocker(implementations, function (db, spies) {
-                db.deleteCBSubscription('subsId', function (err) {
-                    assert.equal(err, 'Error deleting the subscription "subsId" .');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'apiKey');
-                    done();
-                });
+
+            var srem = sinon.stub();
+            var del = sinon.stub();
+            var exec = function (callback) {
+                return callback(execErr);
+            };
+
+            var multiImplementations = {
+                srem: srem,
+                del: del,
+                exec: exec
+            };
+
+            var multi = sinon.stub().returns(multiImplementations);
+
+            var implementations = {
+                multi: multi,
+                hget: hget
+            };
+
+            var execSpy = sinon.spy(multiImplementations, 'exec');
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.deleteCBSubscription(data.DEFAULT_SUBSCRIPTION_ID, function (err) {
+
+                assert(multi.calledOnce);
+                assert(hgetSpy.calledWith(data.DEFAULT_SUBSCRIPTION_ID, 'apiKey'));
+
+                if (hgetErr) {
+
+                    assert.equal(err, errMsg);
+
+                } else {
+
+                    assert(srem.calledWith(data.DEFAULT_API_KEYS[0] + 'subs', data.DEFAULT_SUBSCRIPTION_ID));
+                    assert(del.calledWith(data.DEFAULT_SUBSCRIPTION_ID));
+                    assert(execSpy.calledOnce);
+
+                    execErr ? assert.equal(err, errMsg) : assert.equal(err, null);
+                }
+
+                done();
             });
+        };
+
+        it('should call the callback with error when db fails getting the api-key', function (done) {
+            testDeleteCBSubscription(true, false, done);
         });
 
         it('should call the callback with error when db fails deleting the CB subscription', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 'apiKey');
-                },
-                srem: function (key, value) {},
-                del: function (hash) {},
-                exec: function (callback) {
-                    return callback('Error');
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteCBSubscription('subsId', function (err) {
-                    assert.equal(err, 'Error deleting the subscription "subsId" .');
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'apiKey');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0] , 'apiKeysubs');
-                    assert.equal(spies.srem.getCall(0).args[1] , 'subsId');
-                    assert.equal(spies.del.callCount, 1);
-                    assert.equal(spies.del.getCall(0).args[0] , 'subsId');
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testDeleteCBSubscription(false, true, done);
         });
 
         it('should call the callback without error when db deletes the CB subscription', function (done) {
-            var implementations = {
-                hget: function (hash, key, callback) {
-                    return callback(null, 'apiKey');
-                },
-                srem: function (key, value) {},
-                del: function (hash) {},
-                exec: function (callback) {
-                    return callback(null);
-                }
-            };
-            mocker(implementations, function (db, spies) {
-                db.deleteCBSubscription('subsId', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.hget.callCount, 1);
-                    assert.equal(spies.hget.getCall(0).args[0] , 'subsId');
-                    assert.equal(spies.hget.getCall(0).args[1] , 'apiKey');
-                    assert.equal(spies.srem.callCount, 1);
-                    assert.equal(spies.srem.getCall(0).args[0] , 'apiKeysubs');
-                    assert.equal(spies.srem.getCall(0).args[1] , 'subsId');
-                    assert.equal(spies.del.callCount, 1);
-                    assert.equal(spies.del.getCall(0).args[0] , 'subsId');
-                    assert.equal(spies.exec.callCount, 1);
-                    done();
-                });
-            });
+            testDeleteCBSubscription(false, false, done);
         });
     });
 });

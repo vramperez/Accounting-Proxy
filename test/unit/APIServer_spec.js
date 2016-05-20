@@ -1,81 +1,44 @@
 var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     sinon = require('sinon'),
-    async = require('async');
+    async = require('async'),
+    data = require('../data');
 
 var mocker = function(implementations, callback) {
-    var api_server;
 
-    var mocks = {
-        app: {
-            set: function(prop, value) {},
-            use: function(middleware) {} ,
-            post: function(path, middleware, handler) {} ,
-            get: function(path, handler) {}
-        },
-        db: {},
-        req: {},
-        res: {},
-        config: {},
-        validation: {},
-        url: {},
-        logger: {
-                error: function(msg) {}
-        },
-        notifier: {}
-    };
-    var spies = {
-        app: {},
-        db: {},
-        req: {},
-        res: {},
-        url: {},
-        validation: {},
-        logger: {
-            error: sinon.spy(mocks.logger, 'error')
-        },
-        notifier: {}
-    };
-    // Complete app mock implementation and add spies.
-    async.each(Object.keys(implementations), function(obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function(implem, task_callback2) {
-            mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
-            if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
-                if (obj == 'req' || obj == 'res') {
-                    spies[obj][implem.toString()] = sinon.spy(implementations[obj], implem.toString());
-                } else {
-                    spies[obj][implem.toString()] = sinon.spy(mocks[obj], implem.toString());
-                }
-                task_callback2();
-            } else {
-                task_callback2();
+    var spies = {};
+
+    // Create spies for the mock functions
+    async.forEachOf(implementations, function (value, key, task_callback1) {
+
+        spies[key] = {};
+
+        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
+
+            if (typeof implementations[key][functionName] == 'function') {
+                spies[key][functionName] = sinon.spy(implementations[key], functionName);
             }
-        }, function() {
-            return task_callback1();
-        });
-    }, function() {
-        if (implementations.config == undefined) {
-            mocks.config = {
-                accounting_proxy: {
-                    admin_port: 9001
-                }
-            };
-        } else if (implementations.config.accounting_proxy == undefined) {
-            mocks.config.accounting_proxy = {
-                admin_port: 9001
-            };
-        }
-        mocks.config.database = {
-            type:'./db'
+
+            task_callback2();
+
+        }, task_callback1);
+    }, function () {
+        
+        var config = implementations.config ? implementations.config : {};
+        config.database = {
+            type: './db'
         };
-        api_server = proxyquire('../../APIServer', {
-            './config': mocks.config,
-            './db': mocks.db,
-            url: mocks.url,
-            winston: mocks.logger,
-            './validation': mocks.validation,
-            './notifier': mocks.notifier
+
+        var api_server = proxyquire('../../APIServer', {
+            './config': config,
+            './db': implementations.db ? implementations.db : {},
+            url: implementations.url ? implementations.url : {},
+            winston: implementations.logger ? implementations.logger : {},
+            './validation': implementations.validation ? implementations.validation : {},
+            './notifier': implementations.notifier ? implementations.notifier : {},
+            'crypto': implementations.crypto ? implementations.crypto : {}
         });
+
         return callback(api_server, spies);
     });
 };
@@ -84,17 +47,11 @@ describe('Testing APIServer', function() {
 
     describe('Function "getUnits"', function() {
 
-        it('should return 200 when the response contains the accounting units supported', function() {
-            var modules = ['cal', 'megabyte'];
+        it('should return 200 when the response contains the accounting units supported', function(done) {
+
+            var modules = ['call', 'megabyte'];
+
             var implementations = {
-                app: {
-                    get: function(path, callback) {
-                        if('/api/units' === path) {
-                            return callback(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {},
                 res: {
                     status: function(code) {
                         return this;
@@ -107,20 +64,25 @@ describe('Testing APIServer', function() {
                     }
                 }
             };
-            mocker(implementations, function(api, spies) {
-                api.getUnits(implementations.req, implementations.res);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 200);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {units: modules});
+
+            mocker(implementations, function (api, spies) {
+
+                api.getUnits({}, implementations.res);
+
+                assert(spies.res.status.calledWith(200));
+                assert(spies.res.json.calledWith({units: modules}));
+
+                done();
             });
         });
     });
 
     describe('Function "getApiKeys"', function() {
 
-        it('should return 500 when db fails getting the API keys', function(done) {
-            var user = '0001';
+        var testGetApiKeys = function (error, apiKeysInfo, done) {
+
+            var user = data.DEFAULT_USER;
+
             var implementations = {
                 req: {
                     user: {
@@ -131,458 +93,267 @@ describe('Testing APIServer', function() {
                     status: function(code) {
                         return this;
                     },
-                    send: function() {}
+                    send: function () {},
+                    json: function (msg) {}
                 },
                 db: {
-                    getApiKeys: function(user, callback) {
-                        return callback('Error', null)
+                    getApiKeys: function (user, callback) {
+                        return callback(error, apiKeysInfo);
                     }
                 }
+            };
 
-            }
-            mocker(implementations, function(api, spies) {
+            mocker(implementations, function (api, spies) {
+
                 api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.db.getApiKeys.callCount, 1);
-                assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
+
+                assert(spies.db.getApiKeys.calledWith(user));
+
+                if (error) {
+
+                    assert(spies.res.status.calledWith(500));
+                    assert(spies.res.send.calledOnce);
+
+                } else if (!apiKeysInfo) {
+
+                    assert(spies.res.status.calledWith(404));
+                    assert(spies.res.json.calledWith({error: 'No api-keys available for the user ' + user}));
+
+                } else {
+
+                    assert(spies.res.status.calledWith(200));
+                    assert(spies.res.json.calledWith(apiKeysInfo));
+
+                }
+
                 done();
             });
+        };
+
+        it('should return 500 when db fails getting the API keys', function(done) {
+            testGetApiKeys(true, null, done);
         });
 
         it('should return 404 when there is not API keys for the user specified', function(done) {
-            var user = '0001';
-            var implementations = {
-                req: {
-                    user: {
-                        id: user
-                    }
-                },
-                res: {
-                    status: function(code) {
-                        return this;
-                    },
-                    json: function(msg) {}
-                },
-                db: {
-                    getApiKeys: function(user, callback) {
-                        return callback(null, null)
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.db.getApiKeys.callCount, 1);
-                assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 404);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'No api-keys available for the user ' + user});
-                done();
-            });
+            testGetApiKeys(false, null, done);
         });
 
         it('should return 200 when the response contains the user API keys', function(done) {
-            var user = '0001';
-            var apiKeys = ['apiKey1', 'apiKey1'];
-            var implementations = {
-                req: {
-                    user: {
-                        id: user
-                    }
-                },
-                res: {
-                    status: function(code) {
-                        return this;
-                    },
-                    json: function(body) {}
-                },
-                db: {
-                    getApiKeys: function(user, callback) {
-                        return callback(null, apiKeys);
-                    }
-                }
-
-            }
-            mocker(implementations, function(api, spies) {
-                api.getApiKeys(implementations.req, implementations.res);
-                assert.equal(spies.db.getApiKeys.callCount, 1);
-                assert.equal(spies.db.getApiKeys.getCall(0).args[0], user);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 200);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], apiKeys);
-                done();
-            });
+            testGetApiKeys(false, {}, done);
         });
     });
 
     describe('Function "checkUrl"', function() {
 
-        it('should return 422 when the body is not valid', function(done) {
+        var testCheckUrl = function (body, addTokenErr, checkPathErr, checkResult, done) {
+
+            var token = data.DEFAULT_TOKEN;
+            var path = '/path';
+            var espias;
+
             var implementations = {
                 req: {
-                    setEncoding: function(encoding) {},
-                    body: {}
+                    setEncoding: function (encoding) {},
+                    get: function (header) {
+                        return token;
+                    },
+                    body: body
                 },
                 res: {
-                    status: function(status) {
+                    status: function (status) {
                         return this;
                     },
-                    json: function(json) {}
+                    json: function (msg) {},
+                    send: function () {}
+                },
+                db: {
+                    addToken: function (token, callback) {
+                        return callback(addTokenErr);
+                    },
+                    checkPath: function (path, callback) {
+                        return callback(checkPathErr, checkResult);
+                    }
+                },
+                url: {
+                    parse: function(url) {
+                        return {
+                            pathname: path
+                        }
+                    }
+                },
+                logger: {
+                    error: function (msg) {}
                 }
-            }
-            mocker(implementations, function(api, spies) {
+            };
+
+            mocker(implementations, function (api, spies) {
+
+                espias = spies;
+
                 api.checkUrl(implementations.req, implementations.res);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0] , 422);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Url missing'});
+                
+                assert(spies.req.setEncoding.calledWith('utf-8'));
+
+                if (!body.url) {
+
+                    assert(spies.res.status.calledWith(422));
+                    assert(spies.res.json.calledWith({error: 'Url missing'}));
+
+                } else {
+
+                    if (addTokenErr) {
+                        assert(spies.logger.error.calledWith(addTokenErr));
+                    }
+
+                    assert(spies.db.checkPath.calledWith(path));
+
+                    if (checkPathErr) {
+
+                        assert(spies.res.status.calledWith(500));
+                        assert(spies.res.send.calledOnce);
+
+                    } else if (checkResult) {
+
+                        assert(spies.res.status.calledWith(200));
+                        assert(spies.res.send.calledOnce);
+
+                    } else {
+
+                        assert(spies.res.status.calledWith(400));
+                        assert(spies.res.json.calledWith({error: 'Incorrect url ' + body.url}));
+
+                    }
+                }
+
                 done();
             });
+
+        };
+
+        it('should return 422 when the body is not valid', function(done) {
+            testCheckUrl({}, false, false, false, done);
         });
 
         it('should return 500 when db fails checking the path', function(done) {
-            var token = 'token';
-            var path = '/path';
-            var url = 'http://example.com' + path;
-            var implementations = {
-                req: {
-                    setEncoding: function(encoding) {},
-                    get: function(header) {
-                        return token;
-                    },
-                    body: {
-                        url: url
-                    }
-                },
-                res: {
-                    status: function(status) {
-                        return this;
-                    },
-                    send: function() {}
-                },
-                db: {
-                    addToken: function(token, callback) {
-                        return callback('Error');
-                    },
-                    checkPath: function(path, callback) {
-                        return callback('Error', false);
-                    }
-                },
-                url: {
-                    parse: function(url) {
-                        return {
-                            pathname: path
-                        }
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.checkUrl(implementations.req, implementations.res);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                assert.equal(spies.req.get.callCount, 2);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
-                assert.equal(spies.db.addToken.callCount, 1);
-                assert.equal(spies.db.addToken.getCall(0).args[0], token);
-                assert.equal(spies.url.parse.callCount, 1);
-                assert.equal(spies.url.parse.getCall(0).args[0], url);
-                assert.equal(spies.db.checkPath.callCount, 1);
-                assert.equal(spies.db.checkPath.getCall(0).args[0], path);
-                done();
-            });
+            testCheckUrl({url: data.DEFAULT_URLS[0]}, true, true, false, done);
         });
 
         it('should return 400 when the URL is not valid', function(done) {
-            var token = 'token';
-            var path = '/path';
-            var url = 'http://example.com' + path;
-            var implementations = {
-                req: {
-                    setEncoding: function(encoding) {},
-                    get: function(header) {
-                        return token;
-                    },
-                    body: {
-                        url: url
-                    }
-                },
-                res: {
-                    status: function(status) {
-                        return this;
-                    },
-                    json: function(msg) {}
-                },
-                db: {
-                    addToken: function(token, callback) {
-                        return callback(null);
-                    },
-                    checkPath: function(path, callback) {
-                        return callback(null, false);
-                    }
-                },
-                url: {
-                    parse: function(url) {
-                        return {
-                            pathname: path
-                        }
-                    }
-                },
-                notifier: {
-                    notifyUsageSpecification: function (callback) {
-                        return callback('Error');
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.checkUrl(implementations.req, implementations.res);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 400);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Incorrect url ' + url});
-                assert.equal(spies.req.get.callCount, 2);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
-                assert.equal(spies.db.addToken.callCount, 1);
-                assert.equal(spies.db.addToken.getCall(0).args[0], token);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'Error');
-                assert.equal(spies.notifier.notifyUsageSpecification.callCount, 1);
-                assert.equal(spies.url.parse.callCount, 1);
-                assert.equal(spies.url.parse.getCall(0).args[0], url);
-                assert.equal(spies.db.checkPath.callCount, 1);
-                assert.equal(spies.db.checkPath.getCall(0).args[0], path);
-                done();
-            });
+            testCheckUrl({url: data.DEFAULT_URLS[0]}, false, false, false, done);
         });
 
         it('should return 200 when the URL is valid', function(done) {
-            var token = 'token';
-            var path = '/path';
-            var url = 'http://example.com' + path;
-            var implementations = {
-                req: {
-                    setEncoding: function(encoding) {},
-                    get: function(header) {
-                        return token;
-                    },
-                    body: {
-                        url: url
-                    }
-                },
-                res: {
-                    status: function(status) {
-                        return this;
-                    },
-                    send: function() {}
-                },
-                db: {
-                    addToken: function(token, callback) {
-                        return callback('Error');
-                    },
-                    checkPath: function(url, callback) {
-                        return callback(null, true);
-                    }
-                },
-                url: {
-                    parse: function(url) {
-                        return {
-                            pathname: path
-                        }
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.checkUrl(implementations.req, implementations.res);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 200);
-                assert.equal(spies.res.send.callCount, 1);
-                assert.equal(spies.req.get.callCount, 2);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
-                assert.equal(spies.db.addToken.callCount, 1);
-                assert.equal(spies.db.addToken.getCall(0).args[0], token);
-                assert.equal(spies.url.parse.callCount, 1);
-                assert.equal(spies.url.parse.getCall(0).args[0], url);
-                assert.equal(spies.db.checkPath.callCount, 1);
-                assert.equal(spies.db.checkPath.getCall(0).args[0], path);
-                done();
-            });
+            testCheckUrl({url: data.DEFAULT_URLS[0]}, false, false, true, done);
         });
     });
 
     describe('Function "newBuy"', function() {
 
-        it('should return 400 when the JSON is not valid', function(done) {
+        var testNewBuy = function (validateErr, newBuyErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var body = data.DEFAULT_BUY_INFORMATION;
+            var path = data.DEFAULT_PUBLIC_PATHS[0];
+            body.productSpecification = {
+                url: data.DEFAULT_URLS[0],
+                recordType: data.DEFAULT_RECORD_TYPE
+            };
+
             var implementations = {
                 req: {
-                    setEncoding: function(encoding) {},
-                    body: {}
+                    setEncoding: function (encoding) {},
+                    body: body
                 },
                 res: {
-                    status: function(status) {
+                    status: function (status) {
                         return this;
                     },
-                    json: function(json) {}
+                    json: function (msg) {},
+                    send: function () {}
                 },
                 validation: {
-                    validate: function(schema, body, callback) {
-                        return callback('Error');
+                    validate: function (schema, body, callback) {
+                        return callback(validateErr);
+                    }
+                },
+                db: {
+                    newBuy: function (buy, callback) {
+                        return callback(newBuyErr);
+                    }
+                },
+                url: {
+                    parse: function (url) {
+                        return {
+                            pathname: path
+                        };
+                    }
+                },
+                crypto: {
+                    createHash: function (type) {
+                        return this;
+                    },
+                    update: function (seed) {},
+                    digest: function (type) {
+                        return apiKey
                     }
                 }
-            }
-            mocker(implementations, function(api, spies) {
+            };
+
+            mocker(implementations, function (api, spies) {
+
                 api.newBuy(implementations.req, implementations.res);
-                assert.equal(spies.validation.validate.callCount, 1);
-                assert.equal(spies.validation.validate.getCall(0).args[0] , 'product');
-                assert.deepEqual(spies.validation.validate.getCall(0).args[1] , {});
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0] , 400);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0] , {error: 'Invalid json. Error'});
+
+                assert(spies.req.setEncoding.calledWith('utf-8'));
+
+                if (validateErr) {
+
+                    assert(spies.res.status.calledWith(400));
+                    assert(spies.res.json.calledWith({error: 'Invalid json. ' + validateErr}));
+
+                } else {
+                
+                    assert(spies.crypto.createHash.calledWith('sha1'));
+                    assert(spies.crypto.update.calledWith(body.productId + body.orderId + body.customer));
+                    assert(spies.crypto.digest.calledWith('hex'));
+
+                    if (newBuyErr) {
+
+                        assert(spies.res.status.calledWith(400));
+                        assert(spies.res.send.calledOnce);
+
+                    } else {
+
+                        assert(spies.res.status.calledWith(201));
+                        assert(spies.res.json.calledWith({'API-KEY': apiKey}));
+
+                    }
+                }
+
                 done();
             });
+        };
+
+        it('should return 400 when the JSON is not valid', function(done) {
+            testNewBuy(true, false, done);
         });
 
         it('should return 400 when db fails adding the new buy', function(done) {
-            var path = '/path';
-            var body = {
-                orderID: 'orderId',
-                productId: 'productId',
-                customer: '0001',
-                productSpecification: {
-                    unit: 'call',
-                    recordType: 'callusage',
-                    url: 'http://example.com' + path
-                }
-            }
-            var implementations = {
-                req: {
-                    setEncoding: function(encoding) {},
-                    body: body
-                },
-                res: {
-                    status: function(status) {
-                        return this;
-                    },
-                    send: function() {}
-                },
-                validation: {
-                    validate: function(schema, body, callback) {
-                        return callback(null);
-                    }
-                },
-                db: {
-                    newBuy: function(buy, callback) {
-                        return callback('Error');
-                    }
-                },
-                url: {
-                    parse: function(url) {
-                        return {
-                            pathname: path
-                        };
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.newBuy(implementations.req, implementations.res);
-                assert.equal(spies.validation.validate.callCount, 1);
-                assert.equal(spies.validation.validate.getCall(0).args[0] , 'product');
-                assert.deepEqual(spies.validation.validate.getCall(0).args[1] , body);
-                assert.equal(spies.db.newBuy.callCount, 1);
-                assert.deepEqual(spies.db.newBuy.getCall(0).args[0], {
-                    apiKey: 'c0fa755dca58ad3cd33970c16a61f95d6cb40edb',
-                    publicPath: path,
-                    orderId: body.orderId,
-                    productId: body.productId,
-                    customer: body.customer,
-                    unit: body.productSpecification.unit,
-                    recordType: body.productSpecification.recordType
-                });
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0] , 400);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
+            testNewBuy(false, true, done);
         });
 
         it('should return 201 when the new buy is correct', function(done) {
-            var path = '/path';
-            var body = {
-                orderID: 'orderId',
-                productId: 'productId',
-                customer: '0001',
-                productSpecification: {
-                    unit: 'call',
-                    recordType: 'callusage',
-                    url: 'http://example.com' + path
-                }
-            }
-            var implementations = {
-                req: {
-                    setEncoding: function(encoding) {},
-                    body: body
-                },
-                res: {
-                    status: function(status) {
-                        return this;
-                    },
-                    json: function(msg) {}
-                },
-                validation: {
-                    validate: function(schema, body, callback) {
-                        return callback(null);
-                    }
-                },
-                db: {
-                    newBuy: function(buy, callback) {
-                        return callback(null);
-                    }
-                },
-                url: {
-                    parse: function(url) {
-                        return {
-                            pathname: path
-                        };
-                    }
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.newBuy(implementations.req, implementations.res);
-                assert.equal(spies.validation.validate.callCount, 1);
-                assert.equal(spies.validation.validate.getCall(0).args[0] , 'product');
-                assert.deepEqual(spies.validation.validate.getCall(0).args[1] , body);
-                assert.equal(spies.db.newBuy.callCount, 1);
-                assert.deepEqual(spies.db.newBuy.getCall(0).args[0], {
-                    apiKey: 'c0fa755dca58ad3cd33970c16a61f95d6cb40edb',
-                    publicPath: path,
-                    orderId: body.orderId,
-                    productId: body.productId,
-                    customer: body.customer,
-                    unit: body.productSpecification.unit,
-                    recordType: body.productSpecification.recordType
-                });
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0] , 201);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {'API-KEY': 'c0fa755dca58ad3cd33970c16a61f95d6cb40edb'});
-                done();
-            });
+            testNewBuy(false, false, done);
         });
     });
 
     describe('Function "isJSON"', function() {
 
-        it('should return 415 when the content-type is not "application/json"', function(done) {
+        var testCheckIsJSON = function (isJSON, done) {
+
             var implementations = {
                 req: {
                     is: function(type) {
-                        return false;
+                        return isJSON;
                     }
                 },
                 res: {
@@ -591,42 +362,35 @@ describe('Testing APIServer', function() {
                     },
                     json: function(msg) {}
                 }
-            }
-            mocker(implementations, function(api, spies) {
-                api.checkIsJSON(implementations.req, implementations.res);
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 415);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Content-Type must be "application/json"'});
+            };
+
+            var next = sinon.stub();
+
+            mocker(implementations, function (api, spies) {
+
+                api.checkIsJSON(implementations.req, implementations.res, next);
+
+                if (!isJSON) {
+
+                    assert(spies.res.status.calledWith(415));
+                    assert(spies.res.json.calledWith({error: 'Content-Type must be "application/json"'}));
+
+                } else {
+
+                    assert(next.calledOnce);
+
+                }
+
                 done();
             });
+        };
+
+        it('should return 415 when the content-type is not "application/json"', function(done) {
+            testCheckIsJSON(false, done);
         });
 
         it('should call the callback without error when the content-type is "application/json"', function(done) {
-            var implementations = {
-                req: {
-                    is: function(type) {
-                        return true;
-                    }
-                },
-                res: {
-                    status: function(statusCode) {
-                        return this;
-                    },
-                    json: function(msg) {}
-                }
-            }
-            mocker(implementations, function(api, spies) {
-                api.checkIsJSON(implementations.req, implementations.res, function() {
-                    assert.equal(spies.req.is.callCount, 1);
-                    assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                    assert.equal(spies.res.status.callCount, 0);
-                    assert.equal(spies.res.json.callCount, 0);
-                    done();
-                });
-            });
+            testCheckIsJSON(true, done);
         });
     });
 });

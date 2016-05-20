@@ -14,7 +14,9 @@ var data = {
     DEFAULT_NOTIFICATION_URL: 'http://notification/url',
     DEFAULT_ORDER_IDS: ['orderId1', 'orderId2'],
     DEFAULT_PRODUCT_IDS: ['productId1', 'productId2'],
-    DEFAULT_HREF: 'http://localhost/DSUsageManagement/1'
+    DEFAULT_HREF: 'http://localhost/DSUsageManagement/1',
+    DEFAULT_USER_ID: 'userId',
+    DEFAULT_REQ_PATH: '/public/service'
 };
 
 data.DEFAULT_SERVICES = [{
@@ -35,6 +37,24 @@ data.DEFAULT_NOTIFICATION_INFO = [{
     correlationNumber: '0',
     value: '2'
 }];
+
+data.DEFAULT_ADMINISTRATION_PATHS = {
+    keys: '/accounting_proxy/keys'
+};
+
+data.DEFAULT_ROLES = {
+    admin: 'adminrole',
+    customer: 'customerrole',
+    seller: 'sellerrole'
+};
+
+data.DEFAULT_USER_PROFILE = {
+    appId: data.DEFAULT_APP_IDS[0],
+    id: data.DEFAULT_USER_ID,
+    emails: [{value: 'user@eexample.com'}],
+    displayName: 'user',
+    roles: [{id: data.DEFAULT_ROLES.customer}]
+};
 
 data.DEFAULT_BUY_INFORMATION = {
      apiKey: data.DEFAULT_API_KEYS[0],

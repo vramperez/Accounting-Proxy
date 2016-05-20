@@ -6,11 +6,10 @@ var request = require('request'),
     bodyParser = require('body-parser'),
     logger = require('winston'),
     async = require('async'),
-    notifier = require('../notifier');
+    accountingModules = require('../server').accountingModules;
 
 var app = express();
 var db = require('../' + config.database.type);
-var acc_modules = notifier.acc_modules;
 
 /**
  * Start the endopoint to receive CB notifications.
@@ -122,7 +121,7 @@ var subscribe = function (req, res, unit, options, callback) {
                     if (err) {
                         return callback(err);
                     } else {
-                        if (acc_modules[unit].subscriptionCount !== undefined) {
+                        if (accountingModules[unit].subscriptionCount !== undefined) {
                             accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
                                     return callback(err);
@@ -227,7 +226,7 @@ var updateSubscription = function (req, res, options, callback) {
                         res.send(body);
                         var apiKey = req.get('X-API-KEY');
 
-                        if (acc_modules[subscriptionInfo.unit].subscriptionCount !== undefined) {
+                        if (accountingModules[subscriptionInfo.unit].subscriptionCount !== undefined) {
                             accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
                                     return callback(err);

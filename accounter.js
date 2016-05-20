@@ -1,8 +1,7 @@
-var notifier = require('./notifier'),
-    config = require('./config');
+var config = require('./config'),
+    server = require('./server');
 
 var db = require(config.database.type);
-var acc_modules = notifier.acc_modules;
 
 /**
  * Makes the accounting for the specified unit and accounting function.
@@ -13,10 +12,12 @@ var acc_modules = notifier.acc_modules;
  * @param  {string}   countFunction Name of the count function in the accounting module.
  */
 var count = function (apiKey, unit, countInfo, countFunction, callback) {
-    if (acc_modules[unit] === undefined) {
+    var accountingModules = server.accountingModules;
+
+    if (accountingModules[unit] === undefined) {
         return callback('Invalid accounting unit "' + unit + '"');
     } else {
-        acc_modules[unit][countFunction](countInfo, function (err, amount) {
+        accountingModules[unit][countFunction](countInfo, function (err, amount) {
             if (err) {
                 return callback (err);
             } else {

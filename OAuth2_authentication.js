@@ -1,6 +1,7 @@
 var FIWAREStrategy = require('passport-fiware-oauth').OAuth2Strategy,
     config = require('./config'),
-    logger = require('winston');
+    logger = require('winston'),
+    queryString = require('query-string');
 
 var db = require(config.database.type);
 var FIWARE_STRATEGY = new FIWAREStrategy({
@@ -64,14 +65,18 @@ var getAuthToken = function (headers) {
  * @param  {Object}   req      Incoming request.
  */
 var verifyAppId = function (reqAppId, req, callback) {
+
     if (req.path === config.api.administration_paths.keys) {
         return callback(null, true);
     } else {
+
         db.getAppId(req.path, function (err, appId) { // Check with the whole path
+
             if (err) {
                 return callback(err, false);
             } else if (appId === reqAppId) {
-                req.restPath = '';
+                req.restURL = '?' + queryString.stringify(req.query); // Add the query strings
+
                 // Public path is the whole path
                 req.publicPath = req.path;
                 return callback(null, true);
@@ -83,7 +88,11 @@ var verifyAppId = function (reqAppId, req, callback) {
                         return callback(err, false);
                     } else if (appId === reqAppId) {
                         // Save the path to the endpoint
-                        req.restPath = '/' + req.path.substring(splitPath[1].length + 2);
+                        var restPath = '/' + req.path.substring(splitPath[1].length + 2);
+                        var urlQueryStrings = '?' + queryString.stringify(req.query);
+
+                        req.restURL = restPath + urlQueryStrings;
+
                         // Public path is only the first part of the request path
                         req.publicPath =  '/' + splitPath[1];
                         return callback(null, true);

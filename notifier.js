@@ -1,10 +1,10 @@
 var config = require('./config'),
     async = require('async'),
     request = require('request'),
-    logger = require('winston');
+    logger = require('winston')
+    server = require('./server');
 
 var db = require(config.database.type);
-var acc_modules = {};
 
 /**
  * Send the usage specification for the unit passed to the Usage Managament API.
@@ -12,12 +12,13 @@ var acc_modules = {};
  * @param  {string}   unit     Accounting unit.
  */
 var sendSpecification = function (token, unit, callback) {
+    var accountingModules = server.accountingModules;
 
-    if (acc_modules[unit].getSpecification === undefined) {
+    if (accountingModules[unit].getSpecification === undefined) {
         return callback('Error, function getSpecification undefined for unit ' + unit);
     } else {
 
-        var specification = acc_modules[unit].getSpecification();
+        var specification = accountingModules[unit].getSpecification();
 
         if (specification === undefined) {
             return callback('Error, specification no available for unit ' + unit);
@@ -150,12 +151,6 @@ var notifyUsageSpecification = function (token, callback) {
 
     async.each(units, function (unit, task_callback) {
 
-        try {
-            acc_modules[unit] = require('./acc_modules/' + unit);
-        } catch (e) {
-            return callback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
-        }
-
         db.getHref(unit, function (err, href) {
             if (err) {
                 task_callback(err);
@@ -216,4 +211,3 @@ var notifyUsage = function (callback) {
 };
 
 exports.notifyUsage = notifyUsage;
-exports.acc_modules = acc_modules;

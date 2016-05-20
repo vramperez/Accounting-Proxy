@@ -18,6 +18,23 @@ var express = require('express'),
 var db = require(config.database.type);
 var app = express();
 var admin_paths = config.api.administration_paths;
+var accountingModules = {};
+
+/**
+ * Load all the accounting modules for the supported accounting units.
+ */
+var loadAccountingModules = function (callback) {
+    var units = config.modules.accounting;
+
+    async.each(units, function (unit, task_callback) { 
+        try {
+            accountingModules[unit] = require('./acc_modules/' + unit);
+            task_callback();
+        } catch (e) {
+            task_callback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
+        }
+    }, callback);
+};
 
 /**
  * Start and configure the server.
@@ -26,6 +43,9 @@ exports.init = function (callback) {
     async.series([
         function (callback) {
             db.init(callback);
+        },
+        function (callback) {
+            loadAccountingModules(callback)
         },
         function (callback) {
             notifier.notifyUsage(callback);
@@ -92,6 +112,7 @@ var requestHandler = function (options, res, apiKey, unit) {
     requestInfo.request.time = new Date().getTime();
 
     request(options, function (error, resp, body) {
+
         if (error) {
             res.status(504).send();
             logger.warn('[%s] An error ocurred requesting the endpoint: ' + options.url, apiKey);
@@ -155,6 +176,8 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
         headers: req.headers
     };
 
+    console.log(options)
+
     if (createMehtods.indexOf(req.method) > -1 && isJSON) {
         options.headers['content-length'] = undefined; // Request module will set it.
         options.json = true;
@@ -198,7 +221,7 @@ var handler = function (req, res) {
             res.status(500).send();
         } else if (endpointUrl !== null) { // User is an admin
 
-            prepareRequest(req, res, endpointUrl + req.restPath, null, null);
+            prepareRequest(req, res, endpointUrl + req.restURL, null, null);
 
         } else { // User is not an admin
 
@@ -218,8 +241,7 @@ var handler = function (req, res) {
                             } else if (accountingInfo === null) {
                                 res.status(500).send();
                             } else {
-
-                                prepareRequest(req, res, accountingInfo.url + req.restPath, apiKey, accountingInfo.unit);
+                                prepareRequest(req, res, accountingInfo.url + req.restURL, apiKey, accountingInfo.unit);
 
                             }
                         });
@@ -250,3 +272,4 @@ app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 app.use('/', oauth2.headerAuthentication, getBody, handler);
 
 module.exports.app = app;
+exports.accountingModules = accountingModules;

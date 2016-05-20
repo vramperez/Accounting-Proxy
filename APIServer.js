@@ -21,7 +21,7 @@ exports.checkUrl = function (req, res) {
     var apiKey = req.get('X-API-KEY');
 
     if (!bodyUrl) {
-        res.status(422).json({error: 'Url missing'});
+        res.status(422).json({error: 'Missing URL'});
 
     } else {
 

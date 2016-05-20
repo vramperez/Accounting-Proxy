@@ -3,7 +3,8 @@ var assert = require('assert'),
     usageAPI_mock = require('./test_endpoint'),
     async = require('async'),
     test_config = require('../config_tests').integration,
-    prepare_test = require('./prepareDatabase');
+    prepare_test = require('./prepareDatabase'),
+    data = require('../data');
 
 var server, db_mock, notifier_mock;
 var databaseName = 'testDB_usageAPI.sqlite';
@@ -236,18 +237,10 @@ describe('Testing the usage notifier', function () {
                     path: ''
                 };
 
-                var publicPath = '/public1';
-                var apiKey = 'apiKey1';
-                var services = [{publicPath: publicPath, url: 'http://example/path', appId: 'appId'}];
-                var buys = [{
-                    apiKey: apiKey,
-                    publicPath: publicPath,
-                    orderId: 'orderId1',
-                    productId: 'productId1',
-                    customer: 'user1',
-                    unit: unit,
-                    recordType: 'typeUsage'
-                }];
+                var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                var apiKey = data.DEFAULT_API_KEYS[0];
+                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}];
+                var buys = data.DEFAULT_BUY_INFORMATION;
                 var accountings = [{
                     apiKey: apiKey,
                     value: 2
@@ -268,23 +261,23 @@ describe('Testing the usage notifier', function () {
 
             it('should notify the usage specifications and the usage when they have not been notified and there is an available token', function (done) {
 
-                var unit = 'call';
+                var unit = data.DEFAULT_UNIT;
 
                 mock_config.modules = {
                     accounting: [unit]
                 };
 
-                var publicPath = '/public2';
-                var apiKey = 'apiKey2';
-                var services = [{publicPath: publicPath, url: 'http://example/path', appId: 'appId'}];
+                var publicPath = data.DEFAULT_PUBLIC_PATHS[1];
+                var apiKey = data.DEFAULT_API_KEYS[1];
+                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[1], appId: data.DEFAULT_APP_IDS[1]}];
                 var buys = [{
                     apiKey: apiKey,
                     publicPath: publicPath,
-                    orderId: 'orderId2',
-                    productId: 'productId2',
+                    orderId: data.DEFAULT_ORDER_IDS[1],
+                    productId: data.DEFAULT_PRODUCT_IDS[1],
                     customer: 'user2',
                     unit: unit,
-                    recordType: 'typeUsage'
+                    recordType: data.DEFAULT_RECORD_TYPE
                 }];
                 var accountings = [{
                     apiKey: apiKey,

@@ -3,10 +3,31 @@ var crypto = require('crypto'),
     validation = require('./validation'),
     url = require('url'),
     db = require(config.database.type),
-    logger = require('winston'),
-    notifier = require('./notifier');
+    logger = require('winston');
 
 "use strict";
+
+/**
+ * Return true if the user is an administrator of the service identified by the path.
+ *  Otherwise return false.
+ *
+ * @param  {string}   userId   User identifier.
+ * @param  {string}   path     Public path of the service.
+ */
+var isAdmin = function (userId, path, callback) {
+    db.getAdmins(path, function (err, admins) {
+        if (err) {
+            return callback(err, null);
+
+        } else if (!admins){
+            return callback(null, false);
+
+        } else {
+            var isAdmin = admins.indexOf(userId) > -1;
+            return callback(null, isAdmin);
+        }
+    });
+}
 
 /**
  * Check if the url in the request body is a registered url (registered public path).
@@ -14,7 +35,7 @@ var crypto = require('crypto'),
  * @param  {Object} req     Incoming request.
  * @param  {Object} res     Outgoing response.
  */
-exports.checkUrl = function (req, res) {
+exports.checkURL = function (req, res) {
     req.setEncoding('utf-8');
 
     var bodyUrl = req.body.url;
@@ -25,25 +46,38 @@ exports.checkUrl = function (req, res) {
 
     } else {
 
-        //Save the token to notify the WStore
-        if (apiKey) {
+        var path = url.parse(bodyUrl).path;
 
-            db.addToken(apiKey, function (err) {
-                if (err) {
-                    logger.error(err);
-                }
-            });
-        }
+        isAdmin(req.user.id, path, function (err, isAdmin) {
 
-        // Only check the path because the host and port are the same used for make this request,
-        // so they must be correct
-        db.checkPath(url.parse(bodyUrl).pathname, function (err, correct) {
             if (err) {
-                res.status(500).send();
-            } else if (correct) {
-                res.status(200).send();
-            } else {
-                res.status(400).json({error: 'Incorrect url ' + bodyUrl});
+                res.status(500).json({error: err});
+
+            } else if (!isAdmin) {
+                res.status(401).json({error: 'Access restricted to administrators of the service only'})
+
+            } else{
+                //Save the token to notify the WStore
+                if (apiKey) {
+
+                    db.addToken(apiKey, function (err) {
+                        if (err) {
+                            logger.error(err);
+                        }
+                    });
+                }
+
+                // Only check the path because the host and port are the same used for make this request,
+                // so they must be correct
+                db.checkPath(path, function (err, correct) {
+                    if (err) {
+                        res.status(500).send();
+                    } else if (correct) {
+                        res.status(200).send();
+                    } else {
+                        res.status(400).json({error: 'Incorrect url ' + bodyUrl});
+                    }
+                });
             }
         });
     }

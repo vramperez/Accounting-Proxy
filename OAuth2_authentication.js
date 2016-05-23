@@ -66,7 +66,8 @@ var getAuthToken = function (headers) {
  */
 var verifyAppId = function (reqAppId, req, callback) {
 
-    if (req.path === config.api.administration_paths.keys) {
+    if (req.path === config.api.administration_paths.keys ||
+        req.path === config.api.administration_paths.checkURL) {
         return callback(null, true);
     } else {
 

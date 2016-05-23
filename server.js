@@ -176,8 +176,6 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
         headers: req.headers
     };
 
-    console.log(options)
-
     if (createMehtods.indexOf(req.method) > -1 && isJSON) {
         options.headers['content-length'] = undefined; // Request module will set it.
         options.json = true;
@@ -216,29 +214,33 @@ var handler = function (req, res) {
     var apiKey = req.get('X-API-KEY');
     var contentType = req.is('application/json');
 
-    db.getAdminUrl(req.user.id, req.publicPath, function (err, endpointUrl) {
+    db.getAdminURL(req.publicPath, req.user.id, function (err, endpointURL) {
+
         if (err) {
-            res.status(500).send();
-        } else if (endpointUrl !== null) { // User is an admin
+            res.status(500).json({error: err});
 
-            prepareRequest(req, res, endpointUrl + req.restURL, null, null);
+        } else if (endpointURL) { // Admin
+            prepareRequest(req, res, endpointURL + req.restURL, null, null);
 
-        } else { // User is not an admin
+        } else{ // Not admin user
 
             if (apiKey === undefined) {
                 logger.log('debug', 'Undefined API_KEY');
                 res.status(401).json({ error: 'Undefined "X-API-KEY" header'});
+
             } else {
+
                 db.checkRequest(req.user.id, apiKey, req.publicPath, function (err, correct) {
+
                     if (err) {
                         res.status(500).send();
                     } else if (! correct) { // Invalid apiKey or user for the requested service
                         res.status(401).json({ error: 'Invalid API_KEY or user'});
                     } else {
+
                         db.getAccountingInfo(apiKey, function(err, accountingInfo) {
-                            if (err) {
-                                res.status(500).send();
-                            } else if (accountingInfo === null) {
+
+                            if (err || !accountingInfo) {
                                 res.status(500).send();
                             } else {
                                 prepareRequest(req, res, accountingInfo.url + req.restURL, apiKey, accountingInfo.unit);
@@ -264,7 +266,7 @@ app.use(expressWinston.logger({
 
 app.set('port', config.accounting_proxy.port);
 
-app.post(admin_paths.checkUrl, api.checkIsJSON, bodyParser.json(), api.checkUrl);
+app.post(admin_paths.checkURL, oauth2.headerAuthentication, api.checkIsJSON, bodyParser.json(), api.checkURL);
 app.post(admin_paths.newBuy, api.checkIsJSON, bodyParser.json(), api.newBuy);
 app.get(admin_paths.units, api.getUnits);
 app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);

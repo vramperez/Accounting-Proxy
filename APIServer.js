@@ -46,7 +46,7 @@ exports.checkURL = function (req, res) {
 
     } else {
 
-        var path = url.parse(bodyUrl).pathname;
+        var path = url.parse(bodyUrl).path;
 
         isAdmin(req.user.id, path, function (err, isAdmin) {
 

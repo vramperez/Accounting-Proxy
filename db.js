@@ -1,6 +1,7 @@
 var sqlite = require('sqlite3').verbose(), // Debug enable
     TransactionDatabase = require('sqlite3-transactions').TransactionDatabase,
-    config = require('./config');
+    config = require('./config'),
+    async = require('async');
 
 "use strict"
 
@@ -351,7 +352,9 @@ exports.getAdmins = function (publicPath, callback) {
                 if (err) {
                     return callback('Error in database getting the administrators.', null);
                 } else {
-                    return callback(null, admins);
+                    async.map(admins, function(admin, taskCallback) {
+                        taskCallback(null, admin.idAdmin)
+                    }, callback);
                 }
     });
 };
@@ -362,7 +365,7 @@ exports.getAdmins = function (publicPath, callback) {
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
  */
-exports.getAdminUrl = function (idAdmin, publicPath, callback) {
+exports.getAdminURL = function (idAdmin, publicPath, callback) {
     db.get('SELECT services.url \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \

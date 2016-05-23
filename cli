@@ -230,7 +230,7 @@ cli
                 } else {
                     console.log('SERVICE: ' + publicPath + ' ADMINISTRATORS:');
                     for (var i = 0; i < admins.length; i++) {
-                        console.log('   ' + admins[i].idAdmin);
+                        console.log('   ' + admins[i]);
                     }
                 }
             });

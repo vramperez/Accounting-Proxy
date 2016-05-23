@@ -365,18 +365,11 @@ exports.unbindAdmin = function (idAdmin, publicPath, callback) {
  * @param  {string}   publicPath Public path of the service.
  */
 exports.getAdmins = function (publicPath, callback) {
-    var toReturn = []
-
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
             return callback('Error in database getting the administrators.', null);
         } else {
-            async.each(admins, function (admin, task_callback) {
-                toReturn.push({idAdmin: admin});
-                task_callback();
-            }, function () {
-                return callback(null, toReturn);
-            });
+            return callback(null, admins);
         }
     });
 };

@@ -380,7 +380,7 @@ exports.getAdmins = function (publicPath, callback) {
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
  */
-exports.getAdminUrl = function (idAdmin, publicPath, callback) {
+exports.getAdminURL = function (idAdmin, publicPath, callback) {
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
             return callback('Error getting the admin url.', null);

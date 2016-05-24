@@ -1,7 +1,7 @@
 var FIWAREStrategy = require('passport-fiware-oauth').OAuth2Strategy,
     config = require('./config'),
     logger = require('winston'),
-    queryString = require('query-string');
+    queryString = require('querystring');
 
 var db = require(config.database.type);
 var FIWARE_STRATEGY = new FIWAREStrategy({
@@ -71,32 +71,43 @@ var verifyAppId = function (reqAppId, req, callback) {
         return callback(null, true);
     } else {
 
-        db.getAppId(req.path, function (err, appId) { // Check with the whole path
+        var absolutePath;
+        var queryStrings = queryString.stringify(req.query);
+
+        absolutePath = queryStrings === '' ? req.path : req.path + '?' + queryStrings;
+
+        db.getAppId(absolutePath, function (err, appId) { // Absolute path
 
             if (err) {
-                return callback(err, false);
-            } else if (appId === reqAppId) {
-                req.restURL = '?' + queryString.stringify(req.query); // Add the query strings
+                return callback(err, false)
 
-                // Public path is the whole path
-                req.publicPath = req.path;
+            } else if (appId === reqAppId) {
+                req.restURL = '';
+
+                // Public path is the whole path and query strings
+                req.publicPath = absolutePath;
                 return callback(null, true);
             } else {
 
                 var splitPath = req.path.split('/');
-                db.getAppId('/' + splitPath[1], function (err, appId) { // Check with the first part of the path
+                var publicPath = '/' + splitPath[1]; 
+
+                db.getAppId(publicPath, function (err, appId) { // Check with the first part of the path
+
                     if (err) {
                         return callback(err, false);
+
                     } else if (appId === reqAppId) {
                         // Save the path to the endpoint
                         var restPath = '/' + req.path.substring(splitPath[1].length + 2);
-                        var urlQueryStrings = '?' + queryString.stringify(req.query);
+                        var urlQueryStrings = queryStrings === '' ? '' : '?' + queryString.stringify(req.query);
 
                         req.restURL = restPath + urlQueryStrings;
 
                         // Public path is only the first part of the request path
-                        req.publicPath =  '/' + splitPath[1];
+                        req.publicPath =  publicPath;
                         return callback(null, true);
+
                     } else {
                         return callback(null, false);
                     }

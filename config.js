@@ -20,7 +20,7 @@ config.database = {
      *     './db_Redis': redis database.
      *     './db': sqlite database.
      */
-    type: "./db",
+    type: './db',
 
     /**
      * Database name. If the database type selected is './db_Redis',
@@ -57,7 +57,7 @@ config.usageAPI = {
     /**
      * Port where the Usage Management API is running.
      */
-    port: 8080,
+    port: 8009,
 
     /**
      * Usage Management API.
@@ -98,7 +98,7 @@ config.api = {
         keys: '/accounting_proxy/keys',
         units: '/accounting_proxy/units',
         newBuy: '/accounting_proxy/buys',
-        checkUrl: '/accounting_proxy/urls'
+        checkURL: '/accounting_proxy/urls'
     }
 };
 

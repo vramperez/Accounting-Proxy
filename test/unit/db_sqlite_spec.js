@@ -739,7 +739,7 @@ describe('Testing SQLITE database', function () {
             }
         ];
 
-        var testGetAdmins = function (error, admins, done) {
+        var testGetAdmins = function (error, admins, resExpected, done) {
 
             var all = function (sentence, params, callback) {
                 return callback(error, admins);
@@ -762,7 +762,7 @@ describe('Testing SQLITE database', function () {
                     assert.equal(admins, null);
                 } else {
                     assert.equal(err, null);
-                    assert.equal(admins, admins);
+                    assert.deepEqual(resAdmins, resExpected);
                 }
 
                 done();
@@ -771,15 +771,17 @@ describe('Testing SQLITE database', function () {
 
 
         it('should call the callback with error when db fails getting admins', function (done) {
-            testGetAdmins('Error', null, done);
+            testGetAdmins('Error', null, null, done);
         });
 
         it('should call the callback without error when db returns all the admins', function (done) {
-            testGetAdmins(null, admins, done);
+            var resExpected = [admins[0].idAdmin, admins[1].idAdmin];
+
+            testGetAdmins(null, admins, resExpected, done);
         });
     });
 
-    describe('Function "getAdminUrl"', function () {
+    describe('Function "getAdminURL"', function () {
 
         var sentence = 'SELECT services.url \
             FROM administer, services \
@@ -804,7 +806,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.getAdminUrl(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.getAdminURL(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(getSpy.calledWith(sentence, params));
 

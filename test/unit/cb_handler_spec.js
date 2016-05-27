@@ -1,95 +1,41 @@
 var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     sinon = require('sinon'),
-    async = require('async');
+    async = require('async'),
+    data = require('../data'),
+    util = require('../util');
 
 var mocker = function (implementations, callback) {
-    var mocks, spies, cb_handler;
+    
+    util.getSpies(implementations, function (spies) {
 
-    // Create mocks and spies
-    var logger = {
-        error: function (msg) {}
-    };
-    mocks = {
-        app: {
-            use: function (middleware) {},
-            set: function (key, value) {},
-            post: function (path, handler) {}
-        },
-        config: {
-            database: {
-                type: './db' 
-            },
-            resources: {
-                notification_port: 9002
-            }
-        },
-        db: {},
-        async: {
-            forEachOf: async.forEachOf
-        },
-        req: {},
-        res: {},
-        requester: {
-            request: function (options, callback) {}
-        },
-        url: {},
-        subsUrls: {},
-        notifier: {},
-        accounter: {}
-    };
-    spies = {
-        logger: {
-            error: sinon.spy(logger, 'error')
-        },
-        app: {},
-        config: {},
-        db: {},
-        async: {
-            forEachOf: sinon.spy(mocks.async, 'forEachOf')
-        },
-        req: {},
-        res: {},
-        requester: {},
-        url: {},
-        subsUrls: {},
-        notifier: {},
-        accounter: {}
-    };
+        var config = implementations.config ? implementations.config : {};
+        config.database = {
+            type: './db'
+        };
+        config.resources = {
+            notification_port: data.DEFAULT_PORT
+        };
 
-    // Complete app_mock implementation and add spies
-    async.each(Object.keys(implementations), function (obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
-            mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
-            if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
-                if (obj == 'req' || obj == 'res') {
-                    spies[obj][implem.toString()] = sinon.spy(implementations[obj], implem.toString());
-                } else {
-                    spies[obj][implem.toString()] = sinon.spy(mocks[obj], implem.toString());
-                }
-                task_callback2();
-            } else {
-                task_callback2();
-            }
-        }, function () {
-            return task_callback1();
-        });
-    }, function () {
-        // Mocking dependencies
-        cb_handler = proxyquire('../../orion_context_broker/cb_handler', {
+        var app = implementations.app ? implementations.app : {};
+        app.use = function (middleware) {};
+        app.set = function (key, value) {};
+        app.post = app.post ? implementations.app.post : function (path, handler) {}; 
+
+        var cb_handler = proxyquire('../../orion_context_broker/cb_handler', {
             express: function () {
-                return mocks.app;
+                return app;
             },
-            '../config': mocks.config,
-            '.././db': mocks.db,
-            async: mocks.async,
-            request: mocks.requester.request,
-            url: mocks.url,
-            './subsUrls': mocks.subsUrls,
-            '../notifier': mocks.notifier,
-            '../accounter': mocks.accounter,
-            winston: logger
+            '../config': config,
+            '.././db': implementations.db ? implementations.db : {},
+            request: implementations.requester ? implementations.requester.request : {},
+            url: implementations.url ? implementations.url : {},
+            './subsUrls': implementations.subsUrls ? implementations.subsUrls : {},
+            '../server': implementations.server ? implementations.server : {},
+            '../accounter': implementations.accounter ? implementations.accounter : {},
+            winston: implementations.logger ? implementations.logger: {}
         });
+
         return callback(cb_handler, spies);
     });
 };
@@ -98,1518 +44,568 @@ describe('Testing ContextBroker Handler', function () {
 
     describe('Function "init"', function () {
 
-        it('correct initialization', function () {
-            var port = 9002;
+        it('correct initialization', function (done) {
+
+            var port = data.DEFAULT_PORT;
+
             var implementations = {
                 app: {
                     listen: function (port) {},
                     get: function (prop) {
                         return port;
-                    },
-                    use: function (middleware) {},
-                    set: function (prop, value) {},
-                    post: function (path, handler) {}
+                    }
                 },
                 config: {
-                    database: {
-                        type: './db'
-                    },
                     resources: {
                         notification_port: port
                     }
                 }
             };
+
             mocker(implementations, function (cb_handler, spies) {
+
                 cb_handler.run();
-                assert.equal(spies.app.use.callCount, 1);
-                assert.equal(spies.app.set.callCount, 1);
-                assert.equal(spies.app.set.getCall(0).args[0], 'port');
-                assert.equal(spies.app.set.getCall(0).args[1], port);
-                assert.equal(spies.app.post.callCount, 1);
-                assert.equal(spies.app.post.getCall(0).args[0], '/subscriptions');
-                assert.equal(spies.app.get.callCount, 1);
-                assert.equal(spies.app.get.getCall(0).args[0], 'port');
-                assert.equal(spies.app.listen.callCount, 1);
-                assert.equal(spies.app.listen.getCall(0).args[0], port);
+
+                assert(spies.app.get.calledWith('port'));
+                assert(spies.app.listen.calledWith(port));
+
+                done();
             });
         });
     });
 
     describe('Function "getOperation"', function () {
 
-        it('should return "subscribe" when the request is a CB subscription', function (done) {
-            var path = '/subs_path';
-            var subsUrls = [
-                ['DELETE', '/unsubs_path', 'unsubscribe'],
-                ['POST', path, 'subscribe']
-            ];
+        var testGetOperation = function (path, method, operation, done) {
+
             var implementations = {
-                subsUrls: subsUrls,
+                subsUrls: data.DEFAULT_SUBS_URLS,
                 req: {
-                    method: 'POST'
+                    method: method
                 }
             };
+
             mocker(implementations, function (cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function (operation) {
-                    assert.equal(operation, 'subscribe');
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
-                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe'],
-                        '1': [ 'POST', '/subs_path', 'subscribe']});
+
+                cb_handler.getOperation(path, implementations.req, function (result) {
+
+                    assert.equal(result, operation);
+
                     done();
                 });
             });
+
+        };
+
+        it('should return "subscribe" when the request is a CB subscription', function (done) {
+            testGetOperation(data.DEFAULT_SUBS_PATH, 'POST', 'subscribe', done);
         });
 
         it('should return "unsubscribe" when the request is a CB unsubscription', function (done) {
-            var path = '/unsubs_path';
-            var subsUrls = [
-                ['DELETE', path, 'unsubscribe'],
-                ['POST', '/subs_path', 'subscribe']
-            ];
-            var implementations = {
-                subsUrls: subsUrls,
-                req: {
-                    method: 'DELETE'
-                }
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function (operation) {
-                    assert.equal(operation, 'unsubscribe');
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
-                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe' ],
-                        '1': [ 'POST', '/subs_path', 'subscribe' ] });
-                    done();
-                });
-            });
+           testGetOperation(data.DEFAULT_UNSUBS_PATH, 'DELETE', 'unsubscribe', done);
         });
 
-        it('should not return the operation when the request is from an administrator', function (done) {
-            var path = '/administration';
-            var subsUrls = [
-                ['DELETE', '/unsubs_path', 'unsubscribe'],
-                ['POST', '/subs_path', 'subscribe']
-            ];
-            var implementations = {
-                subsUrls: subsUrls,
-                req: {
-                    method: 'DELETE'
-                }
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.getOperation(path, implementations.req, function (operation) {
-                    assert.equal(operation, null);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], {
-                        '0': [ 'DELETE', '/unsubs_path', 'unsubscribe'],
-                        '1': [ 'POST', '/subs_path', 'subscribe'] });
-                    done();
-                });
-            });
+        it('should return "updateSubscription" when the request is a CB subscription update', function (done) {
+           testGetOperation(data.DEFAULT_UPDATE_SUBS_PATH, 'POST', 'updateSubscription', done);
+        });
+
+        it('should return null when the request is not a subscription, unsubscription or a subscription update', function (done) {
+           testGetOperation('/entities', 'PUT', null, done); 
         });
     });
 
     describe('Function "notificationHandler"', function (done) {
 
-        it('should log the error when db fails getting the subscription information', function (done) {
-            var subscriptionId = 'subscriptionId';
+        var testNotificationHandler = function (getCBSubsErr, countErr, requestErr, done) {
+
+            var subsId = data.DEFAULT_SUBS_ID;
+            var requestStatus = 200;
+            var subscription = data.DEFAULT_SUBSCRIPTION;
+            var method = 'POST';
+
             var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback('Error', null);
-                    }
-                },
                 req: {
                     body: {
-                        subscriptionId: subscriptionId
-                    }
+                        subscriptionId: subsId
+                    },
+                    method: method
                 },
                 res: {
-
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    send: function () {}
                 },
                 app: {
                     post: function (path, handler) {
                         return handler(implementations.req, implementations.res);
                     }
+                },
+                db: {
+                    getCBSubscription: function (subsId, callback) {
+                        return callback(getCBSubsErr, subscription);
+                    }
+                },
+                accounter:{
+                    count: function (apiKey, unit, countInfo, countFunction, callback) {
+                        return callback(countErr);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, {statusCode: requestStatus});
+                    }
+                },
+                logger: {
+                    error: function (msg) {}
                 }
             };
+
             mocker(implementations, function (cb_handler, spies) {
-                assert.equal(spies.db.getCBSubscription.callCount, 1);
-                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'An error ocurred while making the accounting: Invalid subscriptionId');
+
+                assert(spies.db.getCBSubscription.calledWith(subsId));
+
+                if (getCBSubsErr) {
+                    assert(spies.logger.error.calledWith('An error ocurred while making the accounting: Invalid subscriptionId'));
+                } else {
+
+                    assert(spies.accounter.count.calledWith(subscription.apiKey, subscription.unit, {request: implementations.req, response: {}}, 'count'));
+
+                    if (countErr) {
+                        assert(spies.logger.error.calledWith('An error ocurred while making the accounting'));
+                    } else {
+
+                        var options = {
+                            url: subscription.notificationUrl,
+                            method: method,
+                            json: true,
+                            body: implementations.req.body
+                        };
+
+                        assert(spies.requester.request.calledWith(options));
+
+                        if (requestErr) {
+                            assert(spies.logger.error.calledWith('An error ocurred notifying the user, url: ' + options.url));
+                            assert(spies.res.status.calledWith(504));
+                            assert(spies.res.send.calledOnce);
+                        } else {
+                            assert(spies.res.status.calledWith(requestStatus));
+                            assert(spies.res.send.calledOnce);
+                        }
+                    }
+                }
+
                 done();
             });
+        };
+
+        it('should log the error when db fails getting the subscription information', function (done) {
+            testNotificationHandler(true, false, false, done);
         });
 
         it('should log the error when db fails making the accounting', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var body = {
-                subscriptionId: subscriptionId
-            };
-            var subscriptionInfo = {
-                apiKey: 'apiKey',
-                unit: 'megabyte',
-                notificationUrl: 'http://example.com/path'
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, subscriptionInfo);
-                    }
-                },
-                req: {
-                    body: body
-                },
-                res: {
-
-                },
-                app: {
-                    post: function (path, handler) {
-                        return handler(implementations.req, implementations.res);
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback('Error');
-                    }
-                }
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                assert.equal(spies.db.getCBSubscription.callCount, 1);
-                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], subscriptionInfo.apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], subscriptionInfo.unit);
-                assert.deepEqual(spies.accounter.count.getCall(0).args[2], { 
-                    request: implementations.req,
-                    response: {} 
-                });
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'An error ocurred while making the accounting');
-                done();
-            });
+           testNotificationHandler(false, true, false, done); 
         });
 
         it('should return 504 when the notification fails', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var body = {
-                subscriptionId: subscriptionId
-            };
-            var subscriptionInfo = {
-                apiKey: 'apiKey',
-                unit: 'megabyte',
-                notificationUrl: 'http://example.com/path'
-            };
-            var options = {
-                url: subscriptionInfo.notificationUrl,
-                method: 'POST',
-                json: true,
-                body: body
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, subscriptionInfo);
-                    }
-                },
-                req: {
-                    body: body,
-                    method: options.method,
-                    headers: options.headers
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    send: function () {}
-                },
-                app: {
-                    post: function (path, handler) {
-                        return handler(implementations.req, implementations.res);
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', null, null);
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                assert.equal(spies.db.getCBSubscription.callCount, 1);
-                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], subscriptionInfo.apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], subscriptionInfo.unit);
-                assert.deepEqual(spies.accounter.count.getCall(0).args[2], { 
-                    request: implementations.req,
-                    response: {} 
-                });
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                assert.equal(spies.logger.error.callCount, 1);
-                assert.equal(spies.logger.error.getCall(0).args[0], 'An error ocurred notifying the user, url: ' + options.url);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 504);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
+           testNotificationHandler(false, false, true, done);
         });
 
         it('should return 200 when the notification success', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var body = {
-                subscriptionId: subscriptionId
-            };
-            var subscriptionInfo = {
-                apiKey: 'apiKey',
-                unit: 'megabyte',
-                notificationUrl: 'http://example.com/path'
-            };
-            var options = {
-                url: subscriptionInfo.notificationUrl,
-                method: 'POST',
-                json: true,
-                body: body
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, subscriptionInfo);
-                    }
-                },
-                req: {
-                    body: body,
-                    method: options.method,
-                    headers: options.headers
-                },
-                res: {
-                    status: function (code) {
-                        return this;
-                    },
-                    send: function () {}
-                },
-                app: {
-                    post: function (path, handler) {
-                        return handler(implementations.req, implementations.res);
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, {statusCode: 200}, null);
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countInfo, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                assert.equal(spies.db.getCBSubscription.callCount, 1);
-                assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], subscriptionInfo.apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], subscriptionInfo.unit);
-                assert.deepEqual(spies.accounter.count.getCall(0).args[2], { 
-                    request: implementations.req,
-                    response: {} 
-                });
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 200);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
+           testNotificationHandler(false, false, false, done); 
         });
     });
 
-    describe('Function "subscriptionHandler"', function () {
+    describe('Function "subscribe"', function () {
+
+        var testSubscribe = function (requestErr, subsRes, addCBSubsErr, subscriptionCount, countErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var url = data.DEFAULT_URLS[0];
+            var resp = {
+                statusCode: 200,
+                headers: {
+                    header1: 'header1'
+                }
+            };
+            var unit = data.DEFAULT_UNIT;
+            var method = 'POST';
+            var headers = {};
+            var duration = data.DEFAULT_DURATION;
+
+            var implementations = {
+                req: {
+                    body: {
+                        reference: data.DEFAULT_URLS[0]
+                    },
+                    get: function (header) {
+                        return apiKey;
+                    },
+                    method: method,
+                    headers: headers
+                },
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    send: function (body) {},
+                    setHeader: function (header, value) {}
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, resp, subsRes)
+                    }
+                },
+                db: {
+                    addCBSubscription: function (apiKey, subsId, ref, callback) {
+                        return callback(addCBSubsErr);
+                    }
+                },
+                accounter: {
+                    count: function (apiKey, unit, accountingInfo, countFunction, callback) {
+                        return callback(countErr);
+                    }
+                }
+            }
+
+            var accountingModules = {};
+            accountingModules[unit] = {subscriptionCount: subscriptionCount};
+
+            implementations.server = {
+                accountingModules: accountingModules
+            };
+
+            mocker(implementations, function (cb_handler, spies) {
+
+                cb_handler.subscriptionHandler(implementations.req, implementations.res, url, 'subscribe', unit, function (err) {
+
+                    var options = {
+                        url: url,
+                        method: method,
+                        json: true,
+                        headers: headers,
+                        body: {
+                            reference: 'http://localhost:' + data.DEFAULT_PORT + '/subscriptions'
+                        }
+                    };
+
+                    assert(spies.requester.request.calledWith(options));
+
+                    if (requestErr) {
+
+                        assert(spies.res.status.calledWith(504));
+                        assert(spies.res.send.calledOnce);
+
+                    } else if (!subsRes.subscribeResponse) {
+
+                        assert(spies.res.status.calledWith(resp.statusCode));
+                        assert(spies.res.send.calledWith(subsRes));
+                        assert.equal(err, null);
+
+                    } else {
+
+                        assert(spies.res.status.calledWith(resp.statusCode));
+                        for (var header in resp.headers) {
+                            assert(spies.res.setHeader.calledWith(header, resp.headers[header]));
+                        }
+                        assert(spies.res.send.calledWith(subsRes));
+                        assert(spies.req.get.calledWith('X-API-KEY'));
+
+                        if (addCBSubsErr) {
+                            assert.equal(err, addCBSubsErr)
+                        } else if (subscriptionCount) {
+
+                            assert(spies.accounter.count.calledWith(apiKey, unit, {request: {duration}}, 'subscriptionCount'));
+
+                            if (countErr) {
+                                assert.equal(err, countErr);
+                            } else {
+                                assert.equal(err, null);
+                            }
+                        } else {
+                            assert.equal(err, null);
+                        }
+                    }
+
+                    done();
+                });
+            });
+        };
 
         it('should call the callback with error when sending the request to CB fails', function (done) {
-            var body = {
-                reference: 'http://reference/path'
-            };
-            var req = {
-                method: 'POST',
-                body: body,
-                headers: {
-                    'content-type': 'application/json',
-                    accept: 'application/json'
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                send: function () {}
-            };
-            var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', null, null);
-                    }
-                },
-                res: res
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', 'megabyte', function (err) {
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], 504);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.equal(err, 'Error sending the subscription to the CB');
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    done();
-                });
-            });
+            testSubscribe(true, null, false, null, false, done);
         });
 
-        it('should call the callback with error wen sending the request to CB fails', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var apiKey = 'apiKey';
-            var body = {
-                reference: 'http://reference/path',
-            };
-            var req = {
-                method: 'POST',
-                body: body,
+        it('should redirect the CB response and call the callback without error when the subscription is not valid', function (done) {
+            testSubscribe(false, {}, false, undefined, false, done);
+        });
+
+        it('should call the callback with error when db fails adding the subscription', function (done) {
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, 'Error', null, false, done);
+        });
+
+        it('should call the callback without error when there is no accounting function for subscriptions', function (done) {
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, undefined, false, done);
+        });
+
+        it('should call the callback without error when the accounting module fails making the accounting for subscriptions', function (done) {
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, {}, true, done);
+        });
+
+        it('should call the callback without error when there is no error making the accounting for subscription', function (done) {
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, {}, false, done);
+        });
+    });
+
+    describe('Function "unsubscribe"', function () {
+
+        var testUnsubscribe = function (method, subsId, respStatus, requestErr, deleteCBSubsErr, done) {
+
+            var resp = {
+                statusCode: respStatus,
                 headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                get: function (header) {
-                    return apiKey;
+                    header1: 'header1'
                 }
             };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var resp =  {
-                statusCode: 200,
-                headers: {header1: 'header1'}
-            };
-            var body_CB = {
-                subscribeResponse: {
-                    subscriptionId: subscriptionId
-                }
-            };
+            var unsubsRes = {};
+            var url = data.DEFAULT_URLS[0];
+            var unit = data.DEFAULT_UNIT;
+
             var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, body_CB);
+                req: {
+                    path: data.DEFAULT_UNSUBS_PATH + '/' + subsId,
+                    method: method,
+                    headers: {},
+                    body: {
+                        subscriptionId: subsId
                     }
                 },
-                res: res,
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    send: function (body) {},
+                    setHeader: function (header, value) {}
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, resp, unsubsRes);
+                    }
+                },
                 db: {
-                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
-                        return callback('Error');
+                    deleteCBSubscription: function (subsId, callback) {
+                        return callback(deleteCBSubsErr);
                     }
                 }
             };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', 'megabyte', function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers.header1);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
-                    assert.equal(spies.db.addCBSubscription.callCount, 1);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[0], apiKey);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[1], subscriptionId);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[2], 'http://reference/path');
-                    done();
-                });
-            });
-        });
 
-        it('should call the callback with error when the subscription is invalid', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var apiKey = 'apiKey';
-            var body = {
-                reference: 'http://reference/path',
-            };
-            var req = {
-                method: 'POST',
-                body: body,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                get: function (header) {
-                    return apiKey;
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                send: function (body) {}
-            };
-            var resp =  {
-                statusCode: 200,
-                headers: {header1: 'header1'}
-            };
-            var body_CB = {}
-            var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, body_CB);
-                    }
-                },
-                res: res
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
             mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
-                    done();
-                });
-            });
-        });
 
-        it('should not make accounting when the subscription is correct and the accounting unit is "megabyte"', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var unit = 'megabyte';
-            var apiKey = 'apiKey';
-            var body = {
-                reference: 'http://reference/path',
-            };
-            var req = {
-                method: 'POST',
-                body: body,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                get: function (header) {
-                    return apiKey;
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var resp =  {
-                statusCode: 200,
-                headers: {header1: 'header1'}
-            };
-            var body_CB = {
-                subscribeResponse: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, body_CB);
-                    }
-                },
-                res: res,
-                db: {
-                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
-                        return callback(null);
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'megabyte': {}
-                    }
-                }
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', unit, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers.header1);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
-                    assert.equal(spies.db.addCBSubscription.callCount, 1);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[0], apiKey);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[1], subscriptionId);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[2], 'http://reference/path');
-                    done();
-                });
-            });
-        });
+                cb_handler.subscriptionHandler(implementations.req, implementations.res, url, 'unsubscribe', unit, function (err) {
 
-        it('should call the callback with errors when db fails making the accounting', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var unit = 'millisecond';
-            var apiKey = 'apiKey';
-            var body = {
-                reference: 'http://reference/path',
-            };
-            var req = {
-                method: 'POST',
-                body: body,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                get: function (header) {
-                    return apiKey;
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var resp =  {
-                statusCode: 200,
-                headers: {header1: 'header1'}
-            };
-            var body_CB = {
-                subscribeResponse: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, body_CB);
-                    }
-                },
-                res: res,
-                db: {
-                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
-                        return callback(null);
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {
-                            subscriptionCount: function (countInfo, callback) {}
+                    var options = {
+                        url: url,
+                        method: method,
+                        json: true,
+                        headers: implementations.req.headers,
+                        body: implementations.req.body
+                    };
+
+                    assert(spies.requester.request.calledWith(options));
+
+                    if (requestErr) {
+                        assert(spies.res.status.calledWith(504));
+                        assert(spies.res.send.calledOnce);
+                    } else {
+
+                        assert(spies.res.status.calledWith(resp.statusCode));
+                        for (var key in resp.headers) {
+                            assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
                         }
+
+                        if (respStatus !== 200) {
+                            assert(spies.res.send.calledWith(unsubsRes));
+                            assert.equal(err, null);
+                        } else {
+
+                            assert(spies.db.deleteCBSubscription.calledWith(subsId));
+                            assert(spies.res.send.calledWith(unsubsRes));
+
+                            deleteCBSubsErr ? assert.equal(err, deleteCBSubsErr) : assert.equal(err, null);
+                        }
+                    }
+
+                    done();
+                });
+            });
+        };
+
+        it('should call the callback with error when there is an error sending the request to CB', function (done) {
+            testUnsubscribe('POST', data.DEFAULT_SUBS_ID, null, true, false, done);
+        });
+
+        it('should call the callback without error and redirect the response when CB response status is not 200', function (done) {
+           testUnsubscribe('DELETE', data.DEFAULT_SUBS_ID, 400, false, false, done);
+        });
+
+        it('should call the callback with error when db fails deleting the subscription', function (done) {
+           testUnsubscribe('DELETE', data.DEFAULT_SUBS_ID, 200, false, true, done);
+        });
+
+        it('should call the callback without error when the unsubscription is correct', function (done) {
+           testUnsubscribe('DELETE', data.DEFAULT_SUBS_ID, 200, false, null, done); 
+        });
+    });
+
+    describe('Function "updateSubscription"', function () {
+
+        var testUpdateSubscription = function (getCBSubsErr, subsInfo, requestErr, updateResp, subscriptionCount, countErr, done) {
+
+            var subsId = data.DEFAULT_SUBS_ID;
+            var method = 'POST';
+            var url = data.DEFAULT_URLS[0];
+            var unit = data.DEFAULT_UNIT;
+            var subsInfo = subsInfo ? data.DEFAULT_SUBSCRIPTION : null;
+            var updateResp = updateResp ? data.DEFAULT_SUBS_RESPONSE : {};
+            var body = {
+                subscriptionId: subsId
+            };
+            var resp = {
+                statusCode: 200,
+                headers: {
+                    header1: 'header1'
+                }
+            };
+
+            var implementations = {
+                req: {
+                    body: body,
+                    get: function (header) {
+                        return subsInfo.apiKey;
+                    },
+                    method: method,
+                    headers: {}
+                },
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    send: function (body) {},
+                    setHeader: function (header, value) {}
+                },
+                db: {
+                    getCBSubscription: function (subsId, callback) {
+                        return callback(getCBSubsErr, subsInfo);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, resp, updateResp)
                     }
                 },
                 accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback('Error');
+                    count: function (apiKey, unit, accountingInfo, countFunction, callback) {
+                        return callback(countErr);
                     }
                 }
             };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', unit, function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers.header1);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
-                    assert.equal(spies.db.addCBSubscription.callCount, 1);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[0], apiKey);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[1], subscriptionId);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[2], 'http://reference/path');
-                    assert.equal(spies.accounter.count.callCount, 1);
-                    assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                    assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                    assert.deepEqual(spies.accounter.count.getCall(0).args[2], { request: { duration: undefined } });
-                    assert.equal(spies.accounter.count.getCall(0).args[3], 'subscriptionCount');
-                    done();
-                });
-            });
-        });
 
-        it('should make accounting when the subscription is correct and the accounting unit is "millisecond"', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var unit = 'millisecond';
-            var apiKey = 'apiKey';
-            var body = {
-                reference: 'http://reference/path',
+            var accountingModules = {};
+            accountingModules[unit] = {subscriptionCount: subscriptionCount};
+
+            implementations.server = {
+                accountingModules: accountingModules
             };
-            var req = {
-                method: 'POST',
-                body: body,
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                get: function (header) {
-                    return apiKey;
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var resp =  {
-                statusCode: 200,
-                headers: {header1: 'header1'}
-            };
-            var body_CB = {
-                subscribeResponse: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var implementations = {
-                req: req,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, body_CB);
-                    }
-                },
-                res: res,
-                db: {
-                    addCBSubscription: function (apiKey, subscriptionId, reference_url, callback) {
-                        return callback(null);
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {
-                            subscriptionCount: function (countInfo, callback) {}
+
+            mocker(implementations, function (cb_handler, spies) {
+
+                cb_handler.subscriptionHandler(implementations.req, implementations.res, url, 'updateSubscription', unit, function (err) {
+
+                    assert(spies.db.getCBSubscription.calledWith(subsId));
+
+                    if (getCBSubsErr) {
+
+                        assert.equal(err, getCBSubsErr);
+
+                    } else if (!subsInfo) {
+
+                        assert.equal(err, 'Subscription "' + subsId + '" not in database.');
+
+                    } else {
+
+                        var options = {
+                            url: url,
+                            method: 'POST',
+                            json: true,
+                            headers: {},
+                            body: body
+                        };
+
+                        assert(spies.requester.request.calledWith(options));
+
+                        if (requestErr) {
+
+                            assert(spies.res.status.calledWith(504));
+                            assert(spies.res.send.calledOnce);
+
+                        } else if (!updateResp.subscribeResponse) {
+
+                            assert(spies.res.status.calledWith(resp.statusCode));
+                            assert(spies.res.send.calledWith(updateResp));
+
+                        } else {
+
+                            assert(spies.res.status.calledWith(resp.statusCode));
+                            for (var key in resp.headers) {
+                                assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
+                            };
+                            assert(spies.res.send.calledWith(updateResp));
+                            assert(spies.req.get.calledWith('X-API-KEY'));
+
+                            if (!subscriptionCount) {
+
+                                assert.equal(err, null);
+
+                            } else {
+
+                                assert(spies.accounter.count.calledWith(subsInfo.apiKey, subsInfo.unit, {request: {duration: updateResp.subscribeResponse.duration}}, 'subscriptionCount'));
+                                countErr ? assert.equal(err, countErr) : assert.equal(err, null);
+
+                            }
                         }
                     }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'subscribe', unit, function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.deepEqual(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.deepEqual(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers.header1);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], body_CB);
-                    assert.equal(spies.db.addCBSubscription.callCount, 1);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[0], apiKey);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[1], subscriptionId);
-                    assert.equal(spies.db.addCBSubscription.getCall(0).args[2], 'http://reference/path');
-                    assert.equal(spies.accounter.count.callCount, 1);
-                    assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                    assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                    assert.deepEqual(spies.accounter.count.getCall(0).args[2], { request: { duration: undefined } });
-                    assert.equal(spies.accounter.count.getCall(0).args[3], 'subscriptionCount');
+
                     done();
                 });
             });
+        };
+
+        it('should call the callback with error when db fails getting the subscription information', function (done) {
+            testUpdateSubscription(true, false, false, null, null, false, done);
         });
 
-        it('[unsubscribe] error sending the request to the CB', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                }
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                send: function () {}
-            };
-            var implementations = {
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', null, null);
-                    }
-                },
-                req: req,
-                res: res
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', 'megabyte', function (err) {
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], 504);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.equal(err, 'Error sending the unsubscription to the CB');
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    done();
-                });
-            });
+        it('should call the callback with error when there is no subscription to update', function (done) {
+            testUpdateSubscription(false, false, false, null, null, false, done);
         });
 
-        it('[unsubscribe] error, context broker response no OK', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                method: 'POST'
-            };
-            var resp = {
-                headers: { header1: 'header1'},
-                statusCode: 400
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var implementations = {
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, {});
-                    }
-                },
-                req: req,
-                res: res,
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                    done();
-                });
-            });
+        it('should call the callback with error when there is an error making the request to CB', function (done) {
+            testUpdateSubscription(false, true, true, null, null, false, done);
         });
 
-        it('[unsubscribe] error deleting the subscription from database', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                },
-                method: 'POST'
-            };
-            var resp = {
-                headers: { header1: 'header1'},
-                statusCode: 200
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var implementations = {
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, {});
-                    }
-                },
-                req: req,
-                res: res,
-                db: {
-                    deleteCBSubscription: function (subscriptionId, callback) {
-                        return callback('Error');
-                    }
-                }
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', 'megabyte', function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                    assert.equal(spies.db.deleteCBSubscription.callCount, 1);
-                    assert.deepEqual(spies.db.deleteCBSubscription.getCall(0).args[0], req.body.subscriptionId);
-                    done();
-                });
-            });
+        it('should call the callback without error and redirect the response when the update is rejected by the CB', function (done) {
+            testUpdateSubscription(false, true, false, false, null, false, done);
         });
 
-        it('[unsubscribe] correct unsubscription', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                method: 'DELETE',
-                path: '/path/subscriptionId',
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                }
-            };
-            var resp = {
-                headers: { header1: 'header1'},
-                statusCode: 200
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var implementations = {
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, {});
-                    }
-                },
-                req: req,
-                res: res,
-                db: {
-                    deleteCBSubscription: function (subscriptionId, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                    assert.equal(spies.db.deleteCBSubscription.callCount, 1);
-                    assert.deepEqual(spies.db.deleteCBSubscription.getCall(0).args[0], req.body.subscriptionId);
-                    done();
-                });
-            });
+        it('should call the callback without error when there is no accounting function for subscriptions updates', function (done) {
+            testUpdateSubscription(false, true, false, true, false, false, done);
         });
 
-        it('[unsubscribe] correct unsubscription', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                method: 'DELETE',
-                path: '/path/subscriptionId',
-                headers: {
-                    'content-type': 'application/json',
-                    'accept': 'application/json'
-                }
-            };
-            var resp = {
-                headers: { header1: 'header1'},
-                statusCode: 400
-            };
-            var res = {
-                status: function (statusCode) {
-                    return this;
-                },
-                setHeader: function (header, value) {},
-                send: function (body) {}
-            };
-            var implementations = {
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, {});
-                    }
-                },
-                req: req,
-                res: res
-            };
-            var options = {
-                url: 'http://contextBroker/path',
-                method: req.method,
-                json: true,
-                headers: implementations.req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'unsubscribe', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], 'header1');
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                    done();
-                });
-            });
+        it('should call the callback with error when there is an error making the accounting of the subscription update', function (done) {
+            testUpdateSubscription(false, true, false, true, true, true, done);
         });
 
-        it('[updateSubscription] error getting the subscription', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var res = {}
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback('Error', null);
-                    }
-                },
-                req: req,
-                res: res
-            };
-            var options = {};
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    done();
-                });
-            });
-        });
-
-        it('[updateSubscription] wrong subscription update', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var res = {}
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, null);
-                    }
-                },
-                req: req,
-                res: res
-            };
-            var options = {};
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, 'Subscription "' + subscriptionId + '" not in database.');
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    done();
-                });
-            });
-        });
-
-        it('[updateSubscription] error sending the update to CB', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                }
-            };
-            var res = {
-                status: function (code) {
-                    return this;
-                },
-                send: function () {}
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, {});
-                    }
-                },
-                req: req,
-                res: res,
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', {}, {});
-                    }
-                }
-            };
-            var options = {};
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, 'Error sending the subscription to the CB');
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], 504);
-                    done();
-                });
-            });
-        });
-
-        it('[updateSubscription] error while making the accounting', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var duration = 'P1M';
-            var apiKey = 'apiKey';
-            var unit = 'millisecond';
-            var url = 'http://cb/updateSubscription'
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                get: function (header) {
-                    return apiKey;
-                },
-                method: 'POST',
-                headers: {}
-            };
-            var res = {
-                status: function (code) {
-                    return this;
-                },
-                send: function (body) {},
-                setHeader: function (header, value) {}
-            };
-            var resp = {
-                statusCode: 200,
-                headers: { header1: 'header1'}
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, {unit: unit});
-                    }
-                },
-                req: req,
-                res: res,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, { subscribeResponse: { subscriptionId: subscriptionId, duration: duration}});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {
-                            subscriptionCount: function () {}
-                        }
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback('Error');
-                    }
-                }
-            };
-            var options = {
-                url: url,
-                method: req.method,
-                json: true,
-                headers: req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, 'Error');
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers['header1']);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], { subscribeResponse: { subscriptionId: 'subscriptionId', duration: 'P1M' } });
-                    assert.equal(spies.req.get.callCount, 1);
-                    assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                    assert.equal(spies.accounter.count.callCount, 1);
-                    assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                    assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                    assert.deepEqual(spies.accounter.count.getCall(0).args[2], {
-                        request: {
-                            duration: duration
-                        }
-                    });
-                    assert.equal(spies.accounter.count.getCall(0).args[3], 'subscriptionCount');
-                    done();
-                });
-            });
-        });
-
-        it('[updateSubscription] correct (should make accounting)', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var duration = 'P1M';
-            var apiKey = 'apiKey';
-            var unit = 'millisecond';
-            var url = 'http://cb/updateSubscription'
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                get: function (header) {
-                    return apiKey;
-                },
-                method: 'POST',
-                headers: {}
-            };
-            var res = {
-                status: function (code) {
-                    return this;
-                },
-                send: function (body) {},
-                setHeader: function (header, value) {}
-            };
-            var resp = {
-                statusCode: 200,
-                headers: { header1: 'header1'}
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, {unit: unit});
-                    }
-                },
-                req: req,
-                res: res,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, { subscribeResponse: { subscriptionId: subscriptionId, duration: duration}});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {
-                            subscriptionCount: function () {}
-                        }
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            var options = {
-                url: url,
-                method: req.method,
-                json: true,
-                headers: req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers['header1']);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], { subscribeResponse: { subscriptionId: 'subscriptionId', duration: 'P1M' } });
-                    assert.equal(spies.req.get.callCount, 1);
-                    assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                    assert.equal(spies.accounter.count.callCount, 1);
-                    assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                    assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                    assert.deepEqual(spies.accounter.count.getCall(0).args[2], {
-                        request: {
-                            duration: duration
-                        }
-                    });
-                    assert.equal(spies.accounter.count.getCall(0).args[3], 'subscriptionCount');
-                    done();
-                });
-            });
-        });
-        
-        it('[updateSubscription] correct (should not make accounting)', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var duration = 'P1M';
-            var apiKey = 'apiKey';
-            var unit = 'millisecond';
-            var url = 'http://cb/updateSubscription'
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                get: function (header) {
-                    return apiKey;
-                },
-                method: 'POST',
-                headers: {}
-            };
-            var res = {
-                status: function (code) {
-                    return this;
-                },
-                send: function (body) {},
-                setHeader: function (header, value) {}
-            };
-            var resp = {
-                statusCode: 200,
-                headers: { header1: 'header1'}
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, {unit: unit});
-                    }
-                },
-                req: req,
-                res: res,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, { subscribeResponse: { subscriptionId: subscriptionId, duration: duration}});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {}
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
-                    }
-                }
-            };
-            var options = {
-                url: url,
-                method: req.method,
-                json: true,
-                headers: req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.async.forEachOf.callCount, 1);
-                    assert.equal(spies.async.forEachOf.getCall(0).args[0], resp.headers);
-                    assert.equal(spies.res.setHeader.callCount, 1);
-                    assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                    assert.equal(spies.res.setHeader.getCall(0).args[1], resp.headers['header1']);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], { subscribeResponse: { subscriptionId: 'subscriptionId', duration: 'P1M' } });
-                    assert.equal(spies.req.get.callCount, 1);
-                    assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                    done();
-                });
-            });
-        });
-
-        it('[updateSubscription] error in the request', function (done) {
-            var subscriptionId = 'subscriptionId';
-            var duration = 'P1M';
-            var apiKey = 'apiKey';
-            var unit = 'millisecond';
-            var url = 'http://cb/updateSubscription'
-            var req = {
-                body: {
-                    subscriptionId: subscriptionId
-                },
-                method: 'POST',
-                headers: {}
-            };
-            var res = {
-                status: function (code) {
-                    return this;
-                },
-                send: function (body) {}
-            };
-            var resp = {
-                statusCode: 200,
-                headers: { header1: 'header1'}
-            };
-            var implementations = {
-                db: {
-                    getCBSubscription: function (subscriptionId, callback) {
-                        return callback(null, {unit: unit});
-                    }
-                },
-                req: req,
-                res: res,
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, resp, {});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        'millisecond': {}
-                    }
-                },
-            };
-            var options = {
-                url: url,
-                method: req.method,
-                json: true,
-                headers: req.headers,
-                body: req.body
-            };
-            mocker(implementations, function (cb_handler, spies) {
-                cb_handler.subscriptionHandler(req, res, options.url, 'updateSubscription', 'megabyte', function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.db.getCBSubscription.callCount, 1);
-                    assert.equal(spies.db.getCBSubscription.getCall(0).args[0], subscriptionId);
-                    assert.equal(spies.requester.request.callCount, 1);
-                    assert.deepEqual(spies.requester.request.getCall(0).args[0], options);
-                    assert.equal(spies.res.status.callCount, 1);
-                    assert.equal(spies.res.status.getCall(0).args[0], resp.statusCode);
-                    assert.equal(spies.res.send.callCount, 1);
-                    assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                    done();
-                });
-            });
+        it('should call the callback without error when subscription update is correct', function (done) {
+            testUpdateSubscription(false, true, false, true, true, false, done);
         });
     });
 });

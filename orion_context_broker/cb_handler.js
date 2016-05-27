@@ -6,7 +6,7 @@ var request = require('request'),
     bodyParser = require('body-parser'),
     logger = require('winston'),
     async = require('async'),
-    accountingModules = require('../server').accountingModules;
+    server = require('../server');
 
 var app = express();
 var db = require('../' + config.database.type);
@@ -33,14 +33,18 @@ var notificationHandler = function (req, res) {
     var subscriptionId = body.subscriptionId;
 
     db.getCBSubscription(subscriptionId, function (err, subscription) {
-        if (err !== null || subscription === null) {
+
+        if (err || subscription === null) {
             logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
         } else {
+
             // Make accounting
             accounter.count(subscription.apiKey, subscription.unit, countInfo, 'count', function (err) {
+
                 if (err) {
                     logger.error('An error ocurred while making the accounting');
                 } else {
+
                     var options = {
                         url: subscription.notificationUrl,
                         method: req.method,
@@ -49,6 +53,7 @@ var notificationHandler = function (req, res) {
                     };
 
                     request(options, function (error, resp, body) {
+
                         if (error) {
                             logger.error('An error ocurred notifying the user, url: ' + options.url);
                             res.status(504).send();
@@ -92,6 +97,7 @@ exports.getOperation = function (privatePath, req, callback) {
  * @param  {Object}   options  Context Broker request options.
  */
 var subscribe = function (req, res, unit, options, callback) {
+    var accountingModules = server.accountingModules;
     var req_body = req.body;
     var reference_url = req_body.reference;
 
@@ -103,7 +109,7 @@ var subscribe = function (req, res, unit, options, callback) {
         if (err) {
             res.status(504).send();
             return callback('Error sending the subscription to the CB');
-        } else if (body.subscribeResponse !== undefined) {
+        } else if (body.subscribeResponse) {
 
             var subscriptionId = body.subscribeResponse.subscriptionId;
             var duration = body.subscribeResponse.duration;
@@ -151,14 +157,16 @@ var subscribe = function (req, res, unit, options, callback) {
  */
 var unsubscribe = function (req, res, options, callback) {
     var subscriptionId = '';
+
     if (req.method === 'POST') {
         subscriptionId = req.body.subscriptionId;
     } else if (req.method === 'DELETE') {
         var pattern = /\/(\w+)$/;
         var match = pattern.exec(req.path);
-        subscriptionId = match[0];
+        subscriptionId = match[1];
         subscriptionId = subscriptionId.replace('/', '');
     }
+
     options.body = req.body;
 
     // Sends the request to the CB and redirect the response to the subscriber
@@ -199,6 +207,7 @@ var unsubscribe = function (req, res, options, callback) {
  * @param  {Object}   options  Context Broker request options.
  */
 var updateSubscription = function (req, res, options, callback) {
+    var accountingModules = server.accountingModules;
     options.body = req.body;
     var subscriptionId = req.body.subscriptionId;
 
@@ -208,12 +217,14 @@ var updateSubscription = function (req, res, options, callback) {
         } else if (subscriptionInfo === null) {
             return callback('Subscription "' + subscriptionId + '" not in database.')
         } else {
+
             request(options, function (err, resp, body) {
+
                 if (err) {
                     res.status(504).send();
                     return callback('Error sending the subscription to the CB');
 
-                } else if (body.subscribeResponse !== undefined) {
+                } else if (body.subscribeResponse) {
 
                     var subscriptionId = body.subscribeResponse.subscriptionId;
                     var duration = body.subscribeResponse.duration;
@@ -226,7 +237,7 @@ var updateSubscription = function (req, res, options, callback) {
                         res.send(body);
                         var apiKey = req.get('X-API-KEY');
 
-                        if (accountingModules[subscriptionInfo.unit].subscriptionCount !== undefined) {
+                        if (accountingModules[subscriptionInfo.unit].subscriptionCount) {
                             accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                                 if (err) {
                                     return callback(err);

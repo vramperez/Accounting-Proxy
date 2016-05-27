@@ -1,141 +1,66 @@
 var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     sinon = require('sinon'),
-    async = require('async');
-    
-var adminPaths = {
-    keys: '/accounting_proxy/keys',
-    units: '/accounting_proxy/units',
-    newBuy: '/accounting_proxy/buys',
-    checkUrl: '/accounting_proxy/urls',
-}
+    async = require('async'),
+    data = require('../data'),
+    util = require('../util');
+
+var DEFAULT_CONFIG = {
+    database: {
+        type: './db'
+    },
+    accounting_proxy: {
+        port: 9000
+    },
+    log: {
+        file: 'file'
+    },
+    api: {
+        administration_paths: data.DEFAULT_ADMINISTRATION_PATHS
+    }
+};
 
 var mocker = function (implementations, callback) {
-    var mocks, spies, proxy_server;
 
-    mocks = {
-        app: {
-            set: function (prop, value) {},
-            listen: function (port) {},
-            get: function (prop) {},
-            use: function (middleware) {},
-            post: function (path, middleware, handler) {}
-        },
-        expressWinston: {
-            logger: function (transports) {}
-        },
-        req: {},
-        res: {},
-        config: {},
-        api: {},
-        notifier: {},
-        cron: {},
-        async: {
-            series: async.series,
-            each: async.each
-        },
-        url: {},
-        requester: {
-            request: {}
-        },
-        db: {},
-        logger: {
-            log: function (level, msg) {},
-            info: function (msg) {},
-            warn: function (msg) {},
-            error: function (msg) {},
-            transports: {
-                File: function (options) {}
-            }
-        },
-        contextBroker: {},
-        acc_modules: {},
-        accounter: {}
-    }
+    util.getSpies(implementations, function (spies) {
 
-    spies = {
-        app: {},
-        req: {},
-        res: {},
-        config: {},
-        api: {},
-        notifier: {},
-        cron: {},
-        async: {
-            series: sinon.spy(mocks.async, 'series'),
-            each: sinon.spy(mocks.async, 'each')
-        },
-        url: {},
-        requester: {},
-        db: {},
-        logger: {
-            log: sinon.spy(mocks.logger, 'log'),
-            warn: sinon.spy(mocks.logger, 'warn'),
-            info: sinon.spy(mocks.logger, 'info'),
-            error: sinon.spy(mocks.logger, 'error')
-        },
-        contextBroker: {},
-        acc_modules: {},
-        accounter: {}
-    }
-
-    // Complete app_mock implementation and add spies
-    if (implementations.config == undefined) {
-        mocks.config = {
-            accounting_proxy: {
-                port: 9000
-            }
+        // Add default configuration
+        var config = implementations.config ? implementations.config : DEFAULT_CONFIG;
+        if (implementations.config) {
+            for (var key in DEFAULT_CONFIG) {
+                config[key] = DEFAULT_CONFIG[key]
+            };
         }
-    } else if (implementations.config.accounting_proxy == undefined) {
-        mocks.config.accounting_proxy = {
-            port: 9000
-        }
-    }
-    mocks.config.database = {
-        type: './db'
-    }
-    mocks.config.api = {
-        administration_paths: adminPaths
-    }
-    mocks.config.log = {
-        file: 'file'
-    };
-    async.each(Object.keys(implementations), function (obj, task_callback1) {
-        async.each(Object.keys(implementations[obj]), function (implem, task_callback2) {
-            mocks[obj][implem.toString()] = implementations[obj][implem.toString()];
-            if ( typeof implementations[obj][implem] == 'function' && implementations[obj][implem] != undefined) {
-                if (obj == 'req' || obj == 'res') {
-                    spies[obj][implem.toString()] = sinon.spy(implementations[obj], implem.toString());
-                } else {
-                    spies[obj][implem.toString()] = sinon.spy(mocks[obj], implem.toString());
-                }
-                task_callback2();
-            } else {
-                task_callback2();
-            }
-        }, function () {
-            return task_callback1();
-        });
-    }, function () {
-        // Mocking dependencies
-        server = proxyquire('../../server', {
+
+        var app = implementations.app ? implementations.app : {};
+        app.use = app.use ? app.use : function (path, middleware1, middleware2, handler) {}
+        app.set = function (property, value) {} ;
+        app.post = function (path, middleware1, middleware2, middleware3, handler) {};
+        app.get = app.get ? app.get : function (path, middleware, handler) {};
+
+        var logger = implementations.logger ? implementations.logger : {};
+        logger.transports = {
+            File: function (options) {}
+        };
+
+        var server = proxyquire('../../server', {
             express: function () {
-                return mocks.app;
+                return app;
             },
-            request: mocks.requester.request,
-            './config': mocks.config,
-            './db': mocks.db,
-            'async': mocks.async,
-            './APIServer': mocks.api,
-            'winston': mocks.logger,
-            './notifier': mocks.notifier,
-            'node-schedule': mocks.cron,
-            './acc_modules/megabyte': mocks.acc_modules,
-            'url': mocks.url,
-            'express-winston': mocks.expressWinston,
-            './orion_context_broker/cb_handler': mocks.contextBroker,
-            './accounter': mocks.accounter
+            request: implementations.requester ? implementations.requester.request : {},
+            './config': config,
+            './db': implementations.db ? implementations.db : {},
+            './APIServer': implementations.api ? implementations.api : {},
+            'winston': logger,
+            './notifier': implementations.notifier ? implementations.notifier : {},
+            'node-schedule': implementations.cron ? implementations.cron : {},
+            './acc_modules/megabyte': implementations.accModule ? implementations.accModule : {},
+            'url': implementations.url ? implementations.url : {},
+            'express-winston': {logger: function (transports) {} },
+            './orion_context_broker/cb_handler': implementations.contextBroker ? implementations.contextBroker : {},
+            './accounter': implementations.accounter ? implementations.accounter : {}
         });
+
         return callback(server, spies);
     });
 }
@@ -144,1295 +69,530 @@ describe('Testing Server', function () {
 
     describe('Function "initialize"', function () {
 
-        it('error initializing the database', function (done) {
-            var implementations = {
-                db: {
-                    init: function (callback) {
-                        return callback('Error');
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                server.init(function (err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error');
-                    assert.equal(spies.async.series.callCount, 1);
-                    assert.equal(spies.db.init.callCount, 1);
-                    done();
-                });
-            });
-        });
+        var testInit = function (initErr, unit, notifyErr, notifyErrCron, done) {
 
-        it('error notifying the specifications', function (done) {
+            var port = data.DEFAULT_PORT;
+            var notifyCallCount = 0;
+
             var implementations = {
                 db: {
                     init: function (callback) {
-                        return callback(null);
+                        return callback(initErr)
                     }
                 },
                 notifier: {
                     notifyUsage: function (callback) {
-                        return callback('Error');
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                server.init(function (err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error');
-                    assert.equal(spies.async.series.callCount, 1);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsage.callCount, 1);
-                    done();
-                });
-            });
-        });
+                        notifyCallCount += 1;
 
-        it('error notifying the usage', function (done) {
-            var implementations = {
-                db: {
-                    init: function (callback) {
-                        return callback(null);
-                    }
-                },
-                notifier: {
-                    notifyUsage: function (callback) {
-                        return callback('Error');
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                server.init(function (err) {
-                    assert.equal(err, 'Error starting the accounting-proxy. Error');
-                    assert.equal(spies.async.series.callCount, 1);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsage.callCount, 1);
-                    done();
-                });
-            });
-        });
-
-        it('error notifying the accounting (cron service)', function (done) {
-            var cron = false;
-            var port = 9000;
-            var implementations = {
-                db: {
-                    init: function (callback) {
-                        return callback(null);
-                    }
-                },
-                notifier: {
-                    notifyUsage: function (callback) {
-                        if (cron) {
-                            cron = false;
-                            return callback('Error');
+                        if (notifyCallCount === 1) {
+                            return callback(notifyErr);
                         } else {
-                            cron = true;
-                            return callback(null);
+                            return callback(notifyErrCron);
                         }
                     }
-                },
-                cron: {
-                    scheduleJob: function (config, callback) {
-                        return callback();
-                    }
-                },
-                app: {
-                    listen: function (port) {},
-                    get: function (prop) {
-                        return port;
-                    }
-                },
-                contextBroker: {
-                    run: function () {}
                 },
                 config: {
                     resources: {
                         contextBroker: true
+                    },
+                    modules: {
+                        accounting: [unit]
                     },
                     usageAPI: {
                         schedule: '00 00 * * *'
                     }
+                },
+                cron: {
+                    scheduleJob: function (schedule, callback) {
+                        return callback(true)
+                    }
+                },
+                app: {
+                    listen: function (port) {},
+                    get: function (property) {
+                        return port;
+                    }
+                },
+                logger: {
+                    error: function (msg) {},
+                    info: function (msg) {}
+                },
+                contextBroker: {
+                    run: function () {}
                 }
-            }
+            };
+
             mocker(implementations, function (server, spies) {
+
                 server.init(function (err) {
-                    assert.equal(err, null);
-                    assert.equal(spies.async.series.callCount, 1);
-                    assert.equal(spies.db.init.callCount, 1);
-                    assert.equal(spies.notifier.notifyUsage.callCount, 2);
-                    assert.equal(spies.cron.scheduleJob.callCount, 1);
-                    assert.equal(spies.cron.scheduleJob.getCall(0).args[0], implementations.config.usageAPI.schedule);
-                    assert.equal(spies.logger.info.callCount, 1);
-                    assert.equal(spies.logger.info.getCall(0).args[0], 'Loading module for Orion Context Broker...');
-                    assert.equal(spies.contextBroker.run.callCount, 1);
-                    assert.equal(spies.logger.error.callCount, 1);
-                    assert.equal(spies.logger.error.getCall(0).args[0], 'Error while notifying the accounting: Error');
-                    assert.equal(spies.app.listen.callCount, 1);
-                    assert.equal(spies.app.listen.getCall(0).args[0], port);
-                    assert.equal(spies.app.get.callCount, 3);
-                    assert.equal(spies.app.get.getCall(2).args[0], 'port');
+
+                    assert(spies.db.init.calledOnce);
+
+                    if (initErr) {
+                        assert.equal(err, 'Error starting the accounting-proxy. ' + initErr);
+                    } else if (unit !== data.DEFAULT_UNIT) {
+                        assert.equal(err, 'Error starting the accounting-proxy. ' + 
+                            'No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
+                    } else if (notifyErr) {
+                        assert.equal(err, 'Error starting the accounting-proxy. ' + notifyErr);
+                    } else {
+
+                        assert(spies.logger.info.calledWith('Loading module for Orion Context Broker...'));
+                        assert(spies.contextBroker.run.calledOnce);
+                        assert(spies.cron.scheduleJob.calledWith(implementations.config.usageAPI.schedule));
+                        assert(spies.notifier.notifyUsage.calledTwice);
+                        assert(spies.logger.error.calledWith('Error while notifying the accounting: ' + notifyErrCron));
+                        assert(spies.app.get.calledWith('port'));
+                        assert(spies.app.listen.calledWith(port));
+
+                    }
+
                     done();
                 });
             });
+        };
+
+        it('should call the callback with error when db fails initializing', function (done) {
+            testInit(true, null, false, false, done);
         });
 
-        
+        it('should call the callback with error when there is no accounting module for an accounting unit', function (done) {
+            testInit(false, 'wrong', false, false, done);
+        });
+
+        it('should call the callback with error when there is an error notifying the usage', function (done) {
+            testInit(false, data.DEFAULT_UNIT, true, false, done);
+        });
+
+        it('should call the callback without error and initialize the proxy when there is no error initializing', function (done) {
+            testInit(false, data.DEFAULT_UNIT, false, true, done);
+        });
     });
 
-    describe('[Admin]', function () {
+    describe('Function "handler"', function () {
 
-        it('error getting url from dtabase', function (done) {
-            var userId = 'admin';
-            var publicPath = '/publicPath';
+        var testHandler = function (getAdminURLErr, apiKey, checkReqErr, correctReq, getAccInfoErr, done) {
+
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+            var userId = data.DEFAULT_USER_ID;
+
             var implementations = {
-                app: {
-                    use: function (path, middleware, middleware, handler) {
-                        if (path === '/') {
-                            return handler(implementations.req, implementations.res);
-                        }
+                req: {
+                    get: function (header) {
+                        return apiKey;
+                    },
+                    on: function (event, callback) {
+                        return callback();
+                    },
+                    publicPath: publicPath,
+                    user: {
+                        id: userId
                     }
                 },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return undefined;
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath
-                },
-                res:{
-                    status: function (code) {
+                res: {
+                    status: function (statusCode) {
                         return this;
                     },
+                    json: function (msg) {},
                     send: function () {}
                 },
                 db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback('Error', null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('error redirecting the request to the service', function (done) {
-            var userId = 'admin';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware, middleware, handler) {
-                        if (path === '/') {
-                            return handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return undefined;
+                    getAdminURL: function (path, userId, callback) {
+                        return callback(getAdminURLErr, null);
                     },
-                    method: method,
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {}
-                },
-                res:{
-                    status: function (code) {
-                        return this;
+                    checkRequest: function (userId, apiKey, path, callback) {
+                        return callback(checkReqErr, correctReq);
                     },
-                    send: function () {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, url);
+                    getAccountingInfo: function (apiKey, callback) {
+                        return callback(getAccInfoErr, null);
                     }
                 },
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', {}, null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.equal(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.equal(spies.requester.request.getCall(0).args[0].method, method);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {});
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 504);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('correct redirection to the service', function (done) {
-            var userId = 'admin';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
+                logger: {
+                    log: function (level, msg) {}
+                },
                 app: {
-                    use: function (path, middleware1, middleware2, handler) {
+                    use: function (path, middleqare1, middleware2, handler) {
                         if (path === '/') {
                             middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);
                         }
                     }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return undefined;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    method: method,
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {}
-                },
-                res:{
-                    send: function (body) {},
-                    setHeader: function (header, value) {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, url);
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, {headers: {'header1': 'value1'}}, null);
+                }
+            };
+
+            mocker(implementations, function (server, spies) {
+
+                assert(spies.req.get.calledWith('X-API-KEY'));
+                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+
+                if (getAdminURLErr) {
+
+                    assert(spies.res.status.calledWith(500));
+                    assert(spies.res.json.calledWith({error: getAdminURLErr}));
+
+                } else { 
+
+                    if (!apiKey) {
+
+                        assert(spies.logger.log.calledWith('debug', 'Undefined API_KEY'));
+                        assert(spies.res.status.calledWith(401));
+                        assert(spies.res.json.calledWith({ error: 'Undefined "X-API-KEY" header'}));
+
+                    } else {
+
+                        assert(spies.db.checkRequest.calledWith(userId, apiKey, publicPath));
+
+                        if (checkReqErr) {
+
+                            assert(spies.res.status.calledWith(500));
+                            assert(spies.res.send.calledOnce);
+
+                        } else if (!correctReq) {
+
+                            assert(spies.res.status.calledWith(401));
+                            assert(spies.res.json.calledWith({error: 'Invalid API_KEY or user'}));
+
+                        } else {
+
+                            assert(spies.db.getAccountingInfo.calledWith(apiKey));
+                            assert(spies.res.status.calledWith(500));
+                            assert(spies.res.send.calledOnce);
+
+                        }
                     }
                 }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].method, method);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {});
-                assert.equal(spies.res.send.callCount, 1);
+
                 done();
             });
+        };
+
+        it('should return 500 when db fails getting admin URLs', function (done) {
+            testHandler(true, null, false, false, false, done);
+        });
+
+        it('should return 401 when there is no API-Key in the reques headers', function (done) {
+            testHandler(false, undefined, false, false, false, done);
+        });
+
+        it('should return 500 when db fails checking the request', function (done) {
+            testHandler(false, data.DEFAULT_API_KEYS[0], true, false, false, done);
+        });
+
+        it('should return 401 when the apiKey or user is invalid', function (done) {
+            testHandler(false, data.DEFAULT_API_KEYS[0], false, false, false, done);
+        });
+
+        it('should return 500 when db fails getting the accounting information', function (done) {
+            testHandler(false, data.DEFAULT_API_KEYS[0], false, true, true, done);
+        });
+
+        it('should return 500 whenthere is no accounting information', function (done) {
+            testHandler(false, data.DEFAULT_API_KEYS[0], false, true, false, done);
         });
     });
 
-    describe('[No Admin | REST API]', function () {
+    describe('Admin user request', function (done) {
 
-        it('error, "API-KEY" header missing', function (done) {
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return undefined;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                },
-                res:{
-                    json: function (json) {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.logger.log.callCount, 1);
-                assert.equal(spies.logger.log.getCall(0).args[0], 'debug');
-                assert.equal(spies.logger.log.getCall(0).args[1], 'Undefined API_KEY');
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], { error: 'Undefined "X-API-KEY" header'});
-                done();
-            });
-        });
+        var testAdminRequest = function (requestErr, done) {
 
-        it('error checking the request', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback('Error', null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('error, invalid api-key or user', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                },
-                res:{
-                    json: function (json) {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, false);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 401);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0],{ error: 'Invalid API_KEY or user'});
-                done();
-            });
-        });
-
-        it('error getting accounting info', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback('Error', null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('error, no accounting info available', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'GET';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) {},
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback();
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 1);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('error sending the request to the service', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
+            var url = data.DEFAULT_URLS[0];
+            var restPath = '/rest';
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+            var userId = data.DEFAULT_USER_ID;
             var method = 'POST';
-            var unit = 'megabyte';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
-                        return false
-                    },
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('');
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
-                    }
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: false
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback('Error', {}, null);
-                    }
+            var headers = {};
+            var respBody = {};
+            var resp = {
+                statusCode: 200,
+                headers: {
+                    header1: 'header1'
                 }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].method, method);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {});
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].body, '');
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 504);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
+            };
 
-        it('error making the accounting (invalid unit)', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'POST';
-            var unit = 'wrong';
+            var options = {
+                url: url + restPath,
+                method: method,
+                headers: {'content-length': undefined},
+                json: true,
+                body: {}
+            };
+
             var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
-                        return false
-                    },
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('');
-                    },
-                    user: {id: userId},
+                req:  {
+                    method: method,
+                    headers: headers,
+                    restURL: restPath,
+                    body: '{}',
                     publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
+                    user: {
+                        id: userId
                     },
-                    setHeader: function (header, value) {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: false
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, {headers: {'header1': 'value1'}}, {});
-                    }
-                },
-                notifier: {
-                    acc_modules: {}
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback('invalid accounting unit "' + unit + '"');
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].method, method);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {});
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].body, '');
-                assert.equal(spies.res.setHeader.callCount, 1);
-                assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.logger.warn.callCount, 1);
-                assert.equal(spies.logger.warn.getCall(0).args[0], '[%s] Error making the accounting: invalid accounting unit "' + unit + '"');
-                assert.equal(spies.logger.warn.getCall(0).args[1], apiKey);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 500);
-                assert.equal(spies.res.send.callCount, 1);
-                done();
-            });
-        });
-
-        it('correct', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/restPath';
-            var url = 'http://localhost:9000/path';
-            var method = 'POST';
-            var unit = 'megabyte';
-            var amount = 1.357;
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
-                        return false
-                    },
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('');
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
-                },
-                res:{
-                    send: function () {},
-                    status: function (code) {
-                        return this;
-                    },
-                    setHeader: function (header, value) {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
-                    },
-                    makeAccounting: function (apiKey, amount, callback) {
-                        return callback(null);
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: false
-                    }
-                },
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, {headers: {'header1': 'value1'}}, {});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        megabyte: {
-                            count: function (body, callback) {
-                                return callback(null, amount);
-                            }
-                        }
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].method, method);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {});
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].body, '');
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.res.setHeader.callCount, 1);
-                assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
-                assert.equal(spies.res.send.callCount, 1);
-                assert.deepEqual(spies.res.send.getCall(0).args[0], {});
-                done();
-            });
-        });
-    });
-
-    describe('[No Admin | Context Broker]', function () {
-
-        it('error, Content-Type is not a JSON', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/v1/subscribeContext';
-            var url = 'http://localhost:1026';
-            var method = 'POST';
-            var unit = 'megabyte';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
-                        return false
-                    },
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('');
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
-                },
-                res:{
-                    json: function (JSON) {},
-                    status: function (code) {
-                        return this;
-                    },
-                    setHeader: function (header, value) {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: true
-                    }
-                },
-                url: {
-                    parse: function (url) {
-                        return { pathname: restPath}
-                    }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 1);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.res.status.callCount, 1);
-                assert.equal(spies.res.status.getCall(0).args[0], 415);
-                assert.equal(spies.res.json.callCount, 1);
-                assert.deepEqual(spies.res.json.getCall(0).args[0], {error: 'Content-Type must be "application/json"'});
-                done();
-            });
-        });
-
-        it('error handling the subscription/unsubscription', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/v1/subscribeContext';
-            var url = 'http://localhost:1026';
-            var method = 'POST';
-            var unit = 'megabyte';
-            var operation = 'subscribe';
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
+                    is: function (mimeType) {
                         return true;
                     },
                     get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('{}');
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
+                        return undefined;
+                    }
                 },
-                res:{
-                    json: function (JSON) {},
-                    status: function (code) {
+                res: {
+                    status: function (statusCode) {
                         return this;
                     },
+                    send: function () {},
                     setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
+                    getAdminURL: function (path, userId, callback) {
+                        return callback(null, url);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, resp, respBody);
+                    }
+                },
+                logger: {
+                    warn: function (msg, param) {}
+                },
+                app: {
+                    use: function (path, middleware1, middleware2, handler) {
+                        if (path === '/') {
+                            handler(implementations.req, implementations.res);
+                        }
+                    }
+                }
+            };
+
+            mocker(implementations, function (server, spies) {
+
+                assert(spies.req.get.calledWith('X-API-KEY'));
+                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+                assert(spies.requester.request.calledWith(options));
+
+                if (requestErr) {
+
+                    assert(spies.res.status.calledWith(504));
+                    assert(spies.res.send.calledOnce);
+                    assert(spies.logger.warn.calledWith('[%s] An error ocurred requesting the endpoint: ' + options.url, null));
+
+                } else {
+
+                    for (var key in resp.headers) {
+                        assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
+                    }
+                    assert(spies.res.status.calledWith(resp.statusCode));
+                    assert(spies.res.send.calledWith(respBody));
+                }
+
+                done();
+            });
+        };
+
+        it('should return 504 when there is a problem sending request to the service', function (done) {
+            testAdminRequest(true, done);
+        });
+
+        it('should redirect the response to the administrator when there is no error sending the request to the service', function (done) {
+            testAdminRequest(false, done);
+        });
+    });
+
+    describe('Normal user request (REST service)', function () {
+
+
+        var testUserRequest = function (contextBroker, isJson, operation, requestErr, countErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var url = data.DEFAULT_URLS[0];
+            var cbPath = '/v1/entities';
+            var method = 'POST';
+            var unit = data.DEFAULT_UNIT;
+            var restURL = '/rest';
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+            var userId = data.DEFAULT_USER_ID;
+            var body = isJson ? '{}' : {};
+            var accountingInfo = {
+                url: url,
+                unit: unit
+            };
+            var resp = {
+                statusCode: 200,
+                headers: {
+                    header1: 'header1'
+                }
+            };
+            var respBody = {};
+
+            var options = {
+                url: url + restURL,
+                method: method,
+                headers: {},
+                body: {}
+            };
+
+            var implementations = {
+                req: {
+                    method: method,
+                    headers: {},
+                    restURL: restURL,
+                    user: {
+                        id: userId
+                    },
+                    publicPath: publicPath,
+                    body: body,
+                    get: function (header) {
+                        return apiKey;
+                    },
+                    is: function (mimeType) {
+                        return isJson;
+                    }
+                },
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    send: function (body) {},
+                    setHeader: function (header, value) {},
+                    json: function (msg) {}
+                },
+                db: {
+                    getAdminURL: function (path, userId, callback) {
                         return callback(null, null);
                     },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
+                    checkRequest: function (userId, apiKey, path, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
+                        return callback(null, accountingInfo);
                     }
                 },
-                config: {
-                    resources: {
-                        contextBroker: true
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, resp, respBody);
                     }
                 },
-                url: {
-                    parse: function (url) {
-                        return { pathname: restPath}
+                app: {
+                    use: function (path, middleware1, middleware2, handler) {
+                        if (path == '/') {
+                            handler(implementations.req, implementations.res);
+                        }
+                    }
+                },
+                accounter: {
+                    count: function (apiKey, unit, requestInfo, countFunction, callback) {
+                        return callback(countErr);
                     }
                 },
                 contextBroker: {
                     getOperation: function (path, req, callback) {
-                        return callback(operation);
+                        return callback(operation)
                     },
                     subscriptionHandler: function (req, res, url, operation, unit, callback) {
                         return callback('Error');
                     }
-                }
-            }
-            mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 2);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.contextBroker.getOperation.callCount, 1);
-                assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], restPath);
-                assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
-                assert.equal(spies.contextBroker.subscriptionHandler.callCount, 1);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[0], implementations.req);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[2], url + restPath);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[3], operation);
-                assert.equal(spies.contextBroker.subscriptionHandler.getCall(0).args[4], unit);
-                assert.equal(spies.logger.warn.callCount, 1);
-                assert.equal(spies.logger.warn.getCall(0).args[0], '[%s] Error');
-                done();
-            });
-        });
-
-        it('correct', function (done) {
-            var apiKey = 'apiKey';
-            var userId = 'user';
-            var publicPath = '/publicPath';
-            var restPath = '/v1/subscribeContext';
-            var url = 'http://localhost:1026';
-            var method = 'POST';
-            var unit = 'megabyte';
-            var operation = 'another';
-            var amount = 1.357;
-            var implementations = {
-                app: {
-                    use: function (path, middleware1, middleware2, handler) {
-                        if (path === '/') {
-                            middleware2(implementations.req, implementations.res, function () {});
-                            handler(implementations.req, implementations.res);
-                        }
-                    }
-                },
-                req: {
-                    is: function (type) { 
-                        return true;
-                    },
-                    get: function (header) {
-                        return apiKey;
-                    },
-                    on: function (event, callback) {
-                        return callback('{}');
-                    },
-                    user: {id: userId},
-                    publicPath: publicPath,
-                    restPath: restPath,
-                    headers: {},
-                    method: method
-                },
-                res:{
-                    send: function (JSON) {},
-                    status: function (code) {
-                        return this;
-                    },
-                    setHeader: function (header, value) {}
-                },
-                db: {
-                    getAdminUrl: function (userId, publicPath, callback) {
-                        return callback(null, null);
-                    },
-                    checkRequest: function (userId, apiKey, publicPath, callback) {
-                        return callback(null, true);
-                    },
-                    getAccountingInfo: function (apiKey, callback) {
-                        return callback(null, {url: url, unit: unit});
-                    },
-                    makeAccounting: function (apiKey, amount, callback) {
-                        return callback(null);
-                    }
-                },
-                config: {
-                    resources: {
-                        contextBroker: true
-                    }
                 },
                 url: {
                     parse: function (url) {
-                        return { pathname: restPath}
+                        return {
+                            pathname: cbPath
+                        };
                     }
                 },
-                contextBroker: {
-                    getOperation: function (path, req, callback) {
-                        return callback(operation);
-                    },
-                    subscriptionHandler: function (req, res, url, unit, operation, callback) {
-                        return callback('Error');
-                    }
+                logger: {
+                    warn: function (msg, param) {}
                 },
-                requester: {
-                    request: function (options, callback) {
-                        return callback(null, {headers: {'header1': 'value1'}}, {});
-                    }
-                },
-                notifier: {
-                    acc_modules: {
-                        megabyte: {
-                            count: function (body, callback) {
-                                return callback(null, amount);
-                            }
-                        }
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, countInfo, countFunction, callback) {
-                        return callback(null);
+                config: {
+                    resources: {
+                        contextBroker: contextBroker
                     }
                 }
-            }
+            };
+
             mocker(implementations, function (server, spies) {
-                assert.equal(spies.req.on.callCount, 2);
-                assert.equal(spies.req.on.getCall(0).args[0], 'data');
-                assert.equal(spies.req.on.getCall(1).args[0], 'end');
-                assert.equal(spies.req.get.callCount, 2);
-                assert.equal(spies.req.get.getCall(0).args[0], 'X-API-KEY');
-                assert.equal(spies.req.get.getCall(1).args[0], 'X-API-KEY');
-                assert.equal(spies.req.is.callCount, 2);
-                assert.equal(spies.req.is.getCall(0).args[0], 'application/json');
-                assert.equal(spies.req.is.getCall(1).args[0], 'application/json');
-                assert.equal(spies.db.getAdminUrl.callCount, 1);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[0], userId);
-                assert.equal(spies.db.getAdminUrl.getCall(0).args[1], publicPath);
-                assert.equal(spies.db.checkRequest.callCount, 1);
-                assert.equal(spies.db.checkRequest.getCall(0).args[0], userId);
-                assert.equal(spies.db.checkRequest.getCall(0).args[1], apiKey);
-                assert.equal(spies.db.checkRequest.getCall(0).args[2], publicPath);
-                assert.equal(spies.db.getAccountingInfo.callCount, 1);
-                assert.equal(spies.db.getAccountingInfo.getCall(0).args[0], apiKey);
-                assert.equal(spies.contextBroker.getOperation.callCount, 1);
-                assert.equal(spies.contextBroker.getOperation.getCall(0).args[0], restPath);
-                assert.deepEqual(spies.contextBroker.getOperation.getCall(0).args[1], implementations.req);
-                assert.equal(spies.requester.request.callCount, 1);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].url, url + restPath);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].method, 'POST');
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].json, true);
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].headers, {'content-length': undefined });
-                assert.deepEqual(spies.requester.request.getCall(0).args[0].body, {});
-                assert.equal(spies.res.setHeader.callCount, 1);
-                assert.equal(spies.res.setHeader.getCall(0).args[0], 'header1');
-                assert.equal(spies.res.setHeader.getCall(0).args[1], 'value1');
-                assert.equal(spies.accounter.count.callCount, 1);
-                assert.equal(spies.accounter.count.getCall(0).args[0], apiKey);
-                assert.equal(spies.accounter.count.getCall(0).args[1], unit);
-                assert.equal(spies.accounter.count.getCall(0).args[3], 'count');
-                assert.equal(spies.res.send.callCount, 1);
-                assert.deepEqual(spies.res.send.getCall(0).args[0], {});
+
+                assert(spies.req.get.calledWith('X-API-KEY'));
+                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+                assert(spies.db.checkRequest.calledWith(userId, apiKey, publicPath));
+                assert(spies.db.getAccountingInfo.calledWith(apiKey));
+                assert(spies.req.is.calledWith('application/json'));
+
+                if (contextBroker) {
+                    assert(spies.url.parse.calledWith(options.url));
+
+                    if (!isJson) {
+                        assert(spies.res.status.calledWith(415));
+                        assert(spies.res.json.calledWith({error: 'Content-Type must be "application/json"'}));
+                    } else {
+                        assert(spies.url.parse.calledTwice);
+                        assert(spies.contextBroker.getOperation.calledWith(cbPath, implementations.req));
+
+                        if (operation) {
+                            assert(spies.logger.warn.calledWith('[%s] ' + 'Error', apiKey));
+                        }
+                    }
+
+                } else {
+
+                    assert(spies.requester.request.calledWith(options));
+
+                    if (requestErr) {
+
+                        assert(spies.res.status.calledWith(504));
+                        assert(spies.res.send.calledOnce);
+                        assert(spies.logger.warn.calledWith('[%s] An error ocurred requesting the endpoint: ' + options.url, apiKey));
+
+                    } else {
+
+                        for (var key in resp.headers) {
+                            assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
+                        }
+                        assert(spies.accounter.count.calledWith(apiKey, unit));
+
+                        if (countErr) {
+
+                            assert(spies.logger.warn.calledWith('[%s] Error making the accounting: ' + countErr, apiKey));
+                            assert(spies.res.status.calledWith(500));
+                            assert(spies.res.send.calledOnce);
+
+                        } else {
+
+                            assert(spies.res.status.calledWith(resp.statusCode));
+                            assert(spies.res.send.calledWith(respBody));
+
+                        }
+                    }
+                }
+
                 done();
             });
+        };
+
+        it('should return 504 when there is an error sending the request to the service', function (done) {
+            testUserRequest(false, false, null, true, false, done);
+        });
+
+        it('should return 500 when there is an error making the accounting', function (done) {
+            testUserRequest(false, false, null, false, true, done);
+        });
+
+        it('should return the service response and make the accounting when there is no error', function (done) {
+            testUserRequest(false, false, null, false, false, done);
+        });
+
+        it('should return 415 when the CB request mime type is not "application/json"', function (done) {
+            testUserRequest(true, false, 'updateSubscription', false, false, done);
+        });
+
+        it('should return 415 when the CB request mime type is not "application/json"', function (done) {
+            testUserRequest(true, false, 'updateSubscription', false, false, done);
+        });
+
+        it('should return the CB response and make the accounting when there is no error (updateSubscription)', function (done) {
+            testUserRequest(true, true, 'updateSubscription', false, false, done);
+        });
+
+        it('should return the CB response and make the accounting when there is no error (GET entities)', function (done) {
+            testUserRequest(true, true, null, false, false, done);
         });
     });
 });

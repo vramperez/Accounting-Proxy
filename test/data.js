@@ -16,7 +16,33 @@ var data = {
     DEFAULT_PRODUCT_IDS: ['productId1', 'productId2'],
     DEFAULT_HREF: 'http://localhost/DSUsageManagement/1',
     DEFAULT_USER_ID: 'userId',
-    DEFAULT_REQ_PATH: '/public/service'
+    DEFAULT_REQ_PATH: '/public/service',
+    DEFAULT_PORT: 9000,
+    DEFAULT_SUBS_PATH: '/subscription',
+    DEFAULT_UNSUBS_PATH: '/unsubscription',
+    DEFAULT_UPDATE_SUBS_PATH: '/updatesubscription',
+    DEFAULT_SUBS_ID: 'subsId',
+    DEFAULT_DURATION: 'P1M'
+};
+
+data.DEFAULT_SUBS_URLS = [
+    ['DELETE', data.DEFAULT_UNSUBS_PATH, 'unsubscribe'],
+    ['POST', data.DEFAULT_SUBS_PATH, 'subscribe'],
+    ['POST', data.DEFAULT_UPDATE_SUBS_PATH, 'updateSubscription']
+];
+
+data.DEFAULT_SUBSCRIPTION = {
+    apiKey: data.DEFAULT_API_KEYS[0],
+    subscriptionId: data.DEFAULT_SUBS_ID,
+    unit: data.DEFAULT_UNIT,
+    notificationUrl: data.DEFAULT_URLS[0]
+};
+
+data.DEFAULT_SUBS_RESPONSE = {
+    subscribeResponse: {
+        subscriptionId: data.DEFAULT_SUBS_ID,
+        duration: data.DEFAULT_DURATION
+    }
 };
 
 data.DEFAULT_SERVICES = [{
@@ -39,7 +65,10 @@ data.DEFAULT_NOTIFICATION_INFO = [{
 }];
 
 data.DEFAULT_ADMINISTRATION_PATHS = {
-    keys: '/accounting_proxy/keys'
+    keys: '/accounting_proxy/keys',
+    units: '/accounting_proxy/units',
+    newBuy: '/accounting_proxy/buys',
+    checkURL: '/accounting_proxy/urls'
 };
 
 data.DEFAULT_ROLES = {

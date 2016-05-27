@@ -799,7 +799,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getAdmins"', function () {
 
-        var testGetAdmins = function (error, admins, result, done) {
+        var testGetAdmins = function (error, admins, done) {
 
             var smembers = function (hash, callback) {
                 return callback(error, admins);
@@ -822,7 +822,7 @@ describe('Testing REDIS database', function () {
                     assert.equal(res, null);
                 } else {
                     assert.equal(err, null);
-                    assert.deepEqual(res, result);
+                    assert.deepEqual(res, admins);
                 }
 
                 done();
@@ -830,15 +830,15 @@ describe('Testing REDIS database', function () {
         };
 
         it('should call the callback with error when db fails getting the admins', function (done) {
-            testGetAdmins(true, null, null, done);
+            testGetAdmins(true, null, done);
         });
 
         it('should call the callback without error when db returns all admins', function (done) {
-            testGetAdmins(false, ['admin1', 'admin2'], [{idAdmin: 'admin1'}, {idAdmin: 'admin2'}], done);
+            testGetAdmins(false, ['admin1', 'admin2'], done);
         });
     });
 
-    describe('FUnction "getAdminUrl"', function () {
+    describe('FUnction "getAdminURL"', function () {
 
         var testGetAdminUrl = function (smembersErr, admins, hgetErr, done) {
 
@@ -862,7 +862,7 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.getAdminUrl(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.getAdminURL(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
 

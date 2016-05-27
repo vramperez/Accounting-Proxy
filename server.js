@@ -87,7 +87,7 @@ var CBrequestHandler = function(req, res, options, unit) {
         if (operation === 'subscribe' || operation === 'unsubscribe' || operation === 'updateSubscription') {
             contextBroker.subscriptionHandler(req, res, options.url, operation, unit, function (err) {
                 if (err) {
-                    logger.warn('[%s] ' + err, apiKey || 'Admin');
+                    logger.warn('[%s] ' + err, apiKey);
                 }
             });
         } else {
@@ -108,7 +108,7 @@ var requestHandler = function (options, res, apiKey, unit) {
     var requestInfo = {};
 
     // Save request Info
-    requestInfo.request = options;
+    requestInfo.request = JSON.parse(JSON.stringify(options));
     requestInfo.request.time = new Date().getTime();
 
     request(options, function (error, resp, body) {
@@ -125,14 +125,14 @@ var requestHandler = function (options, res, apiKey, unit) {
                 res.setHeader(header, resp.headers[header]);
             }
             if (apiKey === null && unit === null) { // No accounting (admin user)
-                res.send(body);
+                res.status(resp.statusCode).send(body);
             } else {
                 accounter.count(apiKey, unit, requestInfo, 'count', function (err) {
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                         res.status(500).send();
                     } else {
-                        res.send(body);
+                        res.status(resp.statusCode).send(body);
                     }
                 });
             }
@@ -212,7 +212,6 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
  */
 var handler = function (req, res) {
     var apiKey = req.get('X-API-KEY');
-    var contentType = req.is('application/json');
 
     db.getAdminURL(req.publicPath, req.user.id, function (err, endpointURL) {
 
@@ -224,7 +223,7 @@ var handler = function (req, res) {
 
         } else{ // Not admin user
 
-            if (apiKey === undefined) {
+            if (!apiKey) {
                 logger.log('debug', 'Undefined API_KEY');
                 res.status(401).json({ error: 'Undefined "X-API-KEY" header'});
 
@@ -244,7 +243,6 @@ var handler = function (req, res) {
                                 res.status(500).send();
                             } else {
                                 prepareRequest(req, res, accountingInfo.url + req.restURL, apiKey, accountingInfo.unit);
-
                             }
                         });
                     }

@@ -1059,7 +1059,7 @@ describe('Testing REDIS database', function () {
                 } else if (apiKeys.length === 0) {
 
                     assert.equal(err, null);
-                    assert.equal(res, resultExpected);
+                    assert.deepEqual(res, resultExpected);
 
                 } else {
 
@@ -1087,7 +1087,7 @@ describe('Testing REDIS database', function () {
         });
 
         it('should call the callback without error when there are not API keys', function (done) {
-           testGetApiKeys(false, [], false, null, done); 
+           testGetApiKeys(false, [], false, [], done); 
         });
 
         it('should call the callback with error when db fails getting accounting info', function (done) {

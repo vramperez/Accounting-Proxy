@@ -99,11 +99,6 @@ describe('Testing APIServer', function() {
                     assert(spies.res.status.calledWith(500));
                     assert(spies.res.send.calledOnce);
 
-                } else if (!apiKeysInfo) {
-
-                    assert(spies.res.status.calledWith(404));
-                    assert(spies.res.json.calledWith({error: 'No api-keys available for the user ' + user}));
-
                 } else {
 
                     assert(spies.res.status.calledWith(200));
@@ -120,7 +115,7 @@ describe('Testing APIServer', function() {
         });
 
         it('should return 404 when there is not API keys for the user specified', function(done) {
-            testGetApiKeys(false, null, done);
+            testGetApiKeys(false, [], done);
         });
 
         it('should return 200 when the response contains the user API keys', function(done) {

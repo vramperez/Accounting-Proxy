@@ -456,8 +456,6 @@ exports.getApiKeys = function (user, callback) {
     db.smembers(user, function (err, apiKeys) {
         if (err) {
             return callback('Error in databse getting api-keys.', null);
-        } else if (apiKeys.length === 0) {
-            return callback(null, null);
         } else {
             async.each(apiKeys, function (apiKey, task_callback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {

@@ -130,8 +130,6 @@ exports.getApiKeys = function (req, res) {
     db.getApiKeys(user, function (err, apiKeysInfo) {
         if (err) {
             res.status(500).send();
-        } else if (!apiKeysInfo) {
-            res.status(404).json({error: 'No api-keys available for the user ' + user});
         } else {
             res.status(200).json(apiKeysInfo);
         }

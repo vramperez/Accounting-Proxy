@@ -448,8 +448,6 @@ exports.getApiKeys = function (user, callback) {
             }, function (err, apiKeys) {
                 if (err) {
                     return callback('Error in databse getting api-keys.', null);
-                } else if (apiKeys.length === 0) {
-                    return callback(null, null);
                 } else {
                     return callback(null, apiKeys);
                 }

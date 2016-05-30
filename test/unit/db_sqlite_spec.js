@@ -988,12 +988,7 @@ describe('Testing SQLITE database', function () {
                 } else {
 
                     assert.equal(err, null);
-
-                    if(apiKeys.length === 0) {
-                        assert.equal(res, null);
-                    } else {
-                        assert.equal(res, apiKeys);
-                    }
+                    assert.equal(res, apiKeys);
                 }
 
                 done();

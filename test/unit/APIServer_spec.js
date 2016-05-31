@@ -66,7 +66,7 @@ describe('Testing APIServer', function() {
 
         var testGetApiKeys = function (error, apiKeysInfo, done) {
 
-            var user = data.DEFAULT_USER;
+            var user = data.DEFAULT_USER_ID;
 
             var implementations = {
                 req: {
@@ -125,9 +125,8 @@ describe('Testing APIServer', function() {
 
     describe('Function "checkURL"', function() {
 
-        var testcheckURL = function (body, userId, getAdminsErr, admins, addTokenErr, checkPathErr, checkResult, done) {
+        var testcheckURL = function (body, userId, getAdminsErr, admins, token, addTokenErr, done) {
 
-            var token = data.DEFAULT_TOKEN;
             var path = '/path';
             var espias;
 
@@ -135,7 +134,11 @@ describe('Testing APIServer', function() {
                 req: {
                     setEncoding: function (encoding) {},
                     get: function (header) {
-                        return token;
+                        if (token) {
+                            return token;
+                        } else {
+                            return undefined;
+                        }
                     },
                     body: body,
                     user: {
@@ -152,9 +155,6 @@ describe('Testing APIServer', function() {
                 db: {
                     addToken: function (token, callback) {
                         return callback(addTokenErr);
-                    },
-                    checkPath: function (path, callback) {
-                        return callback(checkPathErr, checkResult);
                     },
                     getAdmins: function (path, callback) {
                         return callback(getAdminsErr, admins)
@@ -188,6 +188,7 @@ describe('Testing APIServer', function() {
                 } else {
 
                     assert(spies.db.getAdmins.calledWith(path));
+                    assert(spies.url.parse.calledWith(body.url));
 
                     if (getAdminsErr) {
 
@@ -201,28 +202,17 @@ describe('Testing APIServer', function() {
 
                     } else {
 
-                        if (addTokenErr) {
-                            assert(spies.logger.error.calledWith(addTokenErr));
+                        if (token) {
+
+                            assert(spies.db.addToken.calledWith(token));
+
+                            if (addTokenErr) {
+                                assert(spies.logger.error.calledWith(addTokenErr));
+                            }
                         }
 
-                        assert(spies.db.checkPath.calledWith(path));
-
-                        if (checkPathErr) {
-
-                            assert(spies.res.status.calledWith(500));
-                            assert(spies.res.send.calledOnce);
-
-                        } else if (checkResult) {
-
-                            assert(spies.res.status.calledWith(200));
-                            assert(spies.res.send.calledOnce);
-
-                        } else {
-
-                            assert(spies.res.status.calledWith(400));
-                            assert(spies.res.json.calledWith({error: 'Incorrect url ' + body.url}));
-
-                        }
+                        assert(spies.res.status.calledWith(200));
+                        assert(spies.res.send.calledOnce);
                     }
                 }
 
@@ -232,31 +222,27 @@ describe('Testing APIServer', function() {
         };
 
         it('should return 422 when the body is not valid', function (done) {
-            testcheckURL({}, null, null, null, false, false, false, done);
+            testcheckURL({}, null, null, null, false, false, done);
         });
 
         it('should return 500 when db fails getting the admins', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, null, 'Error', null, false, false, false, done);
+            testcheckURL({url: data.DEFAULT_URLS[0]}, null, 'Error', null, false, false, done);
         });
 
         it('should return 401 when there is no admins for the service', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, null, false, false, false, done);
+            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, null, false, false, done);
         });
 
         it('should return 401 when the user is not an admin', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, 'wrong', false, [data.DEFAULT_USER_ID], false, false, false, done);
-        });
-
-        it('should return 500 when db fails checking the path', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, [data.DEFAULT_USER_ID], true, true, false, done);
-        });
-
-        it('should return 400 when the URL is not valid', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, [data.DEFAULT_USER_ID], false, false, false, done);
+            testcheckURL({url: data.DEFAULT_URLS[0]}, 'wrong', false, [data.DEFAULT_USER_ID], false, false, done);
         });
 
         it('should return 200 when the URL is valid', function (done) {
-            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, [data.DEFAULT_USER_ID], false, false, true, done);
+            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, [data.DEFAULT_USER_ID], null, false, done);
+        });
+
+        it('should return 200 and log the error when the URL is valid but db fails adding the token', function (done) {
+            testcheckURL({url: data.DEFAULT_URLS[0]}, data.DEFAULT_USER_ID, false, [data.DEFAULT_USER_ID], data.DEFAULT_TOKEN, true, done);
         });
     });
 

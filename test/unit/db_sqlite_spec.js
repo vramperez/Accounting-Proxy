@@ -9,7 +9,7 @@ var proxyquire = require('proxyquire'),
  *
  * @param  {Object}   implementations Dependencies to mock and spy.
  */
-var getDb = function (implementations, callback) {
+var getDb = function (implementations) {
 
     var sqlite_stub = {
         verbose: function () {
@@ -23,10 +23,12 @@ var getDb = function (implementations, callback) {
         }
     };
 
-    return proxyquire('../../db', {
+    var db =  proxyquire('../../db', {
         sqlite3: sqlite_stub,
         'sqlite3-transactions': transaction_stub
     });
+
+    return db;
 };
 
 describe('Testing SQLITE database', function () {
@@ -37,16 +39,16 @@ describe('Testing SQLITE database', function () {
             'PRAGMA foreign_keys = 1;',
             'CREATE TABLE IF NOT EXISTS token ( \
                     token               TEXT, \
-                    PRIMARY KEY (token)         )',
+                    PRIMARY KEY (token)             )',
             'CREATE TABLE IF NOT EXISTS units ( \
                     unit                TEXT, \
                     href                TEXT, \
-                    PRIMARY KEY (unit)         )',
+                    PRIMARY KEY (unit)             )',
             'CREATE TABLE IF NOT EXISTS services ( \
                     publicPath          TEXT, \
                     url                 TEXT, \
                     appId               TEXT, \
-                    PRIMARY KEY (publicPath)         )',
+                    PRIMARY KEY (publicPath)             )',
             'CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
                     publicPath          TEXT, \
@@ -58,42 +60,39 @@ describe('Testing SQLITE database', function () {
                     recordType          TEXT, \
                     correlationNumber   TEXT, \
                     PRIMARY KEY (apiKey), \
-                    FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE        )',
+                    FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE            )',
             'CREATE TABLE IF NOT EXISTS subscriptions ( \
                     subscriptionId      TEXT, \
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
                     PRIMARY KEY (subscriptionId), \
-                    FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE        )',
+                    FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE            )',
             'CREATE TABLE IF NOT EXISTS admins ( \
                     idAdmin             TEXT, \
-                    PRIMARY KEY (idAdmin)        )',
+                    PRIMARY KEY (idAdmin)            )',
             'CREATE TABLE IF NOT EXISTS administer ( \
                     idAdmin             TEXT, \
                     publicPath          TEXT, \
                     PRIMARY KEY (idAdmin, publicPath), \
                     FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE, \
-                    FOREIGN KEY (idAdmin) REFERENCES admins (idAdmin) ON DELETE CASCADE        )'
+                    FOREIGN KEY (idAdmin) REFERENCES admins (idAdmin) ON DELETE CASCADE            )'
         ];
 
         it('correct initialization', function (done) {
 
             var implementations = {
-                serialize: function (callback) {
-                    return callback();
-                },
-                run: function (sentence) {}
+                run: function (sentence, callback) {
+                    return callback(null);
+                }
             };
 
             var runSpy = sinon.spy(implementations, 'run');
-            var serializeSpy = sinon.spy(implementations, 'serialize');
 
             var db = getDb(implementations);
 
             db.init(function (err) {
 
                 assert.equal(err, null);
-                assert(serializeSpy.calledOnce);
                 assert.equal(runSpy.callCount, 9);
 
                 async.forEachOf(runSpy.args, function (call, i, task_callback) {
@@ -899,17 +898,18 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "newBuy"', function () {
 
+        var buyInfo = data.DEFAULT_BUY_INFORMATION[0];
         var sentence = 'INSERT OR REPLACE INTO accounting \
                 VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)';
         var params = {
-            "$apiKey": data.DEFAULT_API_KEYS[0],
+            "$apiKey": buyInfo.apiKey,
             "$correlationNumber": 0,
-            "$customer": data.DEFAULT_USER,
-            "$orderId": data.DEFAULT_ORDER_IDS[0],
-            "$productId": data.DEFAULT_PRODUCT_IDS[0],
-            "$publicPath": data.DEFAULT_PUBLIC_PATHS[0],
-            "$recordType": data.DEFAULT_RECORD_TYPE,
-            "$unit": data.DEFAULT_UNIT,
+            "$customer": buyInfo.customer,
+            "$orderId": buyInfo.orderId,
+            "$productId": buyInfo.productId,
+            "$publicPath": buyInfo.publicPath,
+            "$recordType": buyInfo.recordType,
+            "$unit": buyInfo.unit,
             "$value": 0
         };
 
@@ -933,7 +933,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.newBuy(data.DEFAULT_BUY_INFORMATION, function (err) {
+            db.newBuy(data.DEFAULT_BUY_INFORMATION[0], function (err) {
 
                 assert(serializeSpy.calledOnce);
                 assert(runSpy.calledWith(sentence, params));
@@ -962,7 +962,7 @@ describe('Testing SQLITE database', function () {
         var sentence = 'SELECT apiKey, productId, orderId \
             FROM accounting \
             WHERE customer=$user';
-        var params = {'$user': data.DEFAULT_USER};
+        var params = {'$user': data.DEFAULT_USER_ID_ID};
 
         var testGetApiKeys = function (error, apiKeys, done) {
 
@@ -978,7 +978,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.getApiKeys(data.DEFAULT_USER, function (err, res) {
+            db.getApiKeys(data.DEFAULT_USER_ID_ID, function (err, res) {
 
                 assert(allSpy.calledWith(sentence, params));
 
@@ -1029,7 +1029,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.checkRequest(data.DEFAULT_USER, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.checkRequest(data.DEFAULT_USER_ID, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(getSpy.calledWith(sentence, params));
 
@@ -1039,7 +1039,7 @@ describe('Testing SQLITE database', function () {
 
                     assert.equal(err, null);
 
-                    if (!user || user.customer !== data.DEFAULT_USER) {
+                    if (!user || user.customer !== data.DEFAULT_USER_ID) {
                         assert.equal(res, false);
                     } else {
                         assert.equal(res, true);
@@ -1063,7 +1063,7 @@ describe('Testing SQLITE database', function () {
         });
 
         it('should call the callback without error when there is not an error checking the request ', function (done) {
-           testCheckRequest(null, {customer: data.DEFAULT_USER}, done);  
+           testCheckRequest(null, {customer: data.DEFAULT_USER_ID}, done);  
         });
     });
 
@@ -1177,7 +1177,7 @@ describe('Testing SQLITE database', function () {
                 apiKey: data.DEFAULT_API_KEYS[0],
                 orderId: data.DEFAULT_ORDER_IDS[0],
                 productId: data.DEFAULT_PRODUCT_IDS[0],
-                customer: data.DEFAULT_USER,
+                customer: data.DEFAULT_USER_ID,
                 value: 0,
                 correlationNumber: 0,
                 recordType: data.DEFAULT_RECORD_TYPE,

@@ -7,7 +7,6 @@ var data = {
     DEFAULT_APP_IDS: ['appId1', 'appId2'],
     DEFAULT_URLS: ['http://example:8080/path1', 'http://example:8080/path2'],
     DEFAULT_ID_ADMIN: 'idAdmin',
-    DEFAULT_USER: '0001',
     DEFAULT_API_KEYS: ['apiKey1', 'apiKey2'],
     DEFAULT_RECORD_TYPE: 'quantity',
     DEFAULT_SUBSCRIPTION_ID: 'subscriptionId',
@@ -85,14 +84,22 @@ data.DEFAULT_USER_PROFILE = {
     roles: [{id: data.DEFAULT_ROLES.customer}]
 };
 
-data.DEFAULT_BUY_INFORMATION = {
-     apiKey: data.DEFAULT_API_KEYS[0],
-     publicPath: data.DEFAULT_PUBLIC_PATHS[0],
-     orderId: data.DEFAULT_ORDER_IDS[0],
-     productId: data.DEFAULT_PRODUCT_IDS[0],
-     customer: data.DEFAULT_USER,
-     unit: data.DEFAULT_UNIT,
-     recordType: data.DEFAULT_RECORD_TYPE
-};
+data.DEFAULT_BUY_INFORMATION = [{
+    apiKey: data.DEFAULT_API_KEYS[0],
+    publicPath: data.DEFAULT_PUBLIC_PATHS[0],
+    orderId: data.DEFAULT_ORDER_IDS[0],
+    productId: data.DEFAULT_PRODUCT_IDS[0],
+    customer: data.DEFAULT_USER_ID,
+    unit: data.DEFAULT_UNIT,
+    recordType: data.DEFAULT_RECORD_TYPE
+}, {
+    apiKey: data.DEFAULT_API_KEYS[1],
+    publicPath: data.DEFAULT_PUBLIC_PATHS[1],
+    orderId: data.DEFAULT_ORDER_IDS[1],
+    productId: data.DEFAULT_PRODUCT_IDS[1],
+    customer: data.DEFAULT_USER_ID,
+    unit: data.DEFAULT_UNIT,
+    recordType: data.DEFAULT_RECORD_TYPE
+}];
 
 module.exports = data;

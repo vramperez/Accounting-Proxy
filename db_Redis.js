@@ -454,10 +454,11 @@ exports.getApiKeys = function (user, callback) {
     var toReturn = [];
 
     db.smembers(user, function (err, apiKeys) {
+
         if (err) {
             return callback('Error in databse getting api-keys.', null);
         } else {
-            async.each(apiKeys, function (apiKey, task_callback) {
+            async.each(apiKeys.sort(), function (apiKey, task_callback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
                     if (err) {
                         return task_callback('Error in databse getting api-keys.');

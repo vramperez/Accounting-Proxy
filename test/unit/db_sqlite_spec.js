@@ -962,7 +962,7 @@ describe('Testing SQLITE database', function () {
         var sentence = 'SELECT apiKey, productId, orderId \
             FROM accounting \
             WHERE customer=$user';
-        var params = {'$user': data.DEFAULT_USER_ID_ID};
+        var params = {'$user': data.DEFAULT_USER_ID};
 
         var testGetApiKeys = function (error, apiKeys, done) {
 
@@ -978,7 +978,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.getApiKeys(data.DEFAULT_USER_ID_ID, function (err, res) {
+            db.getApiKeys(data.DEFAULT_USER_ID, function (err, res) {
 
                 assert(allSpy.calledWith(sentence, params));
 

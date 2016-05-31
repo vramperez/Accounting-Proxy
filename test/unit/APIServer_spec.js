@@ -128,7 +128,6 @@ describe('Testing APIServer', function() {
         var testcheckURL = function (body, userId, getAdminsErr, admins, token, addTokenErr, done) {
 
             var path = '/path';
-            var espias;
 
             var implementations = {
                 req: {
@@ -173,8 +172,6 @@ describe('Testing APIServer', function() {
             };
 
             mocker(implementations, function (api, spies) {
-
-                espias = spies;
 
                 api.checkURL(implementations.req, implementations.res);
                 

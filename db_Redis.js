@@ -380,7 +380,7 @@ exports.getAdmins = function (publicPath, callback) {
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
  */
-exports.getAdminUrl = function (idAdmin, publicPath, callback) {
+exports.getAdminURL = function (idAdmin, publicPath, callback) {
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
             return callback('Error getting the admin url.', null);
@@ -454,12 +454,11 @@ exports.getApiKeys = function (user, callback) {
     var toReturn = [];
 
     db.smembers(user, function (err, apiKeys) {
+
         if (err) {
             return callback('Error in databse getting api-keys.', null);
-        } else if (apiKeys.length === 0) {
-            return callback(null, null);
         } else {
-            async.each(apiKeys, function (apiKey, task_callback) {
+            async.each(apiKeys.sort(), function (apiKey, task_callback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
                     if (err) {
                         return task_callback('Error in databse getting api-keys.');

@@ -2,7 +2,8 @@ var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     async = require('async'),
     sinon = require('sinon'),
-    data = require('../data');
+    data = require('../data'),
+    util = require('../util');
 
 var mocker = function (implementations, callback) {
 
@@ -12,23 +13,7 @@ var mocker = function (implementations, callback) {
         }
     };
 
-    var spies = {};
-
-    // Create spies for the mock functions
-    async.forEachOf(implementations, function (value, key, task_callback1) {
-
-        spies[key] = {};
-
-        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
-
-            if (typeof implementations[key][functionName] == 'function') {
-                spies[key][functionName] = sinon.spy(implementations[key], functionName);
-            }
-
-            task_callback2();
-
-        }, task_callback1);
-    }, function () { 
+    util.getSpies(implementations, function (spies){
 
         var config = implementations.config ? implementations.config : {};
         config.database = {

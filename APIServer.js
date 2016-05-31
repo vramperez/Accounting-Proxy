@@ -54,7 +54,7 @@ exports.checkURL = function (req, res) {
                 res.status(500).json({error: err});
 
             } else if (!isAdmin) {
-                res.status(401).json({error: 'Access restricted to administrators of the service only'})
+                res.status(401).json({error: 'Access restricted to administrators of the service only'});
 
             } else{
                 //Save the token to notify the WStore
@@ -64,20 +64,11 @@ exports.checkURL = function (req, res) {
                         if (err) {
                             logger.error(err);
                         }
-                    });
-                }
-
-                // Only check the path because the host and port are the same used for make this request,
-                // so they must be correct
-                db.checkPath(path, function (err, correct) {
-                    if (err) {
-                        res.status(500).send();
-                    } else if (correct) {
                         res.status(200).send();
-                    } else {
-                        res.status(400).json({error: 'Incorrect url ' + bodyUrl});
-                    }
-                });
+                    });
+                } else {
+                    res.status(200).send();
+                }
             }
         });
     }
@@ -130,8 +121,6 @@ exports.getApiKeys = function (req, res) {
     db.getApiKeys(user, function (err, apiKeysInfo) {
         if (err) {
             res.status(500).send();
-        } else if (!apiKeysInfo) {
-            res.status(404).json({error: 'No api-keys available for the user ' + user});
         } else {
             res.status(200).json(apiKeysInfo);
         }

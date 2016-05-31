@@ -2,7 +2,8 @@ var proxyquire = require('proxyquire').noCallThru(),
     assert = require('assert'),
     async = require('async'),
     sinon = require('sinon'),
-    data = require('../data');
+    data = require('../data'),
+    util = require('../util');
 
 /**
  * Return an object with the mocked dependencies and object with the neecessary spies specified in implementations.
@@ -11,22 +12,7 @@ var proxyquire = require('proxyquire').noCallThru(),
  */
 var mocker = function (implementations, callback) {
 
-    var spies = {};
-
-    // Create spies for the mock functions
-    async.forEachOf(implementations, function (value, key, task_callback1) {
-
-        spies[key] = {};
-
-        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
-
-            if (typeof implementations[key][functionName] == 'function') {
-                spies[key][functionName] = sinon.spy(implementations[key], functionName);
-            }
-
-            task_callback2();
-        }, task_callback1);
-    }, function () {
+    util.getSpies(implementations, function (spies) {
 
         var config = implementations.config ? implementations.config : {};
         config.database = {
@@ -39,7 +25,7 @@ var mocker = function (implementations, callback) {
             './db': implementations.db ? implementations.db : {},
             request: implementations.requester ? implementations.requester.request : {},
             winston: implementations.logger ? implementations.logger : {},
-            './acc_modules/megabyte': implementations.accModule ? implementations.accModule : {},
+            './server': implementations.server ? implementations.server : {},
         });
 
         return callback(notifier, spies);
@@ -131,7 +117,12 @@ describe('Testing Notifier', function () {
 
             var accModule = {
                 getSpecification: undefined
-            }
+            };
+
+            var server = {
+                accountingModules: {}
+            };
+            server.accountingModules[unit] = accModule;
 
             var config = {
                 modules: {
@@ -142,7 +133,7 @@ describe('Testing Notifier', function () {
             var implementations = {
                 db: db,
                 config: config,
-                accModule: accModule
+                server: server
             };
 
             mocker(implementations, function (notifier, spies) {
@@ -185,6 +176,7 @@ describe('Testing Notifier', function () {
         var testSendSpecification = function (specification, errMsg, requestResponse, addHrefResult, done) {
 
             var token = data.DEFAULT_TOKEN;
+            var unit = data.DEFAULT_UNIT;
 
             var db = {
                 getToken: function (callback) {
@@ -203,7 +195,7 @@ describe('Testing Notifier', function () {
 
             var config = {
                 modules: {
-                    accounting: [data.DEFAULT_UNIT]
+                    accounting: [unit]
                 },
                 usageAPI: {
                     host: 'localhost',
@@ -216,6 +208,10 @@ describe('Testing Notifier', function () {
                 getSpecification: function () {
                     return specification;
                 }
+            };
+
+            var server = {
+                accountingModules: {},
             };
 
             var requester = {
@@ -231,10 +227,13 @@ describe('Testing Notifier', function () {
             var implementations = {
                 db: db,
                 config: config,
-                accModule: accModule,
+                server: server,
                 requester: requester,
-                logger: logger
+                logger: logger,
+                accModule: accModule
             };
+
+            server.accountingModules[unit] = implementations.accModule;
 
             var options = {
                 url: 'http://' + config.usageAPI.host + ':' + 
@@ -254,7 +253,7 @@ describe('Testing Notifier', function () {
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
                     assert(spies.db.getNotificationInfo.calledOnce);
-                    assert(spies.db.getHref.calledWith(data.DEFAULT_UNIT));
+                    assert(spies.db.getHref.calledWith(unit));
                     assert(spies.accModule.getSpecification.calledOnce);
 
                     if (requestResponse) {
@@ -262,7 +261,7 @@ describe('Testing Notifier', function () {
                     }
 
                     if (addHrefResult) {
-                        assert(spies.db.addSpecificationRef.calledWith(data.DEFAULT_UNIT, data.DEFAULT_HREF));
+                        assert(spies.db.addSpecificationRef.calledWith(unit, data.DEFAULT_HREF));
                     }
 
                     done();

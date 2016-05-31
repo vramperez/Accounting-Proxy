@@ -6,36 +6,44 @@ var sqlite = require('sqlite3').verbose(), // Debug enable
 "use strict"
 
 var db = new TransactionDatabase (
-        new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE)
-);
+        new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE));
 
 /*
 * Initialize the database and creates the necessary tables.
 */
 exports.init = function (callback) {
-    db.serialize(function () {
-        db.run('PRAGMA encoding = "UTF-8";');
-        db.run('PRAGMA foreign_keys = 1;');
-
-        db.run('CREATE TABLE IF NOT EXISTS token ( \
+    /*db = new TransactionDatabase (
+        new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE));*/
+    async.series([
+        function (callback) {
+            db.run('PRAGMA encoding = "UTF-8";', callback);
+        },
+        function (callback) {
+            db.run('PRAGMA foreign_keys = 1;', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS token ( \
                     token               TEXT, \
                     PRIMARY KEY (token) \
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS units ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS units ( \
                     unit                TEXT, \
                     href                TEXT, \
                     PRIMARY KEY (unit) \
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS services ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS services ( \
                     publicPath          TEXT, \
                     url                 TEXT, \
                     appId               TEXT, \
                     PRIMARY KEY (publicPath) \
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS accounting ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
                     publicPath          TEXT, \
                     orderId             TEXT, \
@@ -47,31 +55,33 @@ exports.init = function (callback) {
                     correlationNumber   TEXT, \
                     PRIMARY KEY (apiKey), \
                     FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE\
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS subscriptions ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS subscriptions ( \
                     subscriptionId      TEXT, \
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS admins ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS admins ( \
                     idAdmin             TEXT, \
                     PRIMARY KEY (idAdmin)\
-        )');
-
-        db.run('CREATE TABLE IF NOT EXISTS administer ( \
+            )', callback);
+        },
+        function (callback) {
+            db.run('CREATE TABLE IF NOT EXISTS administer ( \
                     idAdmin             TEXT, \
                     publicPath          TEXT, \
                     PRIMARY KEY (idAdmin, publicPath), \
                     FOREIGN KEY (publicPath) REFERENCES services (publicPath) ON DELETE CASCADE, \
                     FOREIGN KEY (idAdmin) REFERENCES admins (idAdmin) ON DELETE CASCADE\
-        )');
-
-        return callback(null);
-    });
+            )', callback);
+        }
+    ], callback);
 };
 
 /**
@@ -448,8 +458,6 @@ exports.getApiKeys = function (user, callback) {
             }, function (err, apiKeys) {
                 if (err) {
                     return callback('Error in databse getting api-keys.', null);
-                } else if (apiKeys.length === 0) {
-                    return callback(null, null);
                 } else {
                     return callback(null, apiKeys);
                 }

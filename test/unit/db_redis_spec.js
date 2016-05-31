@@ -304,7 +304,7 @@ describe('Testing REDIS database', function () {
             };
 
             var hget = function (hash, key, callback) {
-                return callback(hgetErr, data.DEFAULT_USER);
+                return callback(hgetErr, data.DEFAULT_USER_ID);
             };
 
             var multi = sinon.stub().returns(multiImplementations);
@@ -349,7 +349,7 @@ describe('Testing REDIS database', function () {
                         } else {
 
                             assert(hgetSpy.calledWith(subscriptions[0], 'customer'));
-                            assert(srem.calledWith(data.DEFAULT_USER, subscriptions[0]));
+                            assert(srem.calledWith(data.DEFAULT_USER_ID, subscriptions[0]));
                             assert(del.calledWith(subscriptions[0]));
                             assert(del.calledWith(subscriptions[0] + 'subs'));
                             assert(srem.calledWith('apiKeys', subscriptions[0]));
@@ -799,7 +799,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getAdmins"', function () {
 
-        var testGetAdmins = function (error, admins, result, done) {
+        var testGetAdmins = function (error, admins, done) {
 
             var smembers = function (hash, callback) {
                 return callback(error, admins);
@@ -822,7 +822,7 @@ describe('Testing REDIS database', function () {
                     assert.equal(res, null);
                 } else {
                     assert.equal(err, null);
-                    assert.deepEqual(res, result);
+                    assert.deepEqual(res, admins);
                 }
 
                 done();
@@ -830,15 +830,15 @@ describe('Testing REDIS database', function () {
         };
 
         it('should call the callback with error when db fails getting the admins', function (done) {
-            testGetAdmins(true, null, null, done);
+            testGetAdmins(true, null, done);
         });
 
         it('should call the callback without error when db returns all admins', function (done) {
-            testGetAdmins(false, ['admin1', 'admin2'], [{idAdmin: 'admin1'}, {idAdmin: 'admin2'}], done);
+            testGetAdmins(false, ['admin1', 'admin2'], done);
         });
     });
 
-    describe('FUnction "getAdminUrl"', function () {
+    describe('FUnction "getAdminURL"', function () {
 
         var testGetAdminUrl = function (smembersErr, admins, hgetErr, done) {
 
@@ -862,7 +862,7 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.getAdminUrl(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.getAdminURL(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
 
@@ -1047,9 +1047,9 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.getApiKeys(data.DEFAULT_USER, function (err, res) {
+            db.getApiKeys(data.DEFAULT_USER_ID, function (err, res) {
 
-                assert(smembersSpy.calledWith(data.DEFAULT_USER));
+                assert(smembersSpy.calledWith(data.DEFAULT_USER_ID));
 
                 if (smembersErr) {
 
@@ -1059,7 +1059,7 @@ describe('Testing REDIS database', function () {
                 } else if (apiKeys.length === 0) {
 
                     assert.equal(err, null);
-                    assert.equal(res, resultExpected);
+                    assert.deepEqual(res, resultExpected);
 
                 } else {
 
@@ -1087,7 +1087,7 @@ describe('Testing REDIS database', function () {
         });
 
         it('should call the callback without error when there are not API keys', function (done) {
-           testGetApiKeys(false, [], false, null, done); 
+           testGetApiKeys(false, [], false, [], done); 
         });
 
         it('should call the callback with error when db fails getting accounting info', function (done) {
@@ -1125,7 +1125,7 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.checkRequest(data.DEFAULT_USER, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.checkRequest(data.DEFAULT_USER_ID, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[0]));
 
@@ -1139,7 +1139,7 @@ describe('Testing REDIS database', function () {
                     if (!accountingInfo) {
                         assert.equal(res, false);
                     } else {
-                        assert.equal(res, accountingInfo.customer === data.DEFAULT_USER && accountingInfo.publicPath === data.DEFAULT_PUBLIC_PATHS[0]);
+                        assert.equal(res, accountingInfo.customer === data.DEFAULT_USER_ID && accountingInfo.publicPath === data.DEFAULT_PUBLIC_PATHS[0]);
                     }
                 }
 
@@ -1166,7 +1166,7 @@ describe('Testing REDIS database', function () {
 
         it('should return true when the request is valid', function (done) {
            var accountingInfo = {
-                customer:  data.DEFAULT_USER,
+                customer:  data.DEFAULT_USER_ID,
                 publicPath: data.DEFAULT_PUBLIC_PATHS[0]
             };
 
@@ -1335,7 +1335,7 @@ describe('Testing REDIS database', function () {
                 value: 1.3,
                 orderId: data.DEFAULT_ORDER_IDS[0],
                 productId: data.DEFAULT_PRODUCT_IDS[0],
-                customer: data.DEFAULT_USER,
+                customer: data.DEFAULT_USER_ID,
                 correlationNumber: 0,
                 recordType: data.DEFAULT_RECORD_TYPE,
                 unit: data.DEFAULT_UNIT
@@ -1345,7 +1345,7 @@ describe('Testing REDIS database', function () {
                 value: 1.3,
                 orderId: data.DEFAULT_ORDER_IDS[1],
                 productId: data.DEFAULT_PRODUCT_IDS[1],
-                customer: data.DEFAULT_USER,
+                customer: data.DEFAULT_USER_ID,
                 correlationNumber: 0,
                 recordType: data.DEFAULT_RECORD_TYPE,
                 unit: data.DEFAULT_UNIT

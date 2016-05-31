@@ -1,8 +1,7 @@
 var config = require('./config'),
     async = require('async'),
     request = require('request'),
-    logger = require('winston')
-    server = require('./server');
+    logger = require('winston');
 
 var db = require(config.database.type);
 
@@ -12,7 +11,7 @@ var db = require(config.database.type);
  * @param  {string}   unit     Accounting unit.
  */
 var sendSpecification = function (token, unit, callback) {
-    var accountingModules = server.accountingModules;
+    var accountingModules = require('./server').accountingModules;
 
     if (accountingModules[unit].getSpecification === undefined) {
         return callback('Error, function getSpecification undefined for unit ' + unit);
@@ -170,7 +169,6 @@ var notifyUsageSpecification = function (token, callback) {
 var notifyUsage = function (callback) {
 
     db.getToken(function (err, token) {
-
         if (err) {
             return callback(err);
         } else if (!token) {

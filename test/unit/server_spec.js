@@ -67,9 +67,7 @@ var mocker = function (implementations, callback) {
 
 describe('Testing Server', function () {
 
-    describe('Function "initialize"', function () {
-
-        var testInit = function (initErr, unit, notifyErr, notifyErrCron, done) {
+    var testInitAndStop = function (initErr, unit, notifyErr, notifyErrCron, stopErr, done) {
 
             var port = data.DEFAULT_PORT;
             var notifyCallCount = 0;
@@ -108,7 +106,6 @@ describe('Testing Server', function () {
                     }
                 },
                 app: {
-                    listen: function (port) {},
                     get: function (property) {
                         return port;
                     }
@@ -119,7 +116,16 @@ describe('Testing Server', function () {
                 },
                 contextBroker: {
                     run: function () {}
+                },
+                server: {
+                    close: function (callback) {
+                        return callback(stopErr);
+                    }
                 }
+            };
+
+            implementations.app.listen = function (port) {
+                return implementations.server;
             };
 
             mocker(implementations, function (server, spies) {
@@ -145,6 +151,12 @@ describe('Testing Server', function () {
                         assert(spies.app.get.calledWith('port'));
                         assert(spies.app.listen.calledWith(port));
 
+                        if (stopErr !== undefined) {
+
+                            server.stop(function (err) {
+                                assert.equal(err, stopErr);
+                            });
+                        }
                     }
 
                     done();
@@ -152,20 +164,33 @@ describe('Testing Server', function () {
             });
         };
 
+    describe('Function "stop"', function () {
+
+        it('should call the callback with error when there is an error stopping the server', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, 'Error', done);
+        });
+
+        it('should call the callback without error when there is no error stopping the server', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, null, done);
+        });
+    });
+
+    describe('Function "initialize"', function () {
+
         it('should call the callback with error when db fails initializing', function (done) {
-            testInit(true, null, false, false, done);
+            testInitAndStop(true, null, false, false, undefined, done);
         });
 
         it('should call the callback with error when there is no accounting module for an accounting unit', function (done) {
-            testInit(false, 'wrong', false, false, done);
+            testInitAndStop(false, 'wrong', false, false, undefined, done);
         });
 
         it('should call the callback with error when there is an error notifying the usage', function (done) {
-            testInit(false, data.DEFAULT_UNIT, true, false, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, true, false, undefined, done);
         });
 
         it('should call the callback without error and initialize the proxy when there is no error initializing', function (done) {
-            testInit(false, data.DEFAULT_UNIT, false, true, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, done);
         });
     });
 
@@ -197,7 +222,7 @@ describe('Testing Server', function () {
                     send: function () {}
                 },
                 db: {
-                    getAdminURL: function (path, userId, callback) {
+                    getAdminURL: function (userId, path, callback) {
                         return callback(getAdminURLErr, null);
                     },
                     checkRequest: function (userId, apiKey, path, callback) {
@@ -223,7 +248,7 @@ describe('Testing Server', function () {
             mocker(implementations, function (server, spies) {
 
                 assert(spies.req.get.calledWith('X-API-KEY'));
-                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+                assert(spies.db.getAdminURL.calledWith(userId, publicPath));
 
                 if (getAdminURLErr) {
 
@@ -342,7 +367,7 @@ describe('Testing Server', function () {
                     setHeader: function (header, value) {}
                 },
                 db: {
-                    getAdminURL: function (path, userId, callback) {
+                    getAdminURL: function (userId, path, callback) {
                         return callback(null, url);
                     }
                 },
@@ -366,7 +391,7 @@ describe('Testing Server', function () {
             mocker(implementations, function (server, spies) {
 
                 assert(spies.req.get.calledWith('X-API-KEY'));
-                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+                assert(spies.db.getAdminURL.calledWith(userId, publicPath));
                 assert(spies.requester.request.calledWith(options));
 
                 if (requestErr) {
@@ -456,7 +481,7 @@ describe('Testing Server', function () {
                     json: function (msg) {}
                 },
                 db: {
-                    getAdminURL: function (path, userId, callback) {
+                    getAdminURL: function (userId, path, callback) {
                         return callback(null, null);
                     },
                     checkRequest: function (userId, apiKey, path, callback) {
@@ -511,7 +536,7 @@ describe('Testing Server', function () {
             mocker(implementations, function (server, spies) {
 
                 assert(spies.req.get.calledWith('X-API-KEY'));
-                assert(spies.db.getAdminURL.calledWith(publicPath, userId));
+                assert(spies.db.getAdminURL.calledWith(userId, publicPath));
                 assert(spies.db.checkRequest.calledWith(userId, apiKey, publicPath));
                 assert(spies.db.getAccountingInfo.calledWith(apiKey));
                 assert(spies.req.is.calledWith('application/json'));

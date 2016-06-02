@@ -19,6 +19,7 @@ var db = require(config.database.type);
 var app = express();
 var admin_paths = config.api.administration_paths;
 var accountingModules = {};
+var server;
 
 /**
  * Load all the accounting modules for the supported accounting units.
@@ -66,10 +67,18 @@ exports.init = function (callback) {
                     }
                 });
             });
-            app.listen(app.get('port'));
+            server = app.listen(app.get('port'));
+
             return callback(null);
         }
     });
+};
+
+/**
+ * Stop the server
+ */
+exports.stop = function (callback) {
+    server.close(callback);
 };
 
 /**
@@ -127,6 +136,7 @@ var requestHandler = function (options, res, apiKey, unit) {
             if (apiKey === null && unit === null) { // No accounting (admin user)
                 res.status(resp.statusCode).send(body);
             } else {
+
                 accounter.count(apiKey, unit, requestInfo, 'count', function (err) {
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
@@ -213,7 +223,7 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
 var handler = function (req, res) {
     var apiKey = req.get('X-API-KEY');
 
-    db.getAdminURL(req.publicPath, req.user.id, function (err, endpointURL) {
+    db.getAdminURL(req.user.id, req.publicPath, function (err, endpointURL) {
 
         if (err) {
             res.status(500).json({error: err});

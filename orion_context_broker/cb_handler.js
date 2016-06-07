@@ -5,8 +5,7 @@ var request = require('request'),
     accounter = require('../accounter'),
     bodyParser = require('body-parser'),
     logger = require('winston'),
-    async = require('async'),
-    server = require('../server');
+    async = require('async');
 
 var app = express();
 var db = require('../' + config.database.type);
@@ -97,7 +96,6 @@ exports.getOperation = function (privatePath, req, callback) {
  * @param  {Object}   options  Context Broker request options.
  */
 var subscribe = function (req, res, unit, options, callback) {
-    var accountingModules = server.accountingModules;
     var req_body = req.body;
     var reference_url = req_body.reference;
 
@@ -114,30 +112,31 @@ var subscribe = function (req, res, unit, options, callback) {
             var subscriptionId = body.subscribeResponse.subscriptionId;
             var duration = body.subscribeResponse.duration;
             res.status(resp.statusCode);
+
             async.forEachOf(resp.headers, function (header, key, task_callback) {
                 res.setHeader(key, header);
                 task_callback();
             }, function () {
 
-                res.send(body);
                 var apiKey = req.get('X-API-KEY');
 
                 // Store the endpoint information of the subscriber to be notified
                 db.addCBSubscription(apiKey, subscriptionId, reference_url, function (err) {
+
                     if (err) {
+                        res.send(body);
                         return callback(err);
                     } else {
-                        if (accountingModules[unit].subscriptionCount !== undefined) {
-                            accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    return callback(null);
-                                }
-                            });
-                        } else {
-                            return callback(null);
-                        }
+
+                        accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
+                            if (err && err.code !== 'invalidFunction') {
+                                res.send(body);
+                                return callback(err.msg);
+                            } else {
+                                res.send(body);
+                                return callback(null);
+                            }
+                        });
                     }
                 });
             });
@@ -207,14 +206,14 @@ var unsubscribe = function (req, res, options, callback) {
  * @param  {Object}   options  Context Broker request options.
  */
 var updateSubscription = function (req, res, options, callback) {
-    var accountingModules = server.accountingModules;
     options.body = req.body;
     var subscriptionId = req.body.subscriptionId;
 
     db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
+
         if (err) {
             return callback(err);
-        } else if (subscriptionInfo === null) {
+        } else if (!subscriptionInfo) {
             return callback('Subscription "' + subscriptionId + '" not in database.')
         } else {
 
@@ -237,17 +236,13 @@ var updateSubscription = function (req, res, options, callback) {
                         res.send(body);
                         var apiKey = req.get('X-API-KEY');
 
-                        if (accountingModules[subscriptionInfo.unit].subscriptionCount) {
-                            accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
-                                if (err) {
-                                    return callback(err);
-                                } else {
-                                    return callback(null);
-                                }
-                            });
-                        } else {
-                            return callback(null);
-                        }
+                        accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
+                            if (err && err.code !== 'invalidFunction') {
+                                return callback(err);
+                            } else {
+                                return callback(null);
+                            }
+                        });
                     });
                 } else {
                     res.status(resp.statusCode).send(body);

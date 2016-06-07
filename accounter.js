@@ -1,5 +1,4 @@
-var config = require('./config'),
-    server = require('./server');
+var config = require('./config');
 
 var db = require(config.database.type);
 
@@ -12,18 +11,38 @@ var db = require(config.database.type);
  * @param  {string}   countFunction Name of the count function in the accounting module.
  */
 var count = function (apiKey, unit, countInfo, countFunction, callback) {
-    var accountingModules = server.accountingModules;
+    var accountingModules = require('./server').getAccountingModules();
 
     if (accountingModules[unit] === undefined) {
-        return callback('Invalid accounting unit "' + unit + '"');
+        return callback({
+            code: 'invalidUnit',
+            msg: 'Invalid accounting unit "' + unit + '"'
+        });
+
+    } else if (accountingModules[unit][countFunction] === undefined) {
+        return callback({
+            code: 'invalidFunction',
+            msg: 'Invalid count function "' + countFunction + '" for unit "' + unit + '"'
+        });
+
     } else {
+
         accountingModules[unit][countFunction](countInfo, function (err, amount) {
+
             if (err) {
-                return callback (err);
+                return callback ({
+                    code: 'functionError',
+                    msg: err
+                });
+
             } else {
                 db.makeAccounting(apiKey, amount, function (err) {
+
                     if (err) {
-                        return callback(err);
+                        return callback({
+                            code: 'dbError',
+                            msg: err
+                        });
                     } else {
                         return callback(null);
                     }
@@ -31,6 +50,6 @@ var count = function (apiKey, unit, countInfo, countFunction, callback) {
             }
         });
     }
-}
+};
 
 exports.count = count;

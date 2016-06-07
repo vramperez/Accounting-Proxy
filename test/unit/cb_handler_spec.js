@@ -263,7 +263,16 @@ describe('Testing ContextBroker Handler', function () {
                 },
                 accounter: {
                     count: function (apiKey, unit, accountingInfo, countFunction, callback) {
-                        return callback(countErr);
+                        var err = null;
+
+                        if (countErr) {
+                            err = {
+                                code: 'invalidUnit',
+                                msg: countErr
+                            }
+                        }
+
+                        return callback(err);
                     }
                 }
             }

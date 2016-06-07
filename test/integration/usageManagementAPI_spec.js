@@ -3,193 +3,116 @@ var assert = require('assert'),
     usageAPI_mock = require('./test_endpoint'),
     async = require('async'),
     test_config = require('../config_tests').integration,
-    prepare_test = require('./prepareDatabase'),
-    data = require('../data');
+    data = require('../data'),
+    util = require('../util');
 
-var server, db_mock, notifier_mock;
+var server, db, notifierMock;
 var databaseName = 'testDB_usageAPI.sqlite';
 
-var mock_config = {
-    accounting_proxy: {
-        port: 9060
-    },
-    usageAPI: {
-        host: 'localhost',
-        port: test_config.usageAPI_port,
-        path: ''
-    },
-    resources: {
-        contextBroker: false
-    },
-    database: {},
-    resources: {
-        contextBroker: false
-    },
-    api: {
-        administration_paths: {
-            keys: '/accounting_proxy/keys',
-            units: '/accounting_proxy/units',
-            newBuy: '/accounting_proxy/buys',
-            checkUrl: '/accounting_proxy/urls',
-        }
-    },
-    log: {
-        file: 'file'
-    }
-};
+var configMock = util.getConfigMock(false);
 
-var expressWinston_mock = {
-    logger: function (options) {
-        return function (req, res, next) {
-            next();
-        };
-    }
-};
-
-var api_mock = {
-    checkIsJSON: function () {},
-    checkUrl: function () {},
-    newBuy: function () {},
-    getApiKeys: function (){},
-    getUnits: function () {}
-};
-
-var OAuth2authentication_mock = {
-    headerAuthentication: function(req, res) {}
-};
-
-var app_mock = {
-    set: function (prop, value) {},
+// Necessary in order to avoid ERRADDRINUSE when call listening more than once
+var appMock = {
     listen: function (port) {},
-    get: function (prop) {},
     use: function (middleware) {},
-    post: function (path, middleware, handler) {}
+    set: function (property) {},
+    get: function (path, middleware, handler) {},
+    post: function (path, middleware, handler)  {}
 };
 
 var mocker = function (database, done) {
-    if (database === 'sql') {
-        async.series([
-            function (callback) {
-                mock_config.database.type = './db';
-                mock_config.database.name = databaseName;
-                db_mock = proxyquire('../../db', {
-                    './config': mock_config
-                });
-                callback(null);
-            },
-            function (callback) {
-                notifier_mock = proxyquire('../../notifier', {
-                    './config': mock_config,
-                    'winston': {
-                        info: function (msg) {}
-                    },
-                    './db': db_mock
-                });
-                callback(null);
-            },
-            function (callback) {
-                server = proxyquire('../../server', {
-                    express: function () {
-                        return app_mock;
-                    },
-                    './config': mock_config,
-                    './db': db_mock,
-                    './notifier': notifier_mock,
-                    './APIServer': api_mock,
-                    'express-winston': expressWinston_mock,
-                    'winston': {transports: {
-                        File: function (options) {}
-                    }},
-                    'orion_context_broker/cb_handler': {},
-                    './OAuth2_authentication': OAuth2authentication_mock
-                });
-                callback(null);
-            }
-        ]);
-    } else {
-        async.series([
-            function (callback) {
-                var redis_host = test_config.redis_host;
-                var redis_port = test_config.redis_port;
 
-                if (! redis_host || ! redis_port) {
-                    console.log('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
-                    process.exit(1);
-                } else {
-                    mock_config.database.type = './db_Redis';
-                    mock_config.database.name = test_config.redis_database;
-                    mock_config.database.redis_host = redis_host;
-                    mock_config.database.redis_port = redis_port;
-                    db_mock = proxyquire('../../db_Redis', {
-                        './config': mock_config
-                    });
-                    callback();
-                }
+    var notifierMock;
+
+    if (database === 'sql') {
+
+        configMock.database.type = './db';
+        configMock.database.name = databaseName;
+
+        db = proxyquire('../../db', {
+            './config': configMock
+        });
+
+        notifierMock = proxyquire('../../notifier', {
+            './config': configMock,
+            'winston': util.logMock,
+            './db': db
+        });
+
+        server = proxyquire('../../server', {
+            express: function () {
+                return appMock;
             },
-            function (callback) {
-                notifier_mock = proxyquire('../../notifier', {
-                    './config': mock_config,
-                    'winston': {
-                        info: function (msg) {}
-                    },
-                    './db_Redis': db_mock
-                });
-                callback();
-            },
-            function (callback) {
-                server = proxyquire('../../server', {
-                    express: function () {
-                        return app_mock;
-                    },
-                    './config': mock_config,
-                    '.db_Redis': db_mock,
-                    './notifier': notifier_mock,
-                    './APIServer': api_mock,
-                    'express-winston': expressWinston_mock,
-                    'winston': {
-                        transports: {
-                            File: function (options) {}
-                        }
-                    },
-                    'orion_context_broker/cb_handler': {},
-                    './OAuth2_authentication': OAuth2authentication_mock
-                });
-                callback();
-            }
-        ]);
+            './config': configMock,
+            './db': db,
+            './notifier': notifierMock
+        });
+    } else {
+
+        var redis_host = test_config.redis_host;
+        var redis_port = test_config.redis_port;
+
+        if (! redis_host || ! redis_port) {
+            done('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
+        } else {
+
+            configMock.database.type = './db_Redis';
+            configMock.database.name = test_config.redis_database;
+            configMock.database.redis_host = redis_host;
+            configMock.database.redis_port = redis_port;
+
+            db = proxyquire('../../db_Redis', {
+                './config': configMock
+            });
+
+            notifierMock = proxyquire('../../notifier', {
+                './config': configMock,
+                'winston': util.logMock,
+                './db_Redis': db
+            });
+
+            server = proxyquire('../../server', {
+                express: function () {
+                    return appMock;
+                },
+                './config': configMock,
+                '.db_Redis': db,
+                './notifier': notifierMock
+            });
+        }
     }
 
-    db_mock.init(function (err) {
-        if (err) {
-            console.log('Error initializing the database');
-            process.exit(1);
-        } else {
-            return done();
-        }
-    });
+    db.init(done);
 };
 
 console.log('[LOG]: starting an endpoint for testing...');
 usageAPI_mock.run(test_config.usageAPI_port);
 
+// Delete testing database
 after(function (done) {
-    prepare_test.removeDatabase(databaseName, done);
+    util.removeDatabase(databaseName, done);
 });
 
 describe('Testing the usage notifier', function () {
 
-    async.eachSeries(test_config.databases, function (database, task_callback) {
+    async.eachSeries(test_config.databases, function (database, taskCallback) {
+
         describe('with database ' + database, function () {
 
-            before(function (done) {
-                prepare_test.clearDatabase(database, databaseName, function () {
-                    mocker(database, done);
+            // Clear the database and mock dependencies
+            beforeEach(function (done) {
+                util.clearDatabase(database, databaseName, function (err) {
+                    if (err) {
+                        done(err);
+                    } else {
+                        mocker(database, done);
+                    }
                 });
             });
 
-            // Restore the default mock_config values.
+            // Restore the default configMock values.
             afterEach(function () {
-                mock_config.usageAPI = {
+                configMock.usageAPI = {
                     host: 'localhost',
                     port: test_config.usageAPI_port,
                     path: ''
@@ -197,22 +120,22 @@ describe('Testing the usage notifier', function () {
             });
 
             after(function () {
-                task_callback();
+                taskCallback();
             });
 
             it('should not send notifications when there is no API Key for notifications available', function (done) {
 
-                var units = ['call'];
+                var units = ['call', 'megabyte'];
 
-                mock_config.modules = {
+                configMock.modules = {
                     accounting: units
                 };
 
                 server.init(function (err) {
 
-                    db_mock.getHref('call', function (err, href) {
+                    db.getHref('call', function (err, href) {
                         if (err) {
-                            throw new Error('Error getting the Href ' + href);
+                            done(err);
                         } else {
                             assert.equal(href, null);
                             assert.equal(err, null);
@@ -225,13 +148,14 @@ describe('Testing the usage notifier', function () {
 
             it('should call the callback with error when there is an error notifying specifications', function (done) {
 
-                var unit = 'call';
+                var unit = data.DEFAULT_UNIT;
+                var token = data.DEFAULT_TOKEN;
 
-                mock_config.modules = {
+                configMock.modules = {
                     accounting: [unit]
                 };
 
-                mock_config.usageAPI = {
+                configMock.usageAPI = {
                     host: 'wrong',
                     port: '',
                     path: ''
@@ -239,19 +163,19 @@ describe('Testing the usage notifier', function () {
 
                 var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
                 var apiKey = data.DEFAULT_API_KEYS[0];
-                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}];
-                var buys = data.DEFAULT_BUY_INFORMATION;
-                var accountings = [{
+                var service = data.DEFAULT_SERVICES[0];
+                var buy = data.DEFAULT_BUY_INFORMATION[0];
+                var accounting = {
                     apiKey: apiKey,
                     value: 2
-                }];
+                };
 
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
+                util.addToDatabase(db, [service], [buy], [], [], [accounting], [], token, function (err) {
                     if (err) {
-                        throw new Error('Error preparing database');
+                        done(err);
                     } else {
-                        server.init(function (err) {
 
+                        server.init(function (err) {
                             assert.equal(err, 'Error starting the accounting-proxy. Error sending the Specification: ENOTFOUND');
                             done();
                         });
@@ -262,44 +186,36 @@ describe('Testing the usage notifier', function () {
             it('should notify the usage specifications and the usage when they have not been notified and there is an available token', function (done) {
 
                 var unit = data.DEFAULT_UNIT;
+                var token = data.DEFAULT_TOKEN;
+                var apiKey = data.DEFAULT_API_KEYS[0];
 
-                mock_config.modules = {
+                configMock.modules = {
                     accounting: [unit]
                 };
 
-                var publicPath = data.DEFAULT_PUBLIC_PATHS[1];
-                var apiKey = data.DEFAULT_API_KEYS[1];
-                var services = [{publicPath: publicPath, url: data.DEFAULT_URLS[1], appId: data.DEFAULT_APP_IDS[1]}];
-                var buys = [{
-                    apiKey: apiKey,
-                    publicPath: publicPath,
-                    orderId: data.DEFAULT_ORDER_IDS[1],
-                    productId: data.DEFAULT_PRODUCT_IDS[1],
-                    customer: 'user2',
-                    unit: unit,
-                    recordType: data.DEFAULT_RECORD_TYPE
-                }];
-                var accountings = [{
+                var service = data.DEFAULT_SERVICES[0];
+                var buy = data.DEFAULT_BUY_INFORMATION[0];
+                var accounting = {
                     apiKey: apiKey,
                     value: 2
-                }];
+                };
 
-                prepare_test.addToDatabase(db_mock, services, buys, [], [], accountings, [], 'token', function (err) {
+                util.addToDatabase(db, [service], [buy], [], [], [accounting], [], token, function (err) {
                     if (err) {
-                        throw new Error('Error preparing database');
+                        done(err);
                     } else {
-                        server.init(function (err) {
 
+                        server.init(function (err) {
                             assert.equal(err, null);
 
-                            db_mock.getHref(unit, function (err, href) {
+                            db.getHref(unit, function (err, href) {
                                 if (err) {
-                                    throw new Error ('Error getting the href');
+                                    done(err);
                                 } else {
-                                    assert.equal(href, 'http://localhost:9040/usageSpecification/1');
-                                    db_mock.getNotificationInfo(function (err, notificationInfo) {
+                                    assert.equal(href, 'http://localhost:9040/usageSpecification/2');
+                                    db.getNotificationInfo(function (err, notificationInfo) {
                                         if (err) {
-                                            throw new Error ('Error getting the href');    
+                                            done(err);
                                         } else {
                                             assert.equal(notificationInfo, null);
                                             done();

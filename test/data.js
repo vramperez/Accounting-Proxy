@@ -102,4 +102,175 @@ data.DEFAULT_BUY_INFORMATION = [{
     recordType: data.DEFAULT_RECORD_TYPE
 }];
 
+data.room1 = {
+    contextElement: {
+        attributes: [
+        {
+            name: "temperature",
+            type: "float",
+            value: "23"
+        },
+        {
+            name: "pressure",
+            type: "integer",
+            value: "720"
+        }
+        ],
+        id: "Room1",
+        isPattern: "false",
+        type: "Room"
+    },
+    statusCode: {
+        code: "200",
+        reasonPhrase: "OK"
+    }
+};
+
+data.allEntities = {
+    contextResponses: [
+    {
+        contextElement: {
+            attributes: [
+            {
+                name: "temperature",
+                type: "float",
+                value: "23"
+            },
+            {
+                name: "pressure",
+                type: "integer",
+                value: "720"
+            }
+            ],
+            id: "Room1",
+            isPattern: "false",
+            type: ""
+        },
+        statusCode: {
+            code: "200",
+            reasonPhrase: "OK"
+        }
+    },
+    {
+        contextElement: {
+            attributes: [
+            {
+                name: "temperature",
+                type: "float",
+                value: "21"
+            },
+            {
+                name: "pressure",
+                type: "integer",
+                value: "711"
+            }
+            ],
+            id: "Room2",
+            isPattern: "false",
+            type: ""
+        },
+        statusCode: {
+            code: "200",
+            reasonPhrase: "OK"
+        }
+    }
+    ]
+};
+
+data.newEntityReq = {
+    "attributes": [
+        {
+            "name": "temperature",
+            "type": "float",
+            "value": "23"
+        },
+        {
+            "name": "pressure",
+            "type": "integer",
+            "value": "720"
+        }
+    ]
+};
+
+data.newEntityResp = {
+    "contextResponses": [
+        {
+            "attributes": [
+                {
+                    "name": "temperature",
+                    "type": "float",
+                    "value": ""
+                },
+                {
+                    "name": "pressure",
+                    "type": "integer",
+                    "value": ""
+                }
+            ],
+            "statusCode": {
+                "code": "200",
+                "reasonPhrase": "OK"
+            }
+        }
+    ],
+    "id": "Room1",
+    "isPattern": "false",
+    "type": ""
+};
+
+data.createSubscriptionReq = {
+    "entities": [
+    {
+        "type": "Room",
+        "isPattern": "false",
+        "id": "Room1"
+    }
+    ],
+    "attributes": [
+    "temperature"
+    ],
+    "reference": "http://localhost:1028/accumulate",
+    "duration": "P1M",
+    "notifyConditions": [
+    {
+        "type": "ONCHANGE",
+        "condValues": [
+        "pressure"
+        ]
+    }
+    ],
+    "throttling": "PT5S"
+};
+
+data.createSubscriptionResp = {
+    "subscribeResponse": {
+        "duration": "P1M",
+        "subscriptionId": data.DEFAULT_SUBS_ID
+    }
+};
+
+data.updateSubscriptionReq = {
+    "subscriptionId": data.DEFAULT_SUBS_ID,
+    "duration": "P2M"
+};
+
+data.updateSubscriptionResp = {
+    "subscribeResponse": {
+        "subscriptionId": data.DEFAULT_SUBS_ID,
+        "duration": "P2M"
+    }
+};
+
+data.cancelSubscriptionReq = {
+    "subscriptionId": data.DEFAULT_SUBS_ID
+};
+
+data.cancelSubscriptionResp = {
+    "statusCode": {
+        "code": "200",
+        "reasonPhrase": "OK"
+    },
+    "subscriptionId": data.DEFAULT_SUBS_ID
+};
+
 module.exports = data;

@@ -1,20 +1,18 @@
 var express = require('express'),
     bodyParser = require('body-parser'),
     config_test = require('../config_tests').integration,
-    fs = require('fs');
+    fs = require('fs'),
+    data = require('../data');
 
 var app = express();
 
-var subscriptionId = config_test.subscriptionId;
+var subscriptionId = data.DEFAULT_SUBS_ID;
+
 exports.run = function (port) {
     app.listen(port);
 };
 
-var call_handler = function (req, res) {
-    res.status(200).send();
-};
-
-var megabyte_handler =  function (req, res) {
+var returnHtml = function (res) {
     fs.readFile('./test/integration/ejemplo.html', function (err, html) {
         res.writeHeader(200,  {"Content-Type": "text/html"});
         res.write("" + html);
@@ -22,162 +20,36 @@ var megabyte_handler =  function (req, res) {
     });
 };
 
+var serviceHandler =  function (req, res) {
+    returnHtml(res);
+};
+
+var createEntity = function (req, res) {
+    res.status(200).json(data.newEntityResp);
+}
+
 var subscribeContext = function (req, res) {
-    res.writeHeader(200,  {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        subscribeResponse: {
-            duration: "P1M",
-            subscriptionId: subscriptionId
-        }
-    }));
-    res.end();
+    res.status(200).json(data.createSubscriptionResp);   
 };
 
 var unsubscribeContext = function (req, res) {
-    res.writeHeader(200,  {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        statusCode: {
-            code: "200",
-            reasonPhrase: "OK"
-        },
-        subscriptionId: subscriptionId
-    }));
-    res.end();
+    res.status(200).json(data.cancelSubscriptionResp)
 };
 
 var unsubscribeContextDelete = function (req, res) {
-    res.writeHeader(200,  {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        statusCode: {
-            code: "200",
-            reasonPhrase: "OK"
-        },
-        subscriptionId: subscriptionId
-    }));
-    res.end();
+    res.status(200).json(data.cancelSubscriptionResp)
 };
 
 var updateContextSubscription = function (req, res) {
-    res.writeHeader(200, {'Content-Type': 'application/json'});
-    res.write(JSON.stringify({
-        subscribeResponse: {
-            subscriptionId: subscriptionId,
-            duration: req.body.duration
-        }
-    }));
-    res.end();
+    res.status(200).json(data.updateSubscriptionResp);
 };
 
 var contextEntity = function (req, res) {
-    res.writeHeader(200, {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        contextElement: {
-            attributes: [
-                {
-                    name: "temperature",
-                    type: "float",
-                    value: "23"
-                },
-                {
-                    name: "pressure",
-                    type: "integer",
-                    value: "720"
-                }
-            ],
-            id: "Room1",
-            isPattern: "false",
-            type: "Room"
-        },
-        statusCode: {
-            code: "200",
-            reasonPhrase: "OK"
-        }
-    }));
-    res.end();
+    res.status(200).json(data.room1);
 };
 
 var contextEntities = function (req, res) {
-    res.writeHeader(200, {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        contextResponses: [
-        {
-            contextElement: {
-                attributes: [
-                    {
-                        name: "temperature",
-                        type: "float",
-                        value: "23"
-                    },
-                    {
-                        name: "pressure",
-                        type: "integer",
-                        value: "720"
-                    }
-                ],
-                id: "Room1",
-                isPattern: "false",
-                type: ""
-            },
-            statusCode: {
-                code: "200",
-                reasonPhrase: "OK"
-            }
-        },
-        {
-            contextElement: {
-                attributes: [
-                    {
-                        name: "temperature",
-                        type: "float",
-                        value: "21"
-                    },
-                    {
-                        name: "pressure",
-                        type: "integer",
-                        value: "711"
-                    }
-                ],
-                id: "Room2",
-                isPattern: "false",
-                type: ""
-            },
-            statusCode: {
-                code: "200",
-                reasonPhrase: "OK"
-            }
-        }
-    ]
-    }));
-    res.end();
-};
-
-var contextTypes = function (req, res) {
-    res.writeHeader(200, {"Content-Type": "application/json"});
-    res.write(JSON.stringify({
-        statusCode: {
-        code: "200",
-        reasonPhrase: "OK"
-        },
-        types: [
-            {
-                attributes: [
-                    "speed",
-                    "fuel",
-                    "temperature"
-                ],
-                name: "Car"
-            },
-            {
-                attributes: [
-                    "pressure",
-                    "hummidity",
-                    "temperature"
-                ],
-                name: "Room"
-            }
-        ]
-    }));
-    res.end();
+    res.status(200).json(data.allEntities);
 };
 
 var usageSpecificationHandler = function (req, res) {
@@ -197,11 +69,12 @@ var usageHandler = function (req, res) {
 app.delete('/v1/contextSubscriptions/' + subscriptionId, unsubscribeContextDelete);
 
 app.use(bodyParser.json());
-app.get('/rest/call*', call_handler);
-app.get('/rest/megabyte*', megabyte_handler);
+
+app.get('/rest/*', serviceHandler);
+
 app.get('/v1/contextEntity/Room1', contextEntity);
 app.get('/v1/contextEntities', contextEntities);
-app.get('/v1/contextTypes', contextTypes);
+app.post('/v1/contextEntities/Room1', createEntity);
 app.post('/v1/subscribeContext', subscribeContext);
 app.post('/v1/unsubscribeContext', unsubscribeContext);
 app.post('/v1/updatecontextsubscription', updateContextSubscription);

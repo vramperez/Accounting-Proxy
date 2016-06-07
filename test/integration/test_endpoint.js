@@ -7,9 +7,16 @@ var express = require('express'),
 var app = express();
 
 var subscriptionId = data.DEFAULT_SUBS_ID;
+var server;
 
 exports.run = function (port) {
-    app.listen(port);
+    console.log('[LOG]: starting an endpoint for testing (in port ' + port + ')...');
+    server = app.listen(port);
+};
+
+exports.stop = function (callback) {
+    console.log('[LOG]: stopping the endpoint for testing...');
+    server.close(callback);
 };
 
 var returnHtml = function (res) {

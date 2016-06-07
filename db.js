@@ -12,8 +12,7 @@ var db = new TransactionDatabase (
 * Initialize the database and creates the necessary tables.
 */
 exports.init = function (callback) {
-    /*db = new TransactionDatabase (
-        new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE));*/
+
     async.series([
         function (callback) {
             db.run('PRAGMA encoding = "UTF-8";', callback);
@@ -138,7 +137,7 @@ exports.addSpecificationRef = function (unit, href, callback) {
             {
                 $unit: unit,
                 $href: href
-            }, function(err) {
+            }, function (err) {
                 if (err) {
                     return callback('Error adding the href specification: "' + href + '" to unit "' + unit + '" .');
                 } else {
@@ -421,27 +420,25 @@ exports.checkPath = function (publicPath, callback) {
  * @param  {object} buyInformation      Information received from the WStore.  
  */
 exports.newBuy = function (buyInformation, callback) {
-    db.serialize(function () {
-        db.run('INSERT OR REPLACE INTO accounting \
-                VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)',
-                {
-                    $apiKey: buyInformation.apiKey,
-                    $publicPath: buyInformation.publicPath,
-                    $orderId: buyInformation.orderId,
-                    $productId: buyInformation.productId,
-                    $customer: buyInformation.customer,
-                    $unit: buyInformation.unit,
-                    $value: 0,
-                    $recordType: buyInformation.recordType,
-                    $correlationNumber: 0
-                }, function (err) {
-                    if (err) {
-                        return callback('Error in database adding the new buy.');
-                    } else {
-                        return callback(null);
-                    }
+    db.run('INSERT OR REPLACE INTO accounting \
+        VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)',
+        {
+            $apiKey: buyInformation.apiKey,
+            $publicPath: buyInformation.publicPath,
+            $orderId: buyInformation.orderId,
+            $productId: buyInformation.productId,
+            $customer: buyInformation.customer,
+            $unit: buyInformation.unit,
+            $value: 0,
+            $recordType: buyInformation.recordType,
+            $correlationNumber: 0
+        }, function (err) {
+            if (err) {
+                return callback('Error in database adding the new buy.');
+            } else {
+                return callback(null);
+            }
         });
-    });
 };
 
 /**
@@ -614,21 +611,19 @@ exports.resetAccounting = function (apiKey, callback) {
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  */
 exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, callback) {
-    db.serialize(function () {
-        db.run('INSERT OR REPLACE INTO subscriptions \
-                VALUES ($subscriptionId, $apiKey, $notificationUrl)',
-                {
-                    $subscriptionId: subscriptionId,
-                    $apiKey: apiKey,
-                    $notificationUrl: notificationUrl
-                }, function (err) {
-                    if (err) {
-                        return callback('Error in database adding the subscription "' + subscriptionId + '" .');
-                    } else {
-                        return callback(null);
-                    }
+    db.run('INSERT OR REPLACE INTO subscriptions \
+        VALUES ($subscriptionId, $apiKey, $notificationUrl)',
+        {
+            $subscriptionId: subscriptionId,
+            $apiKey: apiKey,
+            $notificationUrl: notificationUrl
+        }, function (err) {
+            if (err) {
+                return callback('Error in database adding the subscription "' + subscriptionId + '" .');
+            } else {
+                return callback(null);
+            }
         });
-    });
 };
 
 /**

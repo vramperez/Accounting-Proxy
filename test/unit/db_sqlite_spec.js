@@ -900,7 +900,7 @@ describe('Testing SQLITE database', function () {
 
         var buyInfo = data.DEFAULT_BUY_INFORMATION[0];
         var sentence = 'INSERT OR REPLACE INTO accounting \
-                VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)';
+        VALUES ($apiKey, $publicPath, $orderId, $productId, $customer, $unit, $value, $recordType, $correlationNumber)';
         var params = {
             "$apiKey": buyInfo.apiKey,
             "$correlationNumber": 0,
@@ -915,27 +915,20 @@ describe('Testing SQLITE database', function () {
 
         var testNewBuy = function (error, done) {
 
-            var serialize = function (callback) {
-                return callback();
-            };
-
             var run = function (sentence, params, callback) {
                 return callback(error);
             };
 
             var implementations = {
-                serialize: serialize,
                 run: run
             };
 
-            var serializeSpy = sinon.spy(implementations, 'serialize');
             var runSpy = sinon.spy(implementations, 'run');
 
             var db = getDb(implementations);
 
             db.newBuy(data.DEFAULT_BUY_INFORMATION[0], function (err) {
 
-                assert(serializeSpy.calledOnce);
                 assert(runSpy.calledWith(sentence, params));
 
                 if (error) {
@@ -1378,7 +1371,7 @@ describe('Testing SQLITE database', function () {
     describe('Function "addCBSubscription"', function () {
 
         var sentence = 'INSERT OR REPLACE INTO subscriptions \
-                VALUES ($subscriptionId, $apiKey, $notificationUrl)';
+        VALUES ($subscriptionId, $apiKey, $notificationUrl)';
         var params = {
             '$subscriptionId': data.DEFAULT_SUBSCRIPTION_ID,
             '$apiKey': data.DEFAULT_API_KEYS[0],
@@ -1387,27 +1380,20 @@ describe('Testing SQLITE database', function () {
 
         var testAddCBSubscription = function (error, done) {
 
-            var serialize = function (callback) {
-                return callback();
-            };
-
             var run = function(sentence, params, callback) {
                 return callback(error);
             };
 
             var implementations = {
-                serialize: serialize,
                 run: run
             };
 
-            var serializeSpy = sinon.spy(implementations, 'serialize');
             var runSpy = sinon.spy(implementations, 'run');
 
             var db = getDb(implementations);
 
             db.addCBSubscription(data.DEFAULT_API_KEYS[0], data.DEFAULT_SUBSCRIPTION_ID, data.DEFAULT_NOTIFICATION_URL, function (err) {
 
-                assert(serializeSpy.calledOnce);
                 assert(runSpy.calledWith(sentence, params));
 
                 if (error) {

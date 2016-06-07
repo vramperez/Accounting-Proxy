@@ -67,6 +67,7 @@ exports.init = function (callback) {
                     }
                 });
             });
+
             server = app.listen(app.get('port'));
 
             return callback(null);
@@ -79,6 +80,10 @@ exports.init = function (callback) {
  */
 exports.stop = function (callback) {
     server.close(callback);
+};
+
+exports.getAccountingModules = function() {
+    return accountingModules;
 };
 
 /**
@@ -138,6 +143,7 @@ var requestHandler = function (options, res, apiKey, unit) {
             } else {
 
                 accounter.count(apiKey, unit, requestInfo, 'count', function (err) {
+
                     if(err) {
                         logger.warn('[%s] Error making the accounting: ' + err, apiKey);
                         res.status(500).send();
@@ -282,4 +288,3 @@ app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 app.use('/', oauth2.headerAuthentication, getBody, handler);
 
 module.exports.app = app;
-exports.accountingModules = accountingModules;

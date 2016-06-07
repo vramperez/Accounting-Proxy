@@ -120,9 +120,13 @@ describe('Testing Notifier', function () {
             };
 
             var server = {
-                accountingModules: {}
+                getAccountingModules: function () {
+                    var accModules = {};
+                    accModules[unit] = accModule;
+
+                    return accModules;
+                }
             };
-            server.accountingModules[unit] = accModule;
 
             var config = {
                 modules: {
@@ -210,9 +214,7 @@ describe('Testing Notifier', function () {
                 }
             };
 
-            var server = {
-                accountingModules: {},
-            };
+            var server = {};
 
             var requester = {
                 request: function (options, callback) {
@@ -233,7 +235,12 @@ describe('Testing Notifier', function () {
                 accModule: accModule
             };
 
-            server.accountingModules[unit] = implementations.accModule;
+            implementations.server.getAccountingModules = function () {
+                var accModules = {};
+                accModules[unit] = implementations.accModule;
+
+                return accModules;
+            };
 
             var options = {
                 url: 'http://' + config.usageAPI.host + ':' + 
@@ -254,6 +261,7 @@ describe('Testing Notifier', function () {
                     assert(spies.db.getToken.calledOnce);
                     assert(spies.db.getNotificationInfo.calledOnce);
                     assert(spies.db.getHref.calledWith(unit));
+                    assert(spies.server.getAccountingModules.calledOnce);
                     assert(spies.accModule.getSpecification.calledOnce);
 
                     if (requestResponse) {

@@ -16,7 +16,7 @@ describe('Testing "Accounter"', function () {
 
     describe('Function "count"', function () {
 
-        var testCount = function (accUnit, countErr, makeAccountingErr, done) {
+        var testCount = function (accUnit, accFunction, countErr, makeAccountingErr, done) {
 
             var unit = accUnit ? accUnit : data.DEFAULT_UNIT;
             var apiKey = data.DEFAULT_API_KEYS[0];
@@ -45,14 +45,17 @@ describe('Testing "Accounter"', function () {
             };
 
             var server = {
-                accountingModules: accountingModules
+                getAccountingModules: function () {
+                    return accountingModules;
+                }
             };
 
             if (!accUnit) {
-                var countStub = sinon.spy(accountingModules[data.DEFAULT_UNIT], countFunction);
+                var countSpy = sinon.spy(accountingModules[data.DEFAULT_UNIT], countFunction);
             }
 
-            var makeAccountingStub = sinon.spy(db, 'makeAccounting');
+            var makeAccountingpy = sinon.spy(db, 'makeAccounting');
+            var getAccModulesSpy = sinon.spy(server, 'getAccountingModules');
 
             var implementations = {
                 db: db,
@@ -62,24 +65,33 @@ describe('Testing "Accounter"', function () {
 
             var accounter = getAccounter(implementations);
 
-            accounter.count(apiKey, unit, countInfo, countFunction, function (err) {
+            accounter.count(apiKey, unit, countInfo, accFunction, function (error) {
+
+                assert(getAccModulesSpy.calledOnce);
 
                 if (accUnit) {
+                    assert.equal(error.code, 'invalidUnit');
+                    assert.equal(error.msg, 'Invalid accounting unit "' + unit + '"');
 
-                    assert.equal(err, 'Invalid accounting unit "' + unit + '"');
+                } else if (accFunction !== countFunction) {
+                    assert(error.code, 'invalidFunction');
+                    assert(error.msg, 'Invalid count function "' + countFunction + '" for unit "' + unit + '"');
+
                 } else {
 
-                    assert(countStub.calledWith(countInfo));
+                    assert(countSpy.calledWith(countInfo));
 
                     if (countErr) {
-                        assert.equal(err, countErr);
+                        assert.equal(error.code, 'functionError');
+                        assert.equal(error.msg, countErr);
+
                     } else {
 
-                        assert(makeAccountingStub.calledWith(apiKey, amount));
+                        assert(makeAccountingpy.calledWith(apiKey, amount));
 
-                        var errorExpected = makeAccountingErr ? makeAccountingErr : null ;
+                        var errorExpected = makeAccountingErr ? {code: 'dbError', msg: makeAccountingErr} : null ;
 
-                        assert.equal(err, errorExpected);
+                        assert.deepEqual(error, errorExpected);
                     }
                 }
 
@@ -87,20 +99,24 @@ describe('Testing "Accounter"', function () {
             });
         };
 
-        it('should return an error when the accounting unit is not valid', function (done) {
-            testCount('wrong', 'Error', null, done);
+        it('should call the callback with error when the accounting unit is not valid', function (done) {
+            testCount('wrong', 'count', 'Error', null, done);
+        });
+
+        it('should call the callback with error when the accounting function is not defined for the accounting unit', function (done) {
+            testCount(null, 'wrong', 'Error', null, done);
         });
 
         it('should call the callback with error when the accounting module fails', function (done) {
-            testCount(null, 'Error', null, done);
+            testCount(null, 'count', 'Error', null, done);
         });
 
         it('should call the callback with error when db fails making the accounting', function (done) {
-           testCount(null, null, 'Error', done); 
+           testCount(null, 'count', null, 'Error', done); 
         });
 
         it('should call the callback without error when the db makes the accounting', function (done) {
-            testCount(null, null, null, done);
+            testCount(null, 'count', null, null, done);
         });
     });
 });

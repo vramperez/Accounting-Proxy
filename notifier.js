@@ -11,7 +11,7 @@ var db = require(config.database.type);
  * @param  {string}   unit     Accounting unit.
  */
 var sendSpecification = function (token, unit, callback) {
-    var accountingModules = require('./server').accountingModules;
+    var accountingModules = require('./server').getAccountingModules();
 
     if (accountingModules[unit].getSpecification === undefined) {
         return callback('Error, function getSpecification undefined for unit ' + unit);

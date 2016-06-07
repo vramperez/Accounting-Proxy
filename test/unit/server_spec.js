@@ -67,7 +67,7 @@ var mocker = function (implementations, callback) {
 
 describe('Testing Server', function () {
 
-    var testInitAndStop = function (initErr, unit, notifyErr, notifyErrCron, stopErr, done) {
+    var testInitAndStop = function (initErr, unit, notifyErr, notifyErrCron, stopErr, getAccModules, done) {
 
             var port = data.DEFAULT_PORT;
             var notifyCallCount = 0;
@@ -157,6 +157,14 @@ describe('Testing Server', function () {
                                 assert.equal(err, stopErr);
                             });
                         }
+
+                        if (getAccModules) {
+
+                            var accModules = {};
+                            accModules[unit] = {};
+
+                            assert.deepEqual(server.getAccountingModules(), accModules);
+                        }
                     }
 
                     done();
@@ -164,33 +172,40 @@ describe('Testing Server', function () {
             });
         };
 
-    describe('Function "stop"', function () {
-
-        it('should call the callback with error when there is an error stopping the server', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, 'Error', done);
-        });
-
-        it('should call the callback without error when there is no error stopping the server', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, null, done);
-        });
-    });
-
     describe('Function "initialize"', function () {
 
         it('should call the callback with error when db fails initializing', function (done) {
-            testInitAndStop(true, null, false, false, undefined, done);
+            testInitAndStop(true, null, false, false, undefined, false, done);
         });
 
         it('should call the callback with error when there is no accounting module for an accounting unit', function (done) {
-            testInitAndStop(false, 'wrong', false, false, undefined, done);
+            testInitAndStop(false, 'wrong', false, false, undefined, false, done);
         });
 
         it('should call the callback with error when there is an error notifying the usage', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, true, false, undefined, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, true, false, undefined, false, done);
         });
 
         it('should call the callback without error and initialize the proxy when there is no error initializing', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, false, done);
+        });
+    });
+
+    describe('Function "stop"', function () {
+
+        it('should call the callback with error when there is an error stopping the server', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, 'Error', false, done);
+        });
+
+        it('should call the callback without error when there is no error stopping the server', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, null, false, done);
+        });
+    });
+
+    describe('Function "getAccountingModules"', function () {
+
+        it('should return the accounting modules when they have been loaded', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, true, done);
         });
     });
 

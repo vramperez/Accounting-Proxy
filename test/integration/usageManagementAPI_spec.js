@@ -85,12 +85,17 @@ var mocker = function (database, done) {
     db.init(done);
 };
 
-console.log('[LOG]: starting an endpoint for testing...');
 usageAPI_mock.run(test_config.usageAPI_port);
 
 // Delete testing database
 after(function (done) {
-    util.removeDatabase(databaseName, done);
+    usageAPI_mock.stop(function (err) {
+        if (err) {
+            done(err);
+        } else {
+            util.removeDatabase(databaseName, done);
+        }
+    });
 });
 
 describe('Testing the usage notifier', function () {

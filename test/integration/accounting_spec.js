@@ -103,12 +103,17 @@ var mocker = function (database, done) {
     server.init(done);
 }
 
-console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run(test_config.accounting_port);
 
 // Delete testing database
 after(function (done) {
-    util.removeDatabase(databaseName, done);
+    test_endpoint.stop(function (err) {
+        if (err) {
+            done(err);
+        } else {
+            util.removeDatabase(databaseName, done);
+        }
+    });
 });
 
 describe('Testing the accounting API. Generic REST use', function () {
@@ -201,7 +206,7 @@ describe('Testing the accounting API. Generic REST use', function () {
                 });
 
                 it('should return 200 when the request is correct', function (done) {
-                   testUserRequest(DEFAULT_URL, 200, done); 
+                   testUserRequest(DEFAULT_URL, 200, done);
                 });
             });
 

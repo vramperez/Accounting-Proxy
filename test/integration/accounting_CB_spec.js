@@ -120,12 +120,17 @@ var mocker = function (database,done) {
     server.init(done);
 };
 
-console.log('[LOG]: starting an endpoint for testing...');
 test_endpoint.run(test_config.accounting_CB_port);
 
 // Delete testing database
 after(function (done) {
-    util.removeDatabase(databaseName, done);
+    test_endpoint.stop(function (err) {
+        if (err) {
+            done(err);
+        } else {
+            util.removeDatabase(databaseName, done);
+        }
+    });
 });
 
 describe('Testing the accounting API. Orion Context-Broker requests', function () {

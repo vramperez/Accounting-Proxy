@@ -16,9 +16,7 @@ config_tests.integration = {
 
     accounting_proxy_port: 9010,
 
-    accounting_CB_port: 9020,
-	accounting_port: 9030,
-    usageAPI_port: 9040,
+    test_endpoint_port: 9020,
 
     subscriptionId: '51c0ac9ed714fb3b37d7d5a8'
 };

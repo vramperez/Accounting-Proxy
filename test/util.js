@@ -1,11 +1,11 @@
 var async = require('async'),
 	sinon = require('sinon'),
 	redis = require('redis'),
-    test_config = require('./config_tests').integration,
+    testConfig = require('./config_tests').integration,
     fs = require('fs'),
     data = require('./data');
 
-var db_mock;
+var dbMock;
 
 var logMock = {
     log: function (level, msg) {},
@@ -48,7 +48,7 @@ exports.getStrategyMock = function (userProfile) {
 exports.getConfigMock = function (enableCB) {
     return {
         accounting_proxy: {
-            port: test_config.accounting_proxy_port
+            port: testConfig.accounting_proxy_port
         },
         resources: {
             contextBroker: enableCB
@@ -69,7 +69,7 @@ exports.getConfigMock = function (enableCB) {
         usageAPI: {
             schedule: '00 00 * * *',
             host: 'localhost',
-            port: test_config.usageAPI_port,
+            port: testConfig.usageAPI_port,
             path: ''
         }
     };
@@ -80,19 +80,19 @@ exports.getSpies = function (implementations, callback) {
 
 	var spies = {};
 
-	async.forEachOf(implementations, function (value, key, task_callback1) {
+	async.forEachOf(implementations, function (value, key, taskCallback1) {
 
         spies[key] = {};
 
-        async.forEachOf(value, function (functionImpl, functionName, task_callback2) {
+        async.forEachOf(value, function (functionImpl, functionName, taskCallback2) {
 
             if (typeof implementations[key][functionName] == 'function') {
                 spies[key][functionName] = sinon.spy(implementations[key], functionName);
             }
 
-            task_callback2();
+            taskCallback2();
 
-        }, task_callback1);
+        }, taskCallback1);
     }, function () {
     	return callback(spies);
     });
@@ -100,8 +100,8 @@ exports.getSpies = function (implementations, callback) {
 
 var loadServices = function (services, callback) {
     if (services.length != 0) {
-        async.eachSeries(services, function (service, task_callback) {
-            db_mock.newService(service.publicPath, service.url, service.appId, task_callback);
+        async.eachSeries(services, function (service, taskCallback) {
+            dbMock.newService(service.publicPath, service.url, service.appId, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -110,8 +110,8 @@ var loadServices = function (services, callback) {
 
 var loadBuys = function (buys, callback) {
     if (buys.length != 0) {
-        async.each(buys, function (buyInfo, task_callback) {
-            db_mock.newBuy(buyInfo, task_callback);
+        async.each(buys, function (buyInfo, taskCallback) {
+            dbMock.newBuy(buyInfo, taskCallback);
         }, callback);
     } else {    
         return callback();
@@ -120,8 +120,8 @@ var loadBuys = function (buys, callback) {
 
 var loadSubscriptions = function (subscriptions, callback) {
     if (subscriptions.length != 0) {
-        async.each(subscriptions, function (subs, task_callback) {
-            db_mock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, task_callback);
+        async.each(subscriptions, function (subs, taskCallback) {
+            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -130,12 +130,12 @@ var loadSubscriptions = function (subscriptions, callback) {
 
 var loadAdmins = function (admins, callback) {
     if (admins.length != 0) {
-        async.each(admins, function (admin, task_callback) {
-            db_mock.addAdmin(admin.idAdmin, function (err) {
+        async.each(admins, function (admin, taskCallback) {
+            dbMock.addAdmin(admin.idAdmin, function (err) {
                 if (err) {
-                    task_callback(err);
+                    taskCallback(err);
                 } else {
-                    db_mock.bindAdmin(admin.idAdmin, admin.publicPath, task_callback);
+                    dbMock.bindAdmin(admin.idAdmin, admin.publicPath, taskCallback);
                 }
             });
         }, callback);
@@ -146,8 +146,8 @@ var loadAdmins = function (admins, callback) {
 
 var loadAccountings = function (accountings, callback) {
     if (accountings.length != 0) {
-        async.each(accountings, function (accounting, task_callback) {
-            db_mock.makeAccounting(accounting.apiKey, accounting.value, task_callback);
+        async.each(accountings, function (accounting, taskCallback) {
+            dbMock.makeAccounting(accounting.apiKey, accounting.value, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -156,8 +156,8 @@ var loadAccountings = function (accountings, callback) {
 
 var loadSpecificationRefs = function (specifications, callback) {
     if (specifications.length != 0) {
-        async.each(specifications, function (specification, task_callback) {
-            db_mock.addSpecificationRef(specification.unit, specification.href, task_callback);
+        async.each(specifications, function (specification, taskCallback) {
+            dbMock.addSpecificationRef(specification.unit, specification.href, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -166,7 +166,7 @@ var loadSpecificationRefs = function (specifications, callback) {
 
 var loadToken = function (token, callback) {
     if (token) {
-        db_mock.addToken(token, callback);
+        dbMock.addToken(token, callback);
     } else {
         return callback(null);
     }
@@ -174,7 +174,7 @@ var loadToken = function (token, callback) {
 
 // Prepare the database for the test adding the services, buy information, subscriptions.
 exports.addToDatabase = function (db, services, buys, subscriptions, admins, accountings, specifications, token, callback) {
-    db_mock = db;
+    dbMock = db;
 
     async.series([
         function (callback) {
@@ -239,10 +239,10 @@ exports.clearDatabase = function (database, name, callback) {
         });
     } else {
         var client = redis.createClient({
-            host: test_config.redis_host,
-            port: test_config.redis_port
+            host: testConfig.redis_host,
+            port: testConfig.redis_port
         });
-        client.select(test_config.redis_database, function (err) {
+        client.select(testConfig.redis_database, function (err) {
             if (err) {
                 return callback('Errro cleaning redis database');
             } else {
@@ -255,8 +255,8 @@ exports.clearDatabase = function (database, name, callback) {
 
 // Remove all databases used for testing
 exports.removeDatabase = function (databaseName, callback) {
-    async.eachSeries(test_config.databases, function (database, task_callback) {
-        exports.clearDatabase(database, databaseName, task_callback);
+    async.eachSeries(testConfig.databases, function (database, taskCallback) {
+        exports.clearDatabase(database, databaseName, taskCallback);
     }, callback);
 };
 

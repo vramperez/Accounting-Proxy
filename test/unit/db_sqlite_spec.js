@@ -95,9 +95,9 @@ describe('Testing SQLITE database', function () {
                 assert.equal(err, null);
                 assert.equal(runSpy.callCount, 9);
 
-                async.forEachOf(runSpy.args, function (call, i, task_callback) {
+                async.forEachOf(runSpy.args, function (call, i, taskCallback) {
                     assert.equal(call[0], sentences[i]);
-                    task_callback();
+                    taskCallback();
                 }, done);
             });
         });

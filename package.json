@@ -21,6 +21,7 @@
     "joi": "7.3.0",
     "mkdirp": "0.5.1",
     "mocha": "2.3.4",
+    "mocha-multi-reporters": "^1.0.4",
     "moment": "^2.12.0",
     "node-schedule": "0.2.9",
     "passport-fiware-oauth": "0.1.6",
@@ -49,7 +50,7 @@
   ],
   "scripts": {
     "test": "npm run unit && npm run administration && npm run accountingCB && npm run usageManagement && npm run accountingGeneric",
-    "unit": "istanbul cover --report cobertura _mocha -- -R xunit > xunit.xml test/unit",
+    "unit": "istanbul cover --report cobertura _mocha -- -R mocha-multi-reporters --reporter-options configFile=./test/configReporters.json test/unit",
     "usageManagement": "mocha test/integration/usageManagementAPI_spec",
     "accountingGeneric": "mocha test/integration/accounting_spec",
     "accountingCB": "mocha test/integration/accounting_CB_spec",

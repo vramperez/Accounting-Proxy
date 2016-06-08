@@ -1,15 +1,15 @@
 var request = require('supertest'),
     assert = require('assert'),
     proxyquire = require('proxyquire'),
-    test_endpoint = require('./test_endpoint'),
+    testEndpoint = require('./test_endpoint'),
     async = require('async'),
-    test_config = require('../config_tests').integration,
+    testConfig = require('../config_tests').integration,
     fs = require('fs'),
     util = require('../util'),
     data = require('../data'),
     redis = require('redis');
 
-var request = request('http://localhost:' + test_config.accounting_proxy_port);
+var request = request('http://localhost:' + testConfig.accounting_proxy_port);
 
 var server, db;
 var databaseName = 'testDB_accounting.sqlite';
@@ -19,7 +19,7 @@ userProfile.token = data.DEFAULT_TOKEN;
 
 var FIWAREStrategyMock = util.getStrategyMock(userProfile);
 
-var DEFAULT_URL = 'http://localhost:' + test_config.accounting_port;
+var DEFAULT_URL = 'http://localhost:' + testConfig.test_endpoint_port;
 
 var configMock = util.getConfigMock(false);
 
@@ -60,15 +60,15 @@ var mocker = function (database, done) {
 
     } else {
 
-        var redis_host = test_config.redis_host;
-        var redis_port = test_config.redis_port;
+        var redis_host = testConfig.redis_host;
+        var redis_port = testConfig.redis_port;
 
         if (! redis_host || ! redis_port) {
             done('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".');
         } else {
 
             configMock.database.type = './db_Redis';
-            configMock.database.name = test_config.redis_database;
+            configMock.database.name = testConfig.redis_database;
             configMock.database.redis_host = redis_host;
             configMock.database.redis_port = redis_port;
 
@@ -103,11 +103,14 @@ var mocker = function (database, done) {
     server.init(done);
 }
 
-test_endpoint.run(test_config.accounting_port);
+// Start the enpoint for testing
+before(function () {
+    testEndpoint.run();
+});
 
 // Delete testing database
 after(function (done) {
-    test_endpoint.stop(function (err) {
+    testEndpoint.stop(function (err) {
         if (err) {
             done(err);
         } else {
@@ -118,7 +121,7 @@ after(function (done) {
 
 describe('Testing the accounting API. Generic REST use', function () {
     
-    async.eachSeries(test_config.databases, function (database, taskCallback) {
+    async.eachSeries(testConfig.databases, function (database, taskCallback) {
 
         describe('with database ' + database, function () {
 

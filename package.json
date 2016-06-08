@@ -48,12 +48,12 @@
     }
   ],
   "scripts": {
-    "test": "npm run unit && npm run usageManagement && npm run accountingGeneric && npm run accountingCB && npm run administration",
+    "test": "npm run unit && npm run administration && npm run accountingCB && npm run usageManagement && npm run accountingGeneric",
     "unit": "istanbul cover _mocha test/unit",
-    "usageManagement": "_mocha test/integration/usageManagementAPI_spec",
-    "accountingGeneric": "_mocha test/integration/accounting_spec",
-    "accountingCB": "_mocha test/integration/accounting_CB_spec",
-    "administration": "_mocha test/integration/administration_spec"
+    "usageManagement": "mocha test/integration/usageManagementAPI_spec",
+    "accountingGeneric": "mocha test/integration/accounting_spec",
+    "accountingCB": "mocha test/integration/accounting_CB_spec",
+    "administration": "mocha test/integration/administration_spec"
   },
   "devDependencies": {
     "mock-redis-client": "^0.91.13",

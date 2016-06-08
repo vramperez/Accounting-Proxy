@@ -1,6 +1,6 @@
 var express = require('express'),
     bodyParser = require('body-parser'),
-    config_test = require('../config_tests').integration,
+    configTest = require('../config_tests').integration,
     fs = require('fs'),
     data = require('../data');
 
@@ -8,8 +8,9 @@ var app = express();
 
 var subscriptionId = data.DEFAULT_SUBS_ID;
 var server;
+var port = configTest.test_endpoint_port;
 
-exports.run = function (port) {
+exports.run = function () {
     console.log('[LOG]: starting an endpoint for testing (in port ' + port + ')...');
     server = app.listen(port);
 };
@@ -19,16 +20,24 @@ exports.stop = function (callback) {
     server.close(callback);
 };
 
-var returnHtml = function (res) {
+var returnHtml = function (callback) {
     fs.readFile('./test/integration/ejemplo.html', function (err, html) {
-        res.writeHeader(200,  {"Content-Type": "text/html"});
-        res.write("" + html);
-        res.end();
+        if (err) {
+            return callback(err, null);
+        } else {
+            return callback(null, html);
+        }
     });
 };
 
 var serviceHandler =  function (req, res) {
-    returnHtml(res);
+    returnHtml(function (err, html) {
+        if (err) {
+            res.status(500).send();
+        } else {
+            res.status(200).send(html);
+        }
+    });
 };
 
 var createEntity = function (req, res) {

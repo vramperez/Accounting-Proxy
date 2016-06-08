@@ -1,8 +1,8 @@
 var assert = require('assert'),
     proxyquire = require('proxyquire').noCallThru(),
-    usageAPI_mock = require('./test_endpoint'),
+    usageAPIMock = require('./test_endpoint'),
     async = require('async'),
-    test_config = require('../config_tests').integration,
+    testConfig = require('../config_tests').integration,
     data = require('../data'),
     util = require('../util');
 
@@ -49,15 +49,15 @@ var mocker = function (database, done) {
         });
     } else {
 
-        var redis_host = test_config.redis_host;
-        var redis_port = test_config.redis_port;
+        var redis_host = testConfig.redis_host;
+        var redis_port = testConfig.redis_port;
 
         if (! redis_host || ! redis_port) {
             done('Variable "redis_host" or "redis_port" are not defined in "config_tests.js".')
         } else {
 
             configMock.database.type = './db_Redis';
-            configMock.database.name = test_config.redis_database;
+            configMock.database.name = testConfig.redis_database;
             configMock.database.redis_host = redis_host;
             configMock.database.redis_port = redis_port;
 
@@ -85,11 +85,14 @@ var mocker = function (database, done) {
     db.init(done);
 };
 
-usageAPI_mock.run(test_config.usageAPI_port);
+// Start the enpoint for testing
+before(function () {
+    usageAPIMock.run();
+});
 
 // Delete testing database
 after(function (done) {
-    usageAPI_mock.stop(function (err) {
+    usageAPIMock.stop(function (err) {
         if (err) {
             done(err);
         } else {
@@ -100,7 +103,7 @@ after(function (done) {
 
 describe('Testing the usage notifier', function () {
 
-    async.eachSeries(test_config.databases, function (database, taskCallback) {
+    async.eachSeries(testConfig.databases, function (database, taskCallback) {
 
         describe('with database ' + database, function () {
 
@@ -115,11 +118,11 @@ describe('Testing the usage notifier', function () {
                 });
             });
 
-            // Restore the default configMock values.
+            // Restore the default configMock values
             afterEach(function () {
                 configMock.usageAPI = {
                     host: 'localhost',
-                    port: test_config.usageAPI_port,
+                    port: testConfig.test_endpoint_port,
                     path: ''
                 };
             });

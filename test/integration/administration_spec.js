@@ -90,6 +90,7 @@ var mocker = function (database, done) {
 
 // Delete testing database
 after(function (done) {
+    this.timeout(5000);
     util.removeDatabase(databaseName, done);
 });
 
@@ -127,6 +128,8 @@ describe('Testing the administration API', function (done) {
 
             // Clear the database and mock dependencies
             beforeEach(function (done) {
+                this.timeout(5000);
+
                 util.clearDatabase(database, databaseName, function (err) {
                     if (err) {
                         done(err);

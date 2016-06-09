@@ -10,7 +10,7 @@ var admin_paths = config.api.administration_paths;
 
 var urlRegExp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
 var pathRegExp = /^\/([\w#!:.?+=&%@!\-\/])/;
-var invalidPathError = 'Invalid path format.'
+var invalidPathError = 'Invalid path format.';
 
 db.init(function(err) {
     if (err) {
@@ -21,11 +21,11 @@ db.init(function(err) {
 var administrationPath = function(path, callback) {
     var is_admin_path = false;
 
-    async.forEachOf(admin_paths, function(admin_path, key, task_callback) {
+    async.forEachOf(admin_paths, function(admin_path, key, taskCallback) {
         if (path === admin_path  && ! is_admin_path) {
             is_admin_path = true;
         }
-        task_callback();
+        taskCallback();
     }, function() {
         return callback(is_admin_path);
     });

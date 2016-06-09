@@ -130,15 +130,15 @@ var associatedApiKeys = function (publicPath, callback) {
  * @param  {Array}   apiKeys  Api-keys array.
  */
 var associatedSubscriptions = function (apiKeys, callback) {
-    async.each(apiKeys, function (apiKey, task_callback) {
+    async.each(apiKeys, function (apiKey, taskCallback) {
         db.smembers(apiKey + 'subs', function (err, subscriptions) {
             if (err) {
-                task_callback(err);
+                taskCallback(err);
             } else if (!subscriptions) {
-                task_callback(null);
+                taskCallback(null);
             } else {
                 apiKeys.push.apply(apiKeys, subscriptions);
-                task_callback(null);
+                taskCallback(null);
             }
         });
     }, function (err) {
@@ -169,16 +169,16 @@ exports.deleteService = function (publicPath, callback) {
         if (err) {
             return callback('Error in database deleting the service.');
         } else {
-            async.each(keys, function (key, task_callback) {
+            async.each(keys, function (key, taskCallback) {
                 db.hget(key, 'customer', function (err, customer) {
                     if (err) {
-                        task_callback(err);
+                        taskCallback(err);
                     } else {
                         multi.srem(customer, key);
                         multi.del(key);
                         multi.del(key + 'subs');
                         multi.srem('apiKeys', key);
-                        task_callback(null);
+                        taskCallback(null);
                     }
                 });
             }, function (err) {
@@ -225,14 +225,14 @@ exports.getAllServices = function (callback) {
         if (err) {
             return callback('Error in database getting the services.', null);
         } else {
-            async.each(publicPaths, function (publicPath, task_callback) {
+            async.each(publicPaths, function (publicPath, taskCallback) {
                 db.hgetall(publicPath, function (err, service) {
                     if (err) {
-                        task_callback(err);
+                        taskCallback(err);
                     } else {
                         service.publicPath = publicPath;
                         toReturn.push(service);
-                        task_callback(null);
+                        taskCallback(null);
                     }
                 });
             }, function (err) {
@@ -286,12 +286,12 @@ exports.deleteAdmin = function (idAdmin, callback) {
         if (err) {
             return callback('Error in database removing admin: "' + idAdmin + '" .');
         } else {
-            async.each(services, function (service, task_callback) {
+            async.each(services, function (service, taskCallback) {
                 db.srem(service.publicPath + 'admins', idAdmin, function (err) {
                     if (err) {
-                        task_callback('Error in database removing admin: "' + idAdmin + '" .');
+                        taskCallback('Error in database removing admin: "' + idAdmin + '" .');
                     } else {
-                        task_callback();
+                        taskCallback();
                     }
                 })
             }, function (err) {
@@ -458,17 +458,17 @@ exports.getApiKeys = function (user, callback) {
         if (err) {
             return callback('Error in databse getting api-keys.', null);
         } else {
-            async.each(apiKeys.sort(), function (apiKey, task_callback) {
+            async.each(apiKeys.sort(), function (apiKey, taskCallback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
                     if (err) {
-                        return task_callback('Error in databse getting api-keys.');
+                        return taskCallback('Error in databse getting api-keys.');
                     } else {
                         toReturn.push({
                             apiKey: apiKey,
                             productId: accountingInfo.productId,
                             orderId: accountingInfo.orderId
                         });
-                        task_callback(null);
+                        taskCallback(null);
                     }
                 });
             }, function (err) {
@@ -538,12 +538,12 @@ exports.getNotificationInfo = function (callback) {
         if (err) {
             return callback('Error in database getting the notification information.', null);
         } else {
-            async.each(apiKeys, function (apiKey, task_callback) {
+            async.each(apiKeys, function (apiKey, taskCallback) {
                 db.hgetall(apiKey, function (err, accountingInfo) {
                     if (err) {
-                        task_callback(err);
+                        taskCallback(err);
                     } else if (parseFloat(accountingInfo.value) === 0) {
-                        task_callback(null);
+                        taskCallback(null);
                     } else {
                         notificationInfo.push({
                             apiKey: apiKey,
@@ -555,7 +555,7 @@ exports.getNotificationInfo = function (callback) {
                             recordType: accountingInfo.recordType,
                             unit: accountingInfo.unit
                         });
-                        task_callback(null);
+                        taskCallback(null);
                     }
                 });
             }, function (err) {

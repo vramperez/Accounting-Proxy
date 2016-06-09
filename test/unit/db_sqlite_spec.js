@@ -35,8 +35,8 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "init"', function () {
         var sentences = [
-            'PRAGMA encoding = "UTF-8";',
             'PRAGMA foreign_keys = 1;',
+            'PRAGMA encoding = "UTF-8";',
             'CREATE TABLE IF NOT EXISTS token ( \
                     token               TEXT, \
                     PRIMARY KEY (token)             )',

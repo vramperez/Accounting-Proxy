@@ -8,6 +8,7 @@ var sqlite = require('sqlite3').verbose(), // Debug enable
 var db = new TransactionDatabase (
         new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE));
 
+
 /*
 * Initialize the database and creates the necessary tables.
 */
@@ -15,10 +16,10 @@ exports.init = function (callback) {
 
     async.series([
         function (callback) {
-            db.run('PRAGMA encoding = "UTF-8";', callback);
+            db.run('PRAGMA foreign_keys = 1;', callback);
         },
         function (callback) {
-            db.run('PRAGMA foreign_keys = 1;', callback);
+            db.run('PRAGMA encoding = "UTF-8";', callback);
         },
         function (callback) {
             db.run('CREATE TABLE IF NOT EXISTS token ( \

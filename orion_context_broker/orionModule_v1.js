@@ -1,112 +1,36 @@
 var request = require('request'),
-    subsUrls = require('./subsUrls'),
     config = require('../config'),
-    express = require('express'),
     accounter = require('../accounter'),
-    bodyParser = require('body-parser'),
-    logger = require('winston'),
     async = require('async');
 
-var app = express();
 var db = require('../' + config.database.type);
 
 /**
- * Start the endopoint to receive CB notifications.
- */
-exports.run = function () {
-    app.listen(app.get('port'));
-};
-
-/**
- * Handles the notification from the CB; make the accounting and notify the user.
- *
- * @param  {Object} req Incoming request.
- * @param  {Object} res Outgoing response.
- */
-var notificationHandler = function (req, res) {
-    var countInfo = {
-        request: req,
-        response: {}
-    };
-    var body = req.body;
-    var subscriptionId = body.subscriptionId;
-
-    db.getCBSubscription(subscriptionId, function (err, subscription) {
-
-        if (err || subscription === null) {
-            logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
-        } else {
-
-            // Make accounting
-            accounter.count(subscription.apiKey, subscription.unit, countInfo, 'count', function (err) {
-
-                if (err) {
-                    logger.error('An error ocurred while making the accounting');
-                } else {
-
-                    var options = {
-                        url: subscription.notificationUrl,
-                        method: req.method,
-                        json: true,
-                        body: body
-                    };
-
-                    request(options, function (error, resp, body) {
-
-                        if (error) {
-                            logger.error('An error ocurred notifying the user, url: ' + options.url);
-                            res.status(504).send();
-                        } else {
-                            res.status(resp.statusCode).send();
-                        }
-                    });
-                }
-            });
-        }
-    });
-};
-
-/**
- * Return the operation associated with the path passed as argument.
- *
- * @param  {string}   privatePath Path for the request.
- * @param  {Object}   req         Incoming request.
- */
-exports.getOperation = function (privatePath, req, callback) {
-    var operation = null;
-
-    async.forEachOf(subsUrls, function (entry, i, taskCallback) {
-        if (req.method === subsUrls[i][0] && privatePath.toLowerCase().match(subsUrls[i][1])) {
-            operation = subsUrls[i][2];
-            taskCallback();
-        } else {
-            taskCallback();
-        }
-    }, function () {
-        return callback(operation);
-    });
-};
-
-/**
- * Auxiliar function that handles subscriptions.
+ * Save the subscription in the db and redirect the response to the user.
+ * If the accounting unit is millisecond, extract the subscription duration
+ * and make the accounting.
  *
  * @param  {Object}   req      Incoming request.
  * @param  {Object}   res      Outgoing response.
  * @param  {string}   unit     Accounting unit.
  * @param  {Object}   options  Context Broker request options.
  */
-var subscribe = function (req, res, unit, options, callback) {
-    var req_body = req.body;
-    var reference_url = req_body.reference;
+exports.subscribe = function (req, res, unit, options, callback) {
 
-    req_body.reference = 'http://localhost:' + config.resources.notification_port + '/subscriptions'; // Change the notification endpoint to accounting endpoint
-    options.body = req_body;
+    var reqBody = req.body;
+    var referenceUrl = reqBody.reference;
+
+    // Change the notification endpoint to accounting endpoint
+    reqBody.reference = 'http://localhost:' + config.resources.notification_port + '/subscriptions';
+    options.body = reqBody;
 
     // Send the request to the CB and redirect the response to the subscriber
     request(options, function (err, resp, body) {
+
         if (err) {
             res.status(504).send();
             return callback('Error sending the subscription to the CB');
+
         } else if (body.subscribeResponse) {
 
             var subscriptionId = body.subscribeResponse.subscriptionId;
@@ -121,7 +45,7 @@ var subscribe = function (req, res, unit, options, callback) {
                 var apiKey = req.get('X-API-KEY');
 
                 // Store the endpoint information of the subscriber to be notified
-                db.addCBSubscription(apiKey, subscriptionId, reference_url, function (err) {
+                db.addCBSubscription(apiKey, subscriptionId, referenceUrl, function (err) {
 
                     if (err) {
                         res.send(body);
@@ -140,6 +64,7 @@ var subscribe = function (req, res, unit, options, callback) {
                     }
                 });
             });
+
         } else {
             res.status(resp.statusCode).send(body);
             return callback(null);
@@ -148,39 +73,44 @@ var subscribe = function (req, res, unit, options, callback) {
 };
 
 /**
- * Auxiliar function that handles unsubscriptions.
+ * Delete the subscription from the database and redirect the response
+ * to the user.
  *
  * @param  {Object}   req      Incoming object.
  * @param  {Object}   res      Outgoing object.
  * @param  {Object}   options  Context Broker request options.
  */
-var unsubscribe = function (req, res, options, callback) {
+exports.unsubscribe = function (req, res, options, callback) {
+
     var subscriptionId = '';
 
     if (req.method === 'POST') {
         subscriptionId = req.body.subscriptionId;
     } else if (req.method === 'DELETE') {
-        var pattern = /\/(\w+)$/;
-        var match = pattern.exec(req.path);
-        subscriptionId = match[1];
-        subscriptionId = subscriptionId.replace('/', '');
+        subscriptionId = req.path.substr(req.path.lastIndexOf('/') + 1);
     }
 
     options.body = req.body;
 
     // Sends the request to the CB and redirect the response to the subscriber
     request(options, function (err, resp, body) {
+
         if (err) {
             res.status(504).send();
             return callback('Error sending the unsubscription to the CB');
+
         } else {
+
             res.status(resp.statusCode);
             async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
                 taskCallback();
             }, function () {
-                if (resp.statusCode === 200) {
+
+                if (!resp.orionError) {
+
                     db.deleteCBSubscription(subscriptionId, function (err) {
+                    	console.log(err)
                         if (err) {
                             res.send(body);
                             return callback(err);
@@ -189,6 +119,7 @@ var unsubscribe = function (req, res, options, callback) {
                             return callback(null);
                         }
                     });
+
                 } else {
                     res.send(body);
                     return callback(null);
@@ -199,13 +130,16 @@ var unsubscribe = function (req, res, options, callback) {
 };
 
 /**
- * Auxiliar function that handles subscriptions updates.
+ * Update the subscription and redirect the response to the client.
+ * If the accounting unit is millisecond, the accounting value will be 
+ * increased according the new subscription duration.
  *
  * @param  {Object}   req      Incoming request.
  * @param  {Object}   res      Outgoing response.
  * @param  {Object}   options  Context Broker request options.
  */
-var updateSubscription = function (req, res, options, callback) {
+exports.updateSubscription = function (req, res, options, callback) {
+
     options.body = req.body;
     var subscriptionId = req.body.subscriptionId;
 
@@ -244,6 +178,7 @@ var updateSubscription = function (req, res, options, callback) {
                             }
                         });
                     });
+
                 } else {
                     res.status(resp.statusCode).send(body);
                     return callback(null);
@@ -252,35 +187,3 @@ var updateSubscription = function (req, res, options, callback) {
         }
     });
 };
-
-/**
- * Manage the subscribe/unsubscribe Context Broker requests.
- *
- * @param  {Object}   req       Incoming request.
- * @param  {Object}   res       Outgoing response.
- * @param  {string}   url       Context-Broker url.
- * @param  {string}   operation Context Broker operation (subscribe, unsubscribe).
- */
-exports.subscriptionHandler = function (req, res, url, operation, unit, callback) {
-    var options = {
-        url: url,
-        method: req.method,
-        json: true,
-        headers: req.headers
-    };
-
-    switch (operation) {
-        case 'subscribe':
-            subscribe(req, res, unit, options, callback);
-            break;
-        case 'unsubscribe':
-            unsubscribe(req, res, options, callback);
-            break;
-        case 'updateSubscription':
-            updateSubscription(req, res, options, callback);
-    }
-};
-
-app.use(bodyParser.json());
-app.set('port', config.resources.notification_port);
-app.post('/subscriptions', notificationHandler);

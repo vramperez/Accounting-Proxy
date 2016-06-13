@@ -62,6 +62,7 @@ exports.init = function (callback) {
                     subscriptionId      TEXT, \
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
+                    expires             TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
             )', callback);
@@ -610,14 +611,16 @@ exports.resetAccounting = function (apiKey, callback) {
  * @param {string} apiKey           Identifies the product.
  * @param {string} subscriptionId   Identifies the subscription.
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
+ * @param {string} expires          Subscription expiration date (ISO8601).
  */
-exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, callback) {
+exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, callback) {
     db.run('INSERT OR REPLACE INTO subscriptions \
-        VALUES ($subscriptionId, $apiKey, $notificationUrl)',
+        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires)',
         {
             $subscriptionId: subscriptionId,
             $apiKey: apiKey,
-            $notificationUrl: notificationUrl
+            $notificationUrl: notificationUrl,
+            $expires: expires
         }, function (err) {
             if (err) {
                 return callback('Error in database adding the subscription "' + subscriptionId + '" .');
@@ -633,7 +636,7 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, c
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.getCBSubscription = function (subscriptionId, callback) {
-    db.get('SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
+    db.get('SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId',
             {
@@ -645,6 +648,50 @@ exports.getCBSubscription = function (subscriptionId, callback) {
                     return callback(null, null);
                 } else {
                     return callback(null, subscriptionInfo);
+                }
+    });
+};
+
+/**
+ * Replace the notification URL with the URL passed as argument.
+ *
+ * @param  {String}   subscriptionId  Subscription identifier.
+ * @param  {String}   notificationUrl New notification URL.
+ */
+exports.updateNotificationUrl = function (subscriptionId, notificationUrl, callback) {
+    db.run('UPDATE subscriptions \
+            SET notificationUrl=$notificationUrl \
+            WHERE subscriptionId=$subscriptionId',
+            {
+                $subscriptionId: subscriptionId,
+                $notificationUrl: notificationUrl
+            }, function (err) {
+                if (err) {
+                    return callback('Error in database updating the notificationURL');
+                } else {
+                    return callback(null);
+                }
+    });
+};
+
+/**
+ * Replace the expiration date with the new expiration date passed as argument.
+ *
+ * @param  {String}   subscriptionId  Subscription identifier.
+ * @param  {String}   expires         New expiration date (ISO8601).
+ */
+exports.updateExpirationDate = function (subscriptionId, expires, callback) {
+    db.run('UPDATE subscriptions \
+            SET expires=$expires \
+            WHERE subscriptionId=$subscriptionId',
+            {
+                $subscriptionId: subscriptionId,
+                $expires: expires
+            }, function (err) {
+                if (err) {
+                    return callback('Error in database updating the expiration date')
+                } else {
+                    return callback(null);
                 }
     });
 };

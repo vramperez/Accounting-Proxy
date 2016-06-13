@@ -5,9 +5,9 @@ var express = require('express'),
     async = require('async'),
     url = require('url'),
     request = require('request'),
-    contextBroker = require('./orion_context_broker/cb_handler'),
     logger = require('winston'),
     accounter = require('./accounter'),
+    cbHandler = require('./orion_context_broker/cbHandler'),
     cron = require('node-schedule'),
     oauth2 = require('./OAuth2_authentication'),
     notifier = require('./notifier'),
@@ -56,8 +56,9 @@ exports.init = function (callback) {
             return callback('Error starting the accounting-proxy. ' + err);
         } else {
             if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
-                logger.info('Loading module for Orion Context Broker...');
-                contextBroker.run();
+                logger.info('Loading modules for Orion Context Broker...');
+
+                cbHandler.run();
             }
 
             cron.scheduleJob(config.usageAPI.schedule, function () {
@@ -94,12 +95,14 @@ exports.getAccountingModules = function() {
  * @param {Object} options  Options for make the request to the endpoint.
  * @param {[type]} unit     Unit for the accounting.
  */
-var CBrequestHandler = function(req, res, options, unit) {
+var cbRequestHandler = function(req, res, options, unit, version) {
     var apiKey = req.get('X-API-KEY');
 
-    contextBroker.getOperation(url.parse(options.url).pathname, req, function (operation) {
-        if (operation === 'subscribe' || operation === 'unsubscribe' || operation === 'updateSubscription') {
-            contextBroker.subscriptionHandler(req, res, options.url, operation, unit, function (err) {
+    cbHandler.getOperation(url.parse(options.url).pathname, req, function (operation) {
+
+        if (operation === 'create' || operation === 'delete' || operation === 'update') {
+
+            cbHandler.subscriptionHandler(req, res, options, operation, unit, version, function (err) {
                 if (err) {
                     logger.warn('[%s] ' + err, apiKey);
                 }
@@ -157,21 +160,25 @@ var requestHandler = function (options, res, apiKey, unit) {
 };
 
 /**
- * Read the data stream and store in the body property of the request.
+ * Return the Context Broker API version of the URL passed as argument. If the context broker
+ *  configuration option is false or the request is not a context broker request, it return null.
  *
- * @param  {Object}   req  Incoming request.
- * @param  {Object}   res  Outgoing response.
+ * @param  {String} reqUrl Request URL
  */
-var getBody = function (req, res, next) {
-    req.body = '';
+var getCBVersion = function (reqUrl) {
+    var v1RegEx = /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/;
+    var v2RegEx = /\/(v2)\/((\w+)\/?)*$/;
+    var version = null;
 
-    req.on('data', function (chunk) {
-        req.body += chunk;
-    });
+    var path = url.parse(reqUrl).pathname;
 
-    req.on('end', function () {
-        next();
-    });
+    if (!config.resources.contextBroker) {
+        return version;
+    } else {
+        version = v1RegEx.test(path) ? 'v1' : v2RegEx.test(path) ? 'v2' : null;
+    }
+
+    return version;
 };
 
 /**
@@ -204,21 +211,24 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
     if (apiKey === null && unit === null) { // redirect (admin user)
         requestHandler(options, res, apiKey, unit);
     } else {
+
         // Orion ContextBroker request
-        if (config.resources.contextBroker &&
-            (/\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/).test(url.parse(options.url).pathname)) {
+        var cbVersion = getCBVersion(options.url);
 
-                if (createMehtods.indexOf(req.method) > -1 && !isJSON) {
-                    res.status(415).json({error: 'Content-Type must be "application/json"'});
-                } else {
-                    CBrequestHandler(req, res, options, unit);
-                }
-
-        } else {
+        if (!cbVersion) { // Normal request (no context broker request)
             requestHandler(options, res, apiKey, unit);
+
+        } else  {
+
+            if (createMehtods.indexOf(req.method) > -1 && !isJSON) {
+                res.status(415).json({error: 'Content-Type must be "application/json"'});
+
+            } else {
+                cbRequestHandler(req, res, options, unit, cbVersion);
+            }
         }
     }
-}
+};
 
 /**
  * Request handler.
@@ -265,6 +275,24 @@ var handler = function (req, res) {
                 });
             }
         }
+    });
+};
+
+/**
+ * Read the data stream and store in the body property of the request.
+ *
+ * @param  {Object}   req  Incoming request.
+ * @param  {Object}   res  Outgoing response.
+ */
+var getBody = function (req, res, next) {
+    req.body = '';
+
+    req.on('data', function (chunk) {
+        req.body += chunk;
+    });
+
+    req.on('end', function () {
+        next();
     });
 };
 

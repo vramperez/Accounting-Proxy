@@ -118,4 +118,5 @@ config.log = {
 
     file: './log/all-log'
 };
+
 module.exports = config;

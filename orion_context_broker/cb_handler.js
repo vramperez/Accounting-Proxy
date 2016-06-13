@@ -75,12 +75,12 @@ var notificationHandler = function (req, res) {
 exports.getOperation = function (privatePath, req, callback) {
     var operation = null;
 
-    async.forEachOf(subsUrls, function (entry, i, task_callback) {
+    async.forEachOf(subsUrls, function (entry, i, taskCallback) {
         if (req.method === subsUrls[i][0] && privatePath.toLowerCase().match(subsUrls[i][1])) {
             operation = subsUrls[i][2];
-            task_callback();
+            taskCallback();
         } else {
-            task_callback();
+            taskCallback();
         }
     }, function () {
         return callback(operation);
@@ -113,9 +113,9 @@ var subscribe = function (req, res, unit, options, callback) {
             var duration = body.subscribeResponse.duration;
             res.status(resp.statusCode);
 
-            async.forEachOf(resp.headers, function (header, key, task_callback) {
+            async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
-                task_callback();
+                taskCallback();
             }, function () {
 
                 var apiKey = req.get('X-API-KEY');
@@ -175,9 +175,9 @@ var unsubscribe = function (req, res, options, callback) {
             return callback('Error sending the unsubscription to the CB');
         } else {
             res.status(resp.statusCode);
-            async.forEachOf(resp.headers, function (header, key, task_callback) {
+            async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
-                task_callback();
+                taskCallback();
             }, function () {
                 if (resp.statusCode === 200) {
                     db.deleteCBSubscription(subscriptionId, function (err) {
@@ -228,9 +228,9 @@ var updateSubscription = function (req, res, options, callback) {
                     var subscriptionId = body.subscribeResponse.subscriptionId;
                     var duration = body.subscribeResponse.duration;
                     res.status(resp.statusCode);
-                    async.forEachOf(resp.headers, function (header, key, task_callback) {
+                    async.forEachOf(resp.headers, function (header, key, taskCallback) {
                         res.setHeader(key, header);
-                        task_callback();
+                        taskCallback();
                     }, function () {
 
                         res.send(body);

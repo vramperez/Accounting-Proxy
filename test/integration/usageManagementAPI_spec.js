@@ -92,6 +92,8 @@ before(function () {
 
 // Delete testing database
 after(function (done) {
+    this.timeout(5000);
+
     usageAPIMock.stop(function (err) {
         if (err) {
             done(err);
@@ -109,6 +111,8 @@ describe('Testing the usage notifier', function () {
 
             // Clear the database and mock dependencies
             beforeEach(function (done) {
+                this.timeout(5000);
+
                 util.clearDatabase(database, databaseName, function (err) {
                     if (err) {
                         done(err);

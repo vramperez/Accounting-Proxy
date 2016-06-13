@@ -27,12 +27,12 @@ var server;
 var loadAccountingModules = function (callback) {
     var units = config.modules.accounting;
 
-    async.each(units, function (unit, task_callback) { 
+    async.each(units, function (unit, taskCallback) { 
         try {
             accountingModules[unit] = require('./acc_modules/' + unit);
-            task_callback();
+            taskCallback();
         } catch (e) {
-            task_callback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
+            taskCallback('No accounting module for unit "' + unit + '" : missing file acc_modules/' + unit + '.js');
         }
     }, callback);
 };

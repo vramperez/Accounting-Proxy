@@ -152,9 +152,11 @@ var attachUserHeaders = function (headers, userInfo) {
  * @param  {Function} next Next middleware.
  */
 exports.headerAuthentication = function (req, res, next) {
+
     try {
         var authToken = getAuthToken(req.headers);
         FIWARE_STRATEGY.userProfile(authToken, function (err, userProfile) {
+
             if (err) {
                 res.status(401).json({error: 'Invalid Auth-Token'});
                 logger.warn('Token ' + authToken + ' invalid');

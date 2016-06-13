@@ -148,15 +148,15 @@ var sendUsage = function (token, accInfo, callback) {
 var notifyUsageSpecification = function (token, callback) {
     var units = config.modules.accounting;
 
-    async.each(units, function (unit, task_callback) {
+    async.each(units, function (unit, taskCallback) {
 
         db.getHref(unit, function (err, href) {
             if (err) {
-                task_callback(err);
+                taskCallback(err);
             } else if (href !== null) {
-                task_callback(null);
+                taskCallback(null);
             } else {
-                sendSpecification(token, unit, task_callback);
+                sendSpecification(token, unit, taskCallback);
             }
         });
     }, callback);
@@ -191,12 +191,12 @@ var notifyUsage = function (callback) {
 
                         } else {
                             // Then, notify the usage
-                            async.each(notificationInfo, function (info, task_callback) {
+                            async.each(notificationInfo, function (info, taskCallback) {
                                 sendUsage(token, info, function (err) {
                                     if (err) {
-                                        task_callback(err);
+                                        taskCallback(err);
                                     } else {
-                                        task_callback(null);
+                                        taskCallback(null);
                                     }
                                 });
                             }, callback);

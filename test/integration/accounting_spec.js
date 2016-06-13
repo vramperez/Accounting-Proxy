@@ -110,6 +110,8 @@ before(function () {
 
 // Delete testing database
 after(function (done) {
+    this.timeout(5000);
+
     testEndpoint.stop(function (err) {
         if (err) {
             done(err);
@@ -127,6 +129,8 @@ describe('Testing the accounting API. Generic REST use', function () {
 
             // Clear the database and mock dependencies
             beforeEach(function (done) {
+                this.timeout(5000);
+
                 util.clearDatabase(database, databaseName, function (err) {
                     if (err) {
                         done(err);

@@ -1,8 +1,8 @@
 var request = require('request'),
-config = require('../config'),
-accounter = require('../accounter'),
-async = require('async'),
-moment = require('moment');
+    config = require('../config'),
+    accounter = require('../accounter'),
+    async = require('async'),
+    moment = require('moment');
 
 var db = require('../' + config.database.type);
 
@@ -16,9 +16,8 @@ var getDuration = function (date1, date2) {
 
     var moment1 = moment(date1);
     var moment2 = moment(date2);
-    var duration = moment2.diff(moment1);
 
-    return moment.duration(duration).toISOString();
+    return moment2.diff(moment1);
 };
 
 /**
@@ -66,6 +65,7 @@ var getNotificationUrl = function (notification) {
 exports.subscribe = function (req, res, unit, options, callback) { 
 
     var subscription = JSON.parse(JSON.stringify(req.body)); // Save the subscription
+    var response = {};
 
 	// Change the notification endpoint to accounting endpoint
 	options.body.notification = {
@@ -78,12 +78,18 @@ exports.subscribe = function (req, res, unit, options, callback) {
 	request(options, function (err, resp, body) {
 
 		if (err) {
-			res.status(504).send();
-			return callback('Error sending the subscription to the CB');
+            response = {
+                status: 504,
+                body: ''
+            };
+			return callback('Error sending the subscription to the CB', response);
 
 		} else if (resp.statusCode !== 201) {
-			res.status(resp.statusCode).send(body);
-			return callback(null);
+            response = {
+                status: resp.statusCode,
+                body: body
+            };
+			return callback(null, response);
 
 		} else {
 
@@ -93,7 +99,8 @@ exports.subscribe = function (req, res, unit, options, callback) {
 			var duration = expires ? getDuration(moment(), expires) : null; // TODO: null --> unlimited duration
 			var notificationUrl = getNotificationUrl(subscription.notification);
 
-			res.status(resp.statusCode);
+            response.status = resp.statusCode;
+            response.body = body;
 
 			async.forEachOf(resp.headers, function (header, key, taskCallback) {
 				res.setHeader(key, header);
@@ -106,17 +113,14 @@ exports.subscribe = function (req, res, unit, options, callback) {
                 db.addCBSubscription(apiKey, subscriptionId, notificationUrl, expires, function (err) {
 
                     if (err) {
-                        res.send(body);
-                        return callback(err);
+                        return callback(err, response);
                     } else {
 
                         accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                             if (err && err.code !== 'invalidFunction') {
-                                res.send(body);
-                                return callback(err.msg);
+                                return callback(err.msg, response);
                             } else {
-                                res.send(body);
-                                return callback(null);
+                                return callback(null, response);
                             }
                         });
                     }
@@ -137,17 +141,23 @@ exports.subscribe = function (req, res, unit, options, callback) {
 exports.unsubscribe = function (req, res, options, callback) {
 
     var subscriptionId = req.path.substr(req.path.lastIndexOf('/') + 1);
+    var response = {};
 
-        // Sends the request to the CB and redirect the response to the subscriber
-        request(options, function (err, resp, body) {
+    // Sends the request to the CB and redirect the response to the subscriber
+    request(options, function (err, resp, body) {
 
         if (err) {
-            res.status(504).send();
-            return callback('Error sending the unsubscription to the CB');
+            response = {
+                status: 504,
+                body: ''
+            };
+            return callback('Error sending the unsubscription to the CB', response);
 
         } else {
 
-            res.status(resp.statusCode);
+            response.status = resp.statusCode;
+            response.body = body;
+
             async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
                 taskCallback();
@@ -157,17 +167,14 @@ exports.unsubscribe = function (req, res, options, callback) {
 
                     db.deleteCBSubscription(subscriptionId, function (err) {
                         if (err) {
-                            res.send(body);
-                            return callback(err);
+                            return callback(err, response);
                         } else {
-                            res.send(body);
-                            return callback(null);
+                            return callback(null, response);
                         }
                     });
 
                 } else {
-                    res.send(body);
-                    return callback(null);
+                    return callback(null, response);
                 }
             });
         }
@@ -185,46 +192,53 @@ exports.updateSubscription = function (req, res, options, callback) {
 
     var subscriptionId = req.path.substr(req.path.lastIndexOf('/') + 1);
 	var update = JSON.parse(JSON.stringify(req.body)); // Save the update
+    var response = {};
 
-	db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
+	request(options, function (err, resp, body) {
 
 		if (err) {
-			return callback(err);
-		} else if (!subscriptionInfo) {
-			return callback('Subscription "' + subscriptionId + '" not in database.')
+            response = {
+                status: 504,
+                body: ''
+            };
+			return callback('Error sending the subscription to the CB', response);
+
+		} else if (resp.statusCode !== 204) {
+            response = {
+                status: resp.statusCode,
+                body: body
+            };
+			return callback(null, response);
+
 		} else {
 
-			request(options, function (err, resp, body) {
+            response.status = resp.statusCode;
+            response.body = body;
 
-				if (err) {
-					res.status(504).send();
-					return callback('Error sending the subscription to the CB');
+			async.forEachOf(resp.headers, function (header, key, taskCallback) {
+                res.setHeader(key, header);
+                taskCallback();
+            }, function () {
 
-				} else if (resp.statusCode !== 204) {
-					res.status(resp.statusCode).send(body);
-					return callback(null);
+				var notificationUrl = update.notification ? getNotificationUrl(update.notification) : undefined;
+                var expires = update.expires
 
-				} else {
+                db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
 
-					res.status(resp.statusCode);
-					async.forEachOf(resp.headers, function (header, key, taskCallback) {
-						res.setHeader(key, header);
-						taskCallback();
-					}, function () {
+                    if (err) {
+                        return callback(err, response);
+                    } else if (!subscriptionInfo) {
+                        return callback('Subscription "' + subscriptionId + '" not in database.', response);
+                    } else {
 
-						res.send(body);
-
-						var notificationUrl = update.notification ? getNotificationUrl(update.notification) : undefined;
-                        var expires = update.expires
-
-						async.series([
-							function (callback) {
+        				async.series([
+        					function (callback) {
 
                                 // Save new notification URL
                                 if (notificationUrl) {
                                     db.updateNotificationUrl(subscriptionId, notificationUrl, callback);
                                 } else {
-                                    callback();
+                                    callback(null);
                                 }
                             },
                             function (callback) {
@@ -254,10 +268,16 @@ exports.updateSubscription = function (req, res, options, callback) {
                                     callback(null);
                                 }
                             }
-                        ], callback);
-					});
-				}
-			});
-		}
-	});
+                        ], function (err) {
+                            response = {
+                                status: resp.statusCode,
+                                body: body,
+                            }
+                            return callback(err, response);
+                        });
+                    }
+                });
+            });
+        }
+    });
 };

@@ -55,7 +55,7 @@ exports.init = function (callback) {
         if (err) {
             return callback('Error starting the accounting-proxy. ' + err);
         } else {
-            if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications.
+            if (config.resources.contextBroker) { //Start ContextBroker Server for subscription notifications
                 logger.info('Loading modules for Orion Context Broker...');
 
                 cbHandler.run();
@@ -102,10 +102,12 @@ var cbRequestHandler = function(req, res, options, unit, version) {
 
         if (operation === 'create' || operation === 'delete' || operation === 'update') {
 
-            cbHandler.subscriptionHandler(req, res, options, operation, unit, version, function (err) {
+            cbHandler.subscriptionHandler(req, res, options, operation, unit, version, function (err, response) {
+
                 if (err) {
                     logger.warn('[%s] ' + err, apiKey);
                 }
+                res.status(response.status).send(response.body);
             });
         } else {
             requestHandler(options, res, apiKey, unit);
@@ -148,7 +150,7 @@ var requestHandler = function (options, res, apiKey, unit) {
                 accounter.count(apiKey, unit, requestInfo, 'count', function (err) {
 
                     if(err) {
-                        logger.warn('[%s] Error making the accounting: ' + err, apiKey);
+                        logger.warn('[%s] Error making the accounting: ' + err.msg, apiKey);
                         res.status(500).send();
                     } else {
                         res.status(resp.statusCode).send(body);
@@ -202,8 +204,13 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
     if (createMehtods.indexOf(req.method) > -1 && isJSON) {
         options.headers['content-length'] = undefined; // Request module will set it.
         options.json = true;
-        options.body = JSON.parse(req.body);
-        req.body = JSON.parse(req.body);
+
+        try {
+            req.body = JSON.parse(req.body);
+            options.body = req.body;
+        } catch (e) {
+            return res.status(400).json({error: 'Invalid JSON'});
+        }
     } else if (createMehtods.indexOf(req.method) > -1) {
         options.body = req.body;
     }

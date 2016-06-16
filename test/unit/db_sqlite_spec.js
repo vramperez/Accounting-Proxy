@@ -31,9 +31,43 @@ var getDb = function (implementations) {
     return db;
 };
 
+var runTest = function (sentence, params, method, args, error, done) {
+
+    var run = function (sentence, params, callback) {
+        return callback(error);
+    };
+
+    var implementations = {
+        run: run
+    };
+
+    var runSpy = sinon.spy(implementations, 'run');
+
+    var db = getDb(implementations);
+
+    var assertions = function (err) {
+
+        assert(runSpy.calledWith(sentence, params));
+
+        if (error) {
+            assert.equal(err, error);
+        } else {
+            assert.equal(err, null);
+        }
+
+        done();
+    };
+
+    var argsCopy = JSON.parse(JSON.stringify(args));
+    argsCopy.push(assertions);
+
+    db[method].apply(this, argsCopy);
+};
+
 describe('Testing SQLITE database', function () {
 
     describe('Function "init"', function () {
+
         var sentences = [
             'PRAGMA foreign_keys = 1;',
             'PRAGMA encoding = "UTF-8";',
@@ -65,6 +99,7 @@ describe('Testing SQLITE database', function () {
                     subscriptionId      TEXT, \
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
+                    expires             TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE            )',
             'CREATE TABLE IF NOT EXISTS admins ( \
@@ -210,43 +245,23 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "addSpecificationRef"', function() {
 
+        var unit = data.DEFAULT_UNIT;
+        var href = data.DEFAULT_HREF;
+
         var sentence = 'INSERT OR REPLACE INTO units             VALUES ($unit, $href)';
-        var params = { '$unit': data.DEFAULT_UNIT, '$href': data.DEFAULT_HREF};
+        var params = { '$unit': unit, '$href': href};
 
-        var testAddSpecificationRef = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.stub(implementations, 'run', run);
-
-            var db = getDb(implementations);
-
-            db.addSpecificationRef(data.DEFAULT_UNIT, data.DEFAULT_HREF, function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error adding the href specification: "' + data.DEFAULT_HREF + '" to unit "' + data.DEFAULT_UNIT + '" .');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'addSpecificationRef';
+        var args = [unit, href];
 
         it('should call the callback with error when db fails adding the specification reference', function (done) {
-            testAddSpecificationRef('Error', done);
+            var errorMsg = 'Error adding the href specification: "' + href + '" to unit "' + unit + '" .';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db adds the specification', function (done) {
-            testAddSpecificationRef(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
@@ -306,47 +321,28 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "newService"', function () {
 
+        var path = data.DEFAULT_PUBLIC_PATHS[0];
+        var url = data.DEFAULT_URLS[0];
+        var appId = data.DEFAULT_APP_IDS[0];
+
         var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId)';
         var params = {
-            '$path': data.DEFAULT_PUBLIC_PATHS[0],
-            '$url': data.DEFAULT_URLS[0],
-            '$appId': data.DEFAULT_APP_IDS[0]
-        }
-
-        var testNewService = function (error, done) {
-
-            var run = function (snetence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.newService(data.DEFAULT_PUBLIC_PATHS[0], data.DEFAULT_URLS[0], data.DEFAULT_APP_IDS[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database adding the new service.');
-                } else {
-                    assert.equal(err, null);
-                }
-                
-                done();
-            });
+            '$path': path,
+            '$url': url,
+            '$appId': appId
         };
 
+        var method = 'newService';
+        var args = [path, url, appId];
+
         it('should call the callback with error when db fails adding the new service', function (done) {
-            testNewService('Error', done);
+            var errorMsg = 'Error in database adding the new service.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db adds the new service', function (done) {
-            testNewService(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
@@ -553,175 +549,93 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "addAdmin"', function () {
 
+        var adminId = data.DEFAULT_ID_ADMIN;
+
         var sentence = 'INSERT OR REPLACE INTO admins             VALUES ($idAdmin)';
-        var params = {'$idAdmin': data.DEFAULT_ID_ADMIN};
+        var params = {'$idAdmin': adminId};
 
-        var testGetAppId = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.addAdmin(data.DEFAULT_ID_ADMIN, function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database adding admin: "' + data.DEFAULT_ID_ADMIN + '" .');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'addAdmin';
+        var args = [adminId];
 
         it('should call the callback with error when db fails adding the new administrator', function (done) {
-            testGetAppId('Error', done);
+            var errorMsg = 'Error in database adding admin: "' + adminId + '" .';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db adds the new admin', function (done) {
-            testGetAppId(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
     describe('Function "deleteAdmin"', function () {
 
+        var adminId = data.DEFAULT_ID_ADMIN;
+
         var sentence = 'DELETE FROM admins             WHERE $idAdmin=idAdmin';
-        var params = {'$idAdmin': data.DEFAULT_ID_ADMIN};
+        var params = {'$idAdmin': adminId};
 
-        var testDeleteAdmin = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.deleteAdmin(data.DEFAULT_ID_ADMIN, function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database removing admin: "' + data.DEFAULT_ID_ADMIN + '" .');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'deleteAdmin';
+        var args = [adminId];
 
         it('should call the callback with error when db fails deleting the administrator', function (done) {
-            testDeleteAdmin('Error', done);
+            var errorMsg = 'Error in database removing admin: "' + adminId + '" .';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback with error when db deletes the admin', function (done) {
-            testDeleteAdmin(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
     describe('Function "bindAdmin"', function () {
 
+        var adminId = data.DEFAULT_ID_ADMIN;
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
         var sentence = 'INSERT OR REPLACE INTO administer             VALUES ($idAdmin, $publicPath)';
         var params = {
-            '$idAdmin': data.DEFAULT_ID_ADMIN,
-            '$publicPath': data.DEFAULT_PUBLIC_PATHS[0]
+            '$idAdmin': adminId,
+            '$publicPath': publicPath
         };
 
-        var testBindAdmin = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.bindAdmin(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (err) {
-                    assert.equal(err, 'Error in database binding the admin to the service.');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'bindAdmin';
+        var args = [adminId, publicPath];
 
         it('should call the callback with error when db fails binding the admin with the service', function (done) {
-            testBindAdmin('Error', done);
+            var errorMsg = 'Error in database binding the admin to the service.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db bind the admin with the service', function (done) {
-            testBindAdmin(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
     describe('Function "unbindAdmin"', function () {
 
+        var adminId = data.DEFAULT_ID_ADMIN;
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
         var sentence = 'DELETE FROM administer             WHERE idAdmin=$idAdmin AND publicPath=$publicPath';
         var params = {
-            '$idAdmin': data.DEFAULT_ID_ADMIN,
-            '$publicPath': data.DEFAULT_PUBLIC_PATHS[0]
+            '$idAdmin': adminId,
+            '$publicPath': publicPath
         };
 
-        var testUnbindAdmin = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.unbindAdmin(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database unbinding the administrator "' + data.DEFAULT_ID_ADMIN + '".');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        }
+        var method = 'unbindAdmin';
+        var args = [adminId, publicPath];
 
         it('should call the callback with error when db fails unbinding the admin', function (done) {
-            testUnbindAdmin('Error', done);
+            var errorMsg = 'Error in database unbinding the administrator "' + adminId + '".';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db unbinds the admin', function (done) {
-            testUnbindAdmin(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
@@ -913,40 +827,17 @@ describe('Testing SQLITE database', function () {
             "$value": 0
         };
 
-        var testNewBuy = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.newBuy(data.DEFAULT_BUY_INFORMATION[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database adding the new buy.');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'newBuy';
+        var args = [buyInfo];
 
         it('should call the callback with error when db fails adding the new buy information', function (done) {
-            testNewBuy('Error', done);
+            var errorMsg = 'Error in database adding the new buy.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db adds new buy information', function (done) {
-            testNewBuy(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
@@ -1370,54 +1261,37 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "addCBSubscription"', function () {
 
+        var apiKey = data.DEFAULT_API_KEYS[0];
+        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+        var notificationUrl = data.DEFAULT_NOTIFICATION_URL;
+        var expires = data.DEFAULT_EXPIRES;
+
         var sentence = 'INSERT OR REPLACE INTO subscriptions \
-        VALUES ($subscriptionId, $apiKey, $notificationUrl)';
+        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires)';
         var params = {
-            '$subscriptionId': data.DEFAULT_SUBSCRIPTION_ID,
-            '$apiKey': data.DEFAULT_API_KEYS[0],
-            '$notificationUrl': data.DEFAULT_NOTIFICATION_URL
+            '$subscriptionId': subsId,
+            '$apiKey': apiKey,
+            '$notificationUrl': notificationUrl,
+            '$expires': expires
         };
 
-        var testAddCBSubscription = function (error, done) {
-
-            var run = function(sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.addCBSubscription(data.DEFAULT_API_KEYS[0], data.DEFAULT_SUBSCRIPTION_ID, data.DEFAULT_NOTIFICATION_URL, function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database adding the subscription "' + data.DEFAULT_SUBSCRIPTION_ID + '" .');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'addCBSubscription';
+        var args = [apiKey, subsId, notificationUrl, expires];
 
         it('should call the callback with error when db fails adding the new CB subscription', function (done) {
-            testAddCBSubscription('Error', done);
+            var errorMsg = 'Error in database adding the subscription "' + subsId + '" .';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db adds the new CB subscription', function (done) {
-            testAddCBSubscription(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
     describe('Function "getCBSubscription"', function () {
 
-        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, accounting.unit \
+        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId';
         var params = {
@@ -1473,7 +1347,63 @@ describe('Testing SQLITE database', function () {
         });
     });
 
+    describe('Function "updateNotificationUrl"', function () {
+
+        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+        var notificationUrl = data.DEFAULT_NOTIFICATION_URL;
+
+        var sentence = 'UPDATE subscriptions \
+            SET notificationUrl=$notificationUrl \
+            WHERE subscriptionId=$subscriptionId';
+        var params = {
+            '$subscriptionId': subsId,
+            '$notificationUrl': notificationUrl
+        };
+
+        var method = 'updateNotificationUrl';
+        var args = [subsId, notificationUrl];
+
+        it('should call the callback with error when db fails updating the notification URL', function (done) {
+            var errorMsg = 'Error in database updating the notificationURL';
+
+            runTest(sentence, params, method, args, errorMsg, done);
+        });
+
+        it('should call the callback without error when there is no error updating the notification URL', function (done) {
+            runTest(sentence, params, method, args, null, done);
+        });
+    });
+
+    describe('Function "updateExpirationDate"', function () {
+
+        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+        var expires = data.DEFAULT_EXPIRES;
+
+        var sentence = 'UPDATE subscriptions \
+            SET expires=$expires \
+            WHERE subscriptionId=$subscriptionId';
+        var params = {
+            '$subscriptionId': subsId,
+            '$expires': expires
+        };
+
+        var method = 'updateExpirationDate';
+        var args = [subsId, expires];
+
+        it('should call the callback with error when db fails updating the notification URL', function (done) {
+            var errorMsg = 'Error in database updating the expiration date';
+
+            runTest(sentence, params, method, args, errorMsg, done);
+        });
+
+        it('should call the callback without error when there is no error updating the notification URL', function (done) {
+            runTest(sentence, params, method, args, null, done);
+        });
+    });
+
     describe('Function "deleteCBSubscription"', function () {
+
+        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
 
         var sentence = 'DELETE FROM subscriptions \
             WHERE subscriptionId=$subscriptionId';
@@ -1481,40 +1411,17 @@ describe('Testing SQLITE database', function () {
             '$subscriptionId': data.DEFAULT_SUBSCRIPTION_ID
         };
 
-        var testDeleteCBSubscription = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.deleteCBSubscription(data.DEFAULT_SUBSCRIPTION_ID, function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error deleting the subscription "' + data.DEFAULT_SUBSCRIPTION_ID + '" .');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'deleteCBSubscription';
+        var args = [subsId];
 
         it('should call the callback with error when db fails deleting the CB subscription', function (done) {
-            testDeleteCBSubscription('Error', done);
+            var errorMsg = 'Error deleting the subscription "' + subsId + '" .';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback with error when db deletes the CB subscription', function (done) {
-            testDeleteCBSubscription(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 });

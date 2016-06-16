@@ -100,7 +100,8 @@ var notificationHandler = function (req, res) {
                         url: subscription.notificationUrl,
                         method: req.method,
                         headers: req.headers,
-                        json: body
+                        json: true,
+                        body: body
                     };
 
                     request(options, function (error, resp, body) {

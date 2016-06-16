@@ -121,7 +121,7 @@ var loadBuys = function (buys, callback) {
 var loadSubscriptions = function (subscriptions, callback) {
     if (subscriptions.length != 0) {
         async.each(subscriptions, function (subs, taskCallback) {
-            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, taskCallback);
+            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, subs.expires, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -210,7 +210,6 @@ exports.addToDatabase = function (db, services, buys, subscriptions, admins, acc
 // Returns the accounting value for specified apiKey
 exports.getAccountingValue = function (db, apiKey, callback) {
     db.getNotificationInfo(function (err, allAccountingInfo) {
-
         if (err) {
             return callback(err);
         } else {

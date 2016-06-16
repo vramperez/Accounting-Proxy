@@ -57,7 +57,7 @@ var mocker = function (implementations, callback) {
             './acc_modules/megabyte': implementations.accModule ? implementations.accModule : {},
             'url': implementations.url ? implementations.url : {},
             'express-winston': {logger: function (transports) {} },
-            './orion_context_broker/cb_handler': implementations.contextBroker ? implementations.contextBroker : {},
+            './orion_context_broker/cbHandler': implementations.contextBroker ? implementations.contextBroker : {},
             './accounter': implementations.accounter ? implementations.accounter : {}
         });
 
@@ -143,7 +143,7 @@ describe('Testing Server', function () {
                         assert.equal(err, 'Error starting the accounting-proxy. ' + notifyErr);
                     } else {
 
-                        assert(spies.logger.info.calledWith('Loading module for Orion Context Broker...'));
+                        assert(spies.logger.info.calledWith('Loading modules for Orion Context Broker...'));
                         assert(spies.contextBroker.run.calledOnce);
                         assert(spies.cron.scheduleJob.calledWith(implementations.config.usageAPI.schedule));
                         assert(spies.notifier.notifyUsage.calledTwice);
@@ -333,7 +333,7 @@ describe('Testing Server', function () {
 
     describe('Admin user request', function (done) {
 
-        var testAdminRequest = function (requestErr, done) {
+        var testAdminRequest = function (wrongBody, requestErr, done) {
 
             var url = data.DEFAULT_URLS[0];
             var restPath = '/rest';
@@ -362,7 +362,7 @@ describe('Testing Server', function () {
                     method: method,
                     headers: headers,
                     restURL: restPath,
-                    body: '{}',
+                    body: wrongBody ? '{' : '{}',
                     publicPath: publicPath,
                     user: {
                         id: userId
@@ -379,7 +379,8 @@ describe('Testing Server', function () {
                         return this;
                     },
                     send: function () {},
-                    setHeader: function (header, value) {}
+                    setHeader: function (header, value) {},
+                    json: function (json) {}
                 },
                 db: {
                     getAdminURL: function (userId, path, callback) {
@@ -407,37 +408,50 @@ describe('Testing Server', function () {
 
                 assert(spies.req.get.calledWith('X-API-KEY'));
                 assert(spies.db.getAdminURL.calledWith(userId, publicPath));
-                assert(spies.requester.request.calledWith(options));
 
-                if (requestErr) {
+                if (wrongBody) {
+
+                    assert(spies.res.status.calledWith(400));
+                    assert(spies.res.json.calledWith({error: 'Invalid JSON'}));
+
+                } else {
+
+                    assert(spies.requester.request.calledWith(options));
+
+                    if (requestErr) {
 
                     assert(spies.res.status.calledWith(504));
                     assert(spies.res.send.calledOnce);
                     assert(spies.logger.warn.calledWith('[%s] An error ocurred requesting the endpoint: ' + options.url, null));
 
-                } else {
+                    } else {
 
-                    for (var key in resp.headers) {
-                        assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
+                        for (var key in resp.headers) {
+                            assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
+                        }
+                        assert(spies.res.status.calledWith(resp.statusCode));
+                        assert(spies.res.send.calledWith(respBody));
                     }
-                    assert(spies.res.status.calledWith(resp.statusCode));
-                    assert(spies.res.send.calledWith(respBody));
                 }
 
                 done();
             });
         };
 
+        it('should return 400 when the body is an invalid JSON', function (done) {
+            testAdminRequest(true, false, done);
+        });
+
         it('should return 504 when there is a problem sending request to the service', function (done) {
-            testAdminRequest(true, done);
+            testAdminRequest(false, true, done);
         });
 
         it('should redirect the response to the administrator when there is no error sending the request to the service', function (done) {
-            testAdminRequest(false, done);
+            testAdminRequest(false, false, done);
         });
     });
 
-    describe('Normal user request (REST service)', function () {
+    describe('Normal user request', function () {
 
 
         var testUserRequest = function (contextBroker, isJson, operation, requestErr, countErr, done) {
@@ -451,6 +465,9 @@ describe('Testing Server', function () {
             var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
             var userId = data.DEFAULT_USER_ID;
             var body = isJson ? '{}' : {};
+            var statusCode = 504;
+            var respBody = '';
+
             var accountingInfo = {
                 url: url,
                 unit: unit
@@ -527,8 +544,11 @@ describe('Testing Server', function () {
                     getOperation: function (path, req, callback) {
                         return callback(operation)
                     },
-                    subscriptionHandler: function (req, res, url, operation, unit, callback) {
-                        return callback('Error');
+                    subscriptionHandler: function (req, res, options, operation, unit, version, callback) {
+                        return callback('Error', {
+                            status: statusCode,
+                            body: respBody
+                        });
                     }
                 },
                 url: {
@@ -568,6 +588,8 @@ describe('Testing Server', function () {
 
                         if (operation) {
                             assert(spies.logger.warn.calledWith('[%s] ' + 'Error', apiKey));
+                            assert(spies.res.status.calledWith(statusCode));
+                            assert(spies.res.send.calledWith(respBody));
                         }
                     }
 
@@ -590,7 +612,7 @@ describe('Testing Server', function () {
 
                         if (countErr) {
 
-                            assert(spies.logger.warn.calledWith('[%s] Error making the accounting: ' + countErr, apiKey));
+                            assert(spies.logger.warn.calledWith('[%s] Error making the accounting: ' + countErr.msg, apiKey));
                             assert(spies.res.status.calledWith(500));
                             assert(spies.res.send.calledOnce);
 
@@ -608,31 +630,31 @@ describe('Testing Server', function () {
         };
 
         it('should return 504 when there is an error sending the request to the service', function (done) {
-            testUserRequest(false, false, null, true, false, done);
+            testUserRequest(false, false, null, true, null, done);
         });
 
         it('should return 500 when there is an error making the accounting', function (done) {
-            testUserRequest(false, false, null, false, true, done);
+            testUserRequest(false, false, null, false, {msg: 'Error'}, done);
         });
 
         it('should return the service response and make the accounting when there is no error', function (done) {
-            testUserRequest(false, false, null, false, false, done);
+            testUserRequest(false, false, null, false, null, done);
         });
 
         it('should return 415 when the CB request mime type is not "application/json"', function (done) {
-            testUserRequest(true, false, 'updateSubscription', false, false, done);
+            testUserRequest(true, false, 'updateSubscription', false, null, done);
         });
 
         it('should return 415 when the CB request mime type is not "application/json"', function (done) {
-            testUserRequest(true, false, 'updateSubscription', false, false, done);
+            testUserRequest(true, false, 'updateSubscription', false, null, done);
         });
 
         it('should return the CB response and make the accounting when there is no error (updateSubscription)', function (done) {
-            testUserRequest(true, true, 'updateSubscription', false, false, done);
+            testUserRequest(true, true, 'update', false, null, done);
         });
 
         it('should return the CB response and make the accounting when there is no error (GET entities)', function (done) {
-            testUserRequest(true, true, null, false, false, done);
+            testUserRequest(true, true, null, false, null, done);
         });
     });
 });

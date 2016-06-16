@@ -19,6 +19,7 @@ exports.subscribe = function (req, res, unit, options, callback) {
 
     var reqBody = req.body;
     var referenceUrl = reqBody.reference;
+    var response = {};
 
     // Change the notification endpoint to accounting endpoint
     reqBody.reference = 'http://localhost:' + config.resources.notification_port + '/subscriptions';
@@ -28,37 +29,38 @@ exports.subscribe = function (req, res, unit, options, callback) {
     request(options, function (err, resp, body) {
 
         if (err) {
-            res.status(504).send();
-            return callback('Error sending the subscription to the CB');
+            response = {
+                status: 504,
+                body: ''
+            };
+            return callback('Error sending the subscription to the CB', response);
 
         } else if (body.subscribeResponse) {
 
             var subscriptionId = body.subscribeResponse.subscriptionId;
             var duration = body.subscribeResponse.duration;
-            res.status(resp.statusCode);
 
             async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
                 taskCallback();
             }, function () {
 
+                response.status = resp.statusCode;
+                response.body = body;
                 var apiKey = req.get('X-API-KEY');
 
                 // Store the endpoint information of the subscriber to be notified
-                db.addCBSubscription(apiKey, subscriptionId, referenceUrl, function (err) {
+                db.addCBSubscription(apiKey, subscriptionId, referenceUrl, '', function (err) {
 
                     if (err) {
-                        res.send(body);
-                        return callback(err);
+                        return callback(err, response);
                     } else {
 
                         accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                             if (err && err.code !== 'invalidFunction') {
-                                res.send(body);
-                                return callback(err.msg);
+                                return callback(err.msg, response);
                             } else {
-                                res.send(body);
-                                return callback(null);
+                                return callback(null, response);
                             }
                         });
                     }
@@ -66,8 +68,11 @@ exports.subscribe = function (req, res, unit, options, callback) {
             });
 
         } else {
-            res.status(resp.statusCode).send(body);
-            return callback(null);
+            response = {
+                status: resp.statusCode,
+                body: body
+            };
+            return callback(null, response);
         }
     });
 };
@@ -83,6 +88,7 @@ exports.subscribe = function (req, res, unit, options, callback) {
 exports.unsubscribe = function (req, res, options, callback) {
 
     var subscriptionId = '';
+    var response = {};
 
     if (req.method === 'POST') {
         subscriptionId = req.body.subscriptionId;
@@ -96,33 +102,36 @@ exports.unsubscribe = function (req, res, options, callback) {
     request(options, function (err, resp, body) {
 
         if (err) {
-            res.status(504).send();
-            return callback('Error sending the unsubscription to the CB');
+            response = {
+                status: 504,
+                body: ''
+            };
+            return callback('Error sending the unsubscription to the CB', response);
 
         } else {
 
-            res.status(resp.statusCode);
+            response = {
+                status: resp.statusCode,
+                body: body
+            };
+
             async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
                 taskCallback();
             }, function () {
 
-                if (!resp.orionError) {
+                if (!body.orionError) {
 
                     db.deleteCBSubscription(subscriptionId, function (err) {
-                    	console.log(err)
                         if (err) {
-                            res.send(body);
-                            return callback(err);
+                            return callback(err, response);
                         } else {
-                            res.send(body);
-                            return callback(null);
+                            return callback(null, response);
                         }
                     });
 
                 } else {
-                    res.send(body);
-                    return callback(null);
+                    return callback(null, response);
                 }
             });
         }
@@ -142,48 +151,56 @@ exports.updateSubscription = function (req, res, options, callback) {
 
     options.body = req.body;
     var subscriptionId = req.body.subscriptionId;
+    var response = {};
 
-    db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
+    request(options, function (err, resp, body) {
 
         if (err) {
-            return callback(err);
-        } else if (!subscriptionInfo) {
-            return callback('Subscription "' + subscriptionId + '" not in database.')
-        } else {
+            response = {
+                status: 504,
+                body: ''
+            };
+            return callback('Error sending the subscription to the CB', response);
 
-            request(options, function (err, resp, body) {
+        } else if (body.subscribeResponse) {
 
-                if (err) {
-                    res.status(504).send();
-                    return callback('Error sending the subscription to the CB');
+            var subscriptionId = body.subscribeResponse.subscriptionId;
+            var duration = body.subscribeResponse.duration;
 
-                } else if (body.subscribeResponse) {
+            async.forEachOf(resp.headers, function (header, key, taskCallback) {
+                res.setHeader(key, header);
+                taskCallback();
+            }, function () {
 
-                    var subscriptionId = body.subscribeResponse.subscriptionId;
-                    var duration = body.subscribeResponse.duration;
-                    res.status(resp.statusCode);
-                    async.forEachOf(resp.headers, function (header, key, taskCallback) {
-                        res.setHeader(key, header);
-                        taskCallback();
-                    }, function () {
+                response.status = resp.statusCode;
+                response.body = body;
+                var apiKey = req.get('X-API-KEY');
 
-                        res.send(body);
-                        var apiKey = req.get('X-API-KEY');
+                db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
+
+                    if (err) {
+                        return callback(err, response);
+                    } else if (!subscriptionInfo) {
+                        return callback('Subscription "' + subscriptionId + '" not in database.', response)
+                    } else {
 
                         accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
                             if (err && err.code !== 'invalidFunction') {
-                                return callback(err);
+                                return callback(err, response);
                             } else {
-                                return callback(null);
+                                return callback(null, response);
                             }
                         });
-                    });
-
-                } else {
-                    res.status(resp.statusCode).send(body);
-                    return callback(null);
-                }
+                    }
+                });
             });
+
+        } else {
+            response = {
+                status: resp.statusCode,
+                body: body
+            };
+            return callback(null, response);
         }
     });
 };

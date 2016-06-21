@@ -42,10 +42,10 @@ var serviceHandler =  function (req, res) {
 
 var createEntity = function (req, res) {
     res.status(200).json(data.newEntityResp);
-}
+};
 
 var subscribeContext = function (req, res) {
-    res.status(200).json(data.createSubscriptionResp);   
+    res.status(200).json(data.createSubscriptionResp_v1);   
 };
 
 var unsubscribeContext = function (req, res) {
@@ -67,6 +67,19 @@ var contextEntity = function (req, res) {
 var contextEntities = function (req, res) {
     res.status(200).json(data.allEntities);
 };
+
+var createSubscription = function (req, res) {
+    res.setHeader('Location', '/v2/subscriptions/' + subscriptionId);
+    res.status(201).send();
+};
+
+var deleteSubscription = function (req, res) {
+    res.status(204).send();
+};
+
+var updateSubscription = function (req, res) {
+    res.status(204).send();  
+}
 
 var usageSpecificationHandler = function (req, res) {
     if (req.body.name === 'call') {
@@ -94,5 +107,8 @@ app.post('/v1/contextEntities/Room1', createEntity);
 app.post('/v1/subscribeContext', subscribeContext);
 app.post('/v1/unsubscribeContext', unsubscribeContext);
 app.post('/v1/updatecontextsubscription', updateContextSubscription);
+app.post('/v2/subscriptions', createSubscription);
+app.delete('/v2/subscriptions/' + data.DEFAULT_SUBS_ID, deleteSubscription);
+app.patch('/v2/subscriptions/' + data.DEFAULT_SUBS_ID, updateSubscription);
 app.post('/usageSpecification', usageSpecificationHandler);
 app.post('/usage', usageHandler);

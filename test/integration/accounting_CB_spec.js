@@ -25,7 +25,7 @@ var configMock = util.getConfigMock(true);
 
 var mocker = function (database,done) {
 
-    var authenticationMock, accounterMock, cbHandlerMock;
+    var authenticationMock, accounterMock, cbHandlerMock, orionModuleV1Mock;
 
     if (database === 'sql') {
 
@@ -48,11 +48,25 @@ var mocker = function (database,done) {
             './db': db
         });
 
-        cbHandlerMock = proxyquire('../../orion_context_broker/cb_handler', {
+        orionModuleV1Mock = proxyquire('../../orion_context_broker/orionModule_v1', {
+            '../config': configMock,
+            '.././db': db,
+            '../accounter': accounterMock
+        });
+
+        orionModuleV2Mock = proxyquire('../../orion_context_broker/orionModule_v2', {
+            '../config': configMock,
+            '.././db': db,
+            '../accounter': accounterMock
+        });
+
+        cbHandlerMock = proxyquire('../../orion_context_broker/cbHandler', {
             '../config': configMock,
             'winston': util.logMock,
             '.././db': db,
-            '../accounter': accounterMock
+            '../accounter': accounterMock,
+            './orionModule_v1': orionModuleV1Mock,
+            './orionModule_v2': orionModuleV2Mock
         });
 
         server = proxyquire('../../server', {
@@ -61,7 +75,7 @@ var mocker = function (database,done) {
             'winston': util.logMock, // Not display logger messages while testing
             'express-winston': util.expressWinstonMock,
             './accounter': accounterMock,
-            './orion_context_broker/cb_handler': cbHandlerMock,
+            './orion_context_broker/cbHandler': cbHandlerMock,
             './OAuth2_authentication': authenticationMock,
             './notifier': util.notifierMock
         });
@@ -97,18 +111,32 @@ var mocker = function (database,done) {
                 './db_Redis': db
             });
 
-            cbHandlerMock = proxyquire('../../orion_context_broker/cb_handler', {
+            orionModuleV1Mock = proxyquire('../../orion_context_broker/orionModule_v1', {
+                '../config': configMock,
+                '.././db_Redis': db,
+                '../accounter': accounterMock
+            });
+
+            orionModuleV2Mock = proxyquire('../../orion_context_broker/orionModule_v2', {
+                '../config': configMock,
+                '.././db_Redis': db,
+                '../accounter': accounterMock
+            });
+
+            cbHandlerMock = proxyquire('../../orion_context_broker/cbHandler', {
                 '../config': configMock,
                 'winston': util.logMock,
                 '../accounter': accounterMock,
-                '.././db_Redis': db
+                '.././db_Redis': db,
+                './orionModule_v1': orionModuleV1Mock,
+                './orionModule_v2': orionModuleV2Mock
             });
 
             server = proxyquire('../../server', {
                 './config': configMock,
                 './db_Redis': db,
                 'winston': util.logMock, // Not display logger messages while testing
-                './orion_context_broker/cb_handler': cbHandlerMock,
+                './orion_context_broker/cbHandler': cbHandlerMock,
                 'express-winston': util.expressWinstonMock,
                 './OAuth2_authentication': authenticationMock,
                 './accounter': accounterMock,
@@ -160,6 +188,130 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             } else {
                 assert.deepEqual(res, subsInfo);
                 return callback(null);
+            }
+        });
+    };
+
+    var testCreateSubs = function (version, unit, compareFunction, amount, done) {
+
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+        var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
+        buyInfo.unit = unit;
+
+        var notificationUrl =  version === 'v1' ? data.createSubscriptionReq_v1.reference : data.createSubscriptionReq_v2.notification.http.url;
+        var expires = version === 'v1' ? '' : data.DEFAULT_EXPIRES;
+        var requestPath = version === 'v1' ? publicPath + '/v1/subscribeContext' : publicPath + '/v2/subscriptions';
+        var expectedStatus = version === 'v1' ? 200 : 201;
+        var expectedResp = version === 'v1' ? data.createSubscriptionResp_v1 : {};
+        var payload = version === 'v1' ? data.createSubscriptionReq_v1 : data.createSubscriptionReq_v2;
+
+        var expectedSubsInfo = {
+            apiKey: buyInfo.apiKey,
+            notificationUrl: notificationUrl,
+            unit: buyInfo.unit,
+            expires: expires
+        };
+
+        util.addToDatabase(db, [service], [buyInfo], [], [], [], [], null, function (err) {
+            if (err) {
+                done(err);
+            } else {
+
+                request
+                    .post(requestPath)
+                    .set('x-auth-token', userProfile.token)
+                    .set('X-API-KEY', buyInfo.apiKey)
+                    .set('content-type', 'application/json')
+                    .type('json')
+                    .send(JSON.stringify(payload))
+                    .expect(expectedStatus)
+                    .end(function (err, res) {
+                        if (err) {
+                            done(err);
+                        } else {
+
+                            assert.deepEqual(res.body, expectedResp);
+                            checkCBSubscription(data.DEFAULT_SUBS_ID, expectedSubsInfo, function (err) {
+                                if (err) {
+                                    done(err);
+                                } else if (unit === 'millisecond') {
+                                    checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                } else {
+                                    done();
+                                }
+                            });
+                        }
+                    });
+            }
+        });
+    };
+
+    var testUpdateSubscription = function (version, unit, notificationUrl, expirationDateBefore, subsInfo, compareFunction, amount, done) {
+
+        var subsId = data.DEFAULT_SUBS_ID;
+
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+        var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
+        buyInfo.unit = unit;
+
+        var url = version === 'v1' ? publicPath + '/v1/updateContextSubscription' :  publicPath + '/v2/subscriptions/' + subsId;
+        var method = version === 'v1' ? 'post' : 'patch';
+        var expectedStatus = version === 'v1' ? 200 : 204;
+        var expectedResp = version === 'v1' ? data.updateSubscriptionResp : {};
+        var payload = version === 'v1' ? data.updateSubscriptionReq: '';
+        var subscription = version === 'v1' ? data.DEFAULT_SUBSCRIPTION_v1 : data.DEFAULT_SUBSCRIPTION_v2;
+
+        if (notificationUrl) {
+            payload = JSON.stringify(data.updateNotificationUrl);
+        }
+
+        if (expirationDateBefore === true) {
+            payload = JSON.stringify(data.updateExpirationDateBefore);
+        }
+
+        if (expirationDateBefore === false) {
+            payload = JSON.stringify(data.updateExpirationDateAfter);
+        }
+
+        util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {
+            if (err) {
+                done(err);
+            } else {
+
+                request
+                    [method](url)
+                    .set('x-auth-token', userProfile.token)
+                    .set('X-API-KEY', buyInfo.apiKey)
+                    .set('content-type', 'application/json')
+                    .type('json')
+                    .send(payload)
+                    .expect(expectedStatus)
+                    .end(function (err, res) {
+                        if (err) {
+                            done(err);
+                        } else {
+
+                            if (version === 'v1') {
+                                assert.deepEqual(res.body, expectedResp);
+                                checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+
+                            } else {
+                                if (expirationDateBefore === null) {
+                                    checkCBSubscription(subsId, subsInfo, done);
+                                } else {
+                                    checkCBSubscription(subsId, subsInfo, function (err) {
+                                        if (err) {
+                                            done(err);
+                                        } else {
+                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
             }
         });
     };
@@ -249,286 +401,324 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 it('should fail (500) when an error occur making the accounting (wrong unit)', function (done) {
                     testRequestHandler(undefined, undefined, 'wrongUnit', 500, {}, done);
                 });
-
             });
 
-            describe('Requests to a CB whole service', function (done) {
+            describe('API v1', function () {
 
-                var testGetEntities = function (path, method, unit, compareFunction, amount, payload, expectedResp, done) {
+                var VERSION = 'v1';
 
-                    var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
-                    var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
-                    buyInfo.unit = unit;
+                describe('Requests to a CB whole service', function () {
 
-                    util.addToDatabase(db, [service], [buyInfo], [], [], [], [], null, function (err) {
-                        if (err) {
-                            done(err);
-                        } else if (method === 'post') {
+                    var testGetEntities = function (path, method, unit, compareFunction, amount, payload, expectedResp, done) {
 
-                            request
-                                .post(publicPath + path)
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .set('content-type', 'application/json')
-                                .type('json')
-                                .send(JSON.stringify(payload))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
-                                        checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
-                                            if (err) {
-                                                done(err);
-                                            } else {
-                                                assert.deepEqual(res.body, expectedResp);
-                                                done();
-                                            }
-                                        });
-                                    }
-                                });
+                        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
+                        buyInfo.unit = unit;
 
-                        } else if (method === 'get') {
+                        util.addToDatabase(db, [service], [buyInfo], [], [], [], [], null, function (err) {
+                            if (err) {
+                                done(err);
+                            } else if (method === 'post') {
 
-                            request
-                                .get(publicPath + path)
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
-                                        checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
-                                            if (err) {
-                                                done(err);
-                                            } else {
-                                                assert.deepEqual(res.body, expectedResp);
-                                                done();
-                                            }
-                                        });
-                                    }
-                                });
-                        }
-                    });
-                };
+                                request
+                                    .post(publicPath + path)
+                                    .set('x-auth-token', userProfile.token)
+                                    .set('X-API-KEY', buyInfo.apiKey)
+                                    .set('content-type', 'application/json')
+                                    .type('json')
+                                    .send(JSON.stringify(payload))
+                                    .expect(200)
+                                    .end(function (err, res) {
+                                        if (err) {
+                                            done(err);
+                                        } else {
+                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    assert.deepEqual(res.body, expectedResp);
+                                                    done();
+                                                }
+                                            });
+                                        }
+                                    });
 
-                it('should return the entity and make accounting using call unit when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntity/Room1', 'get', 'call', 'equal', 1, {}, data.room1, done);
-                });
+                            } else if (method === 'get') {
 
-                it('should return the entity and make accounting using megabyte unit when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntity/Room1', 'get', 'megabyte', 'equal', 0.00022125244140625, {}, data.room1, done);
-                });
-
-                it('should return the entity and make accounting using millisecond unit when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntity/Room1', 'get', 'millisecond', 'notEqual', 0, {}, data.room1, done);
-                });
-
-                it('should return all entitites and make accounting using unit call when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities', 'get', 'call', 'equal', 1, {}, data.allEntities, done);
-                });
-
-                it('should return all entitites and make accounting using unit megabyte when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities', 'get', 'megabyte', 'equal', 0.000457763671875, {}, data.allEntities, done);
-                });
-
-                it('should return all entitites and make accounting using unit millisecond when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities', 'get', 'millisecond', 'notEqual', 0, {}, data.allEntities, done);
-                });
-
-                it('should create a new entity and make the accounting using unit call when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities/Room1', 'post', 'call', 'equal', 1, data.newEntityReq, data.newEntityResp, done);
-                });
-
-                it('should create a new entity and make the accounting using unit megabyte when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities/Room1', 'post', 'megabyte', 'equal', 0.00001430511474609375, data.newEntityReq, data.newEntityResp, done);
-                });
-
-                it('should create a new entity and make the accounting using unit millisecond when the request is valid', function (done) {
-                    testGetEntities('/v1/contextEntities/Room1', 'post', 'millisecond', 'notEqual', 0, data.newEntityReq, data.newEntityResp, done);
-                });
-            });
-
-            describe('Create subscriptions requests', function () {
-
-                var testCreateSubs = function (unit, compareFunction, amount, done) {
-
-                    var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
-                    var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
-                    buyInfo.unit = unit;
-
-                    var expectedSubsInfo = {
-                        apiKey: buyInfo.apiKey,
-                        notificationUrl: data.createSubscriptionReq.reference,
-                        unit: buyInfo.unit
+                                request
+                                    .get(publicPath + path)
+                                    .set('x-auth-token', userProfile.token)
+                                    .set('X-API-KEY', buyInfo.apiKey)
+                                    .expect(200)
+                                    .end(function (err, res) {
+                                        if (err) {
+                                            done(err);
+                                        } else {
+                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
+                                                if (err) {
+                                                    done(err);
+                                                } else {
+                                                    assert.deepEqual(res.body, expectedResp);
+                                                    done();
+                                                }
+                                            });
+                                        }
+                                    });
+                            }
+                        });
                     };
 
-                    util.addToDatabase(db, [service], [buyInfo], [], [], [], [], null, function (err) {
-                        if (err) {
-                            done(err);
-                        } else {
-
-                            request
-                                .post(publicPath + '/v1/subscribeContext')
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .set('content-type', 'application/json')
-                                .type('json')
-                                .send(JSON.stringify(data.createSubscriptionReq))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
-
-                                        assert.deepEqual(res.body, data.createSubscriptionResp);
-                                        checkCBSubscription(data.createSubscriptionResp.subscribeResponse.subscriptionId, expectedSubsInfo, function (err) {
-                                            if (err) {
-                                                done(err);
-                                            } else if (unit === 'millisecond') {
-                                                checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
-                                            } else {
-                                                done();
-                                            }
-                                        });
-                                    }
-                                });
-                        }
+                    it('should return the entity and make accounting using call unit when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntity/Room1', 'get', 'call', 'equal', 1, {}, data.room1, done);
                     });
-                };
 
-                it('should create the subscription when the create subscription request is correct (call unit)', function (done) {
-                    testCreateSubs('call', 'equal', null, done);
+                    it('should return the entity and make accounting using megabyte unit when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntity/Room1', 'get', 'megabyte', 'equal', 0.00022125244140625, {}, data.room1, done);
+                    });
+
+                    it('should return the entity and make accounting using millisecond unit when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntity/Room1', 'get', 'millisecond', 'notEqual', 0, {}, data.room1, done);
+                    });
+
+                    it('should return all entitites and make accounting using unit call when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities', 'get', 'call', 'equal', 1, {}, data.allEntities, done);
+                    });
+
+                    it('should return all entitites and make accounting using unit megabyte when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities', 'get', 'megabyte', 'equal', 0.000457763671875, {}, data.allEntities, done);
+                    });
+
+                    it('should return all entitites and make accounting using unit millisecond when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities', 'get', 'millisecond', 'notEqual', 0, {}, data.allEntities, done);
+                    });
+
+                    it('should create a new entity and make the accounting using unit call when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities/Room1', 'post', 'call', 'equal', 1, data.newEntityReq, data.newEntityResp, done);
+                    });
+
+                    it('should create a new entity and make the accounting using unit megabyte when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities/Room1', 'post', 'megabyte', 'equal', 0.00001430511474609375, data.newEntityReq, data.newEntityResp, done);
+                    });
+
+                    it('should create a new entity and make the accounting using unit millisecond when the request is valid', function (done) {
+                        testGetEntities('/v1/contextEntities/Room1', 'post', 'millisecond', 'notEqual', 0, data.newEntityReq, data.newEntityResp, done);
+                    });
                 });
 
-                it('should create the subscriptio when the create subscription request is correct (megabyte unit)', function (done) {
-                    testCreateSubs('megabyte', 'equal', null, done);
+                describe('Create subscription requests', function () {
+
+                    it('should create the subscription when the create subscription request is correct (call unit)', function (done) {
+                        testCreateSubs(VERSION, 'call', 'equal', null, done);
+                    });
+
+                    it('should create the subscriptio when the create subscription request is correct (megabyte unit)', function (done) {
+                        testCreateSubs(VERSION, 'megabyte', 'equal', null, done);
+                    });
+
+                    it('should create the subscriptions and make accounting using unit millisecond when the create subscription request is correct', function (done) {
+                        testCreateSubs(VERSION, 'millisecond', 'equal', 2592000000, done); 
+                    });
                 });
 
-                it('should create the subscriptions and make accounting using unit millisecond when the create subscription request is correct', function (done) {
-                   testCreateSubs('millisecond', 'equal', 2592000000, done); 
+                describe('Update subscriptions requests', function () {
+
+                    it('should update the subscriptions when the update subscriptoin request is valid (call unit)', function (done) {
+                        testUpdateSubscription(VERSION, 'call', null, null, null, 'equal', undefined, done);
+                    });
+
+                    it('should update the subscriptions when the update subscription request is valid (megabyte unit)', function (done) {
+                        testUpdateSubscription(VERSION, 'megabyte', null, null, null, 'equal', undefined, done);
+                    });
+
+                    it('should update the subscriptions when the update subscription request is valid (millisecond unit)', function (done) {
+                        testUpdateSubscription(VERSION, 'millisecond', null, null, null, 'equal', 5270400000, done);
+                    });
                 });
-            });
 
-            describe('Update subscriptions requests', function () {
+                describe('Delete subscriptions requests', function () {
 
-                var testUpdateSubs = function (unit, compareFunction, amount, done) {
+                    var testDeleteSubscription = function (method, done) {
 
-                    var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
-                    var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
-                    buyInfo.unit = unit;
+                        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
 
-                    var subscription = data.DEFAULT_SUBSCRIPTION;
+                        var subscription = data.DEFAULT_SUBSCRIPTION_v1;
 
-                    util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {
-                        if (err) {
-                            done(err);
-                        } else {
+                        util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {
+                            if (err) {
+                                done(err);
 
-                            request
-                                .post(publicPath + '/v1/updateContextSubscription')
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .set('content-type', 'application/json')
-                                .type('json')
-                                .send(JSON.stringify(data.updateSubscriptionReq))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
+                            } else if (method === 'post') {
 
-                                        assert.deepEqual(res.body, data.updateSubscriptionResp);
-                                        if (unit === 'millisecond') {
-                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                request
+                                    .post(publicPath + '/v1/unsubscribeContext')
+                                    .set('x-auth-token', userProfile.token)
+                                    .set('X-API-KEY', buyInfo.apiKey)
+                                    .set('content-type', 'application/json')
+                                    .type('json')
+                                    .send(JSON.stringify(data.cancelSubscriptionReq))
+                                    .expect(200)
+                                    .end(function (err, res) {
+                                        if (err) {
+                                            done(err);
                                         } else {
-                                            done();
+
+                                            assert.deepEqual(res.body, data.cancelSubscriptionResp);
+                                            checkCBSubscription(res.subscriptionId ,null, done);
                                         }
-                                    }
-                                });
-                        }
+                                    });
+                            } else {
+
+                                request
+                                    .delete(publicPath + '/v1/contextSubscriptions/' + data.DEFAULT_SUBS_ID)
+                                    .set('x-auth-token', userProfile.token)
+                                    .set('X-API-KEY', buyInfo.apiKey)
+                                    .set('content-type', 'application/json')
+                                    .type('json')
+                                    .send(JSON.stringify(data.cancelSubscriptionReq))
+                                    .expect(200)
+                                    .end(function (err, res) {
+                                        if (err) {
+                                            done(err);
+                                        } else {
+
+                                            assert.deepEqual(res.body, data.cancelSubscriptionResp);
+                                            checkCBSubscription(res.subscriptionId ,null, done);
+                                        }
+                                    });
+                            }
+                        });
+                    };
+
+                    it('should cancel and delete the subscription when the cancel subscription request is valid (POST request)', function (done) {
+                        testDeleteSubscription('post', done);
                     });
-                };
 
-                it('should update the subscriptions when the update subscriptoin request is valid (call unit)', function (done) {
-                    testUpdateSubs('call', 'equal', null, done);
-                });
-
-                it('should update the subscriptions when the update subscription request is valid (megabyte unit)', function (done) {
-                    testUpdateSubs('megabyte', 'equal', null, done);
-                });
-
-                it('should update the subscriptions when the update subscription request is valid (millisecond unit)', function (done) {
-                    testUpdateSubs('millisecond', 'equal', 5270400000, done);
+                    it('should cancel and delete the subscription when the cancel subscription request is valid (DELETE request)', function (done) {
+                        testDeleteSubscription('delete', done);
+                    });
                 });
             });
 
-            describe('Delete subscriptions requests', function () {
+            describe('API v2', function () {
 
-                var testDeleteSubscription = function (method, done) {
+                var VERSION = 'v2';
 
-                    var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
-                    var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
+                describe('Entities operations (whole service)', function () {
 
-                    var subscription = data.DEFAULT_SUBSCRIPTION;
-
-                    util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {
-                        if (err) {
-                            done(err);
-
-                        } else if (method === 'post') {
-
-                            request
-                                .post(publicPath + '/v1/unsubscribeContext')
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .set('content-type', 'application/json')
-                                .type('json')
-                                .send(JSON.stringify(data.cancelSubscriptionReq))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
-
-                                        assert.deepEqual(res.body, data.cancelSubscriptionResp);
-                                        checkCBSubscription(res.subscriptionId ,null, done);
-                                    }
-                                });
-                        } else {
-
-                            request
-                                .delete(publicPath + '/v1/contextSubscriptions/' + data.DEFAULT_SUBS_ID)
-                                .set('x-auth-token', userProfile.token)
-                                .set('X-API-KEY', buyInfo.apiKey)
-                                .set('content-type', 'application/json')
-                                .type('json')
-                                .send(JSON.stringify(data.cancelSubscriptionReq))
-                                .expect(200)
-                                .end(function (err, res) {
-                                    if (err) {
-                                        done(err);
-                                    } else {
-
-                                        assert.deepEqual(res.body, data.cancelSubscriptionResp);
-                                        checkCBSubscription(res.subscriptionId ,null, done);
-                                    }
-                                });
-                        }
-                    });
-                };
-
-                it('should cancel and delete the subscription when the cancel subscription request is valid (POST request)', function (done) {
-                    testDeleteSubscription('post', done);
                 });
 
-                it('should cancel and delete the subscription when the cancel subscription request is valid (DELETE request)', function (done) {
-                    testDeleteSubscription('delete', done);
+                describe('Create subscription requests', function () {
+
+                    it('should create the subscription when the create subscription request is correct (call unit)', function (done) {
+                        testCreateSubs(VERSION, 'call', 'equal', null, done);
+                    });
+
+                    it('should create the subscriptio when the create subscription request is correct (megabyte unit)', function (done) {
+                        testCreateSubs(VERSION, 'megabyte', 'equal', null, done);
+                    });
+
+                    it('should create the subscriptions and make accounting using unit millisecond when the create subscription request is correct', function (done) {
+                       testCreateSubs(VERSION, 'millisecond', 'notEqual', 0, done);
+                    });
+                });
+
+                describe('Update subscriptions requests', function () {
+
+                    it('should return 204 and update the notification URL when the update subscription request is correct', function (done) {
+                        var subsInfo = {
+                            apiKey: data.DEFAULT_API_KEYS[0],
+                            expires: data.DEFAULT_EXPIRES,
+                            notificationUrl: data.updateNotificationUrl.notification.http.url,
+                            unit: data.DEFAULT_UNIT
+                        };
+
+                        testUpdateSubscription(VERSION, subsInfo.unit, true, null, subsInfo, 'equal', undefined, done);
+                    });
+
+                    it('should return 204 and update the expiration time when the update request is correct (call unit)', function (done) {
+                        var unit = 'call';
+                        var subsInfo = {
+                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
+                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
+                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
+                            unit: unit
+                        };
+
+                        testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
+                    });
+
+                    it('should return 204 and update the expiration time when the update request is correct (megabyte unit)', function (done) {
+                        var unit = 'megabyte';
+                        var subsInfo = {
+                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
+                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
+                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
+                            unit: unit
+                        };
+
+                        testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
+                    });
+
+                    it('should return 204 and not update the expiration time when the new expiration date is before the old expiration date (millisecond unit)', function (done) {
+                        var unit = 'millisecond';
+                        var subsInfo = {
+                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
+                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
+                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
+                            unit: unit
+                        };
+
+                        testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
+                    });
+
+                    it('should return 204, update the expiration time and make the accounting when the new expiration date is after the old expiration date (millisecond unit)', function (done) {
+                        var unit = 'millisecond';
+                        var subsInfo = {
+                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
+                            expires: data.updateExpirationDateAfter.expires,
+                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
+                            unit: unit
+                        };
+
+                        testUpdateSubscription(VERSION, unit, false, false, subsInfo, 'notEqual', 0, done);
+                    });
+                });
+
+                describe('Delete subscriptions requests', function () {
+
+                    it('should delete the subscription when the unsubscribe request is correct', function (done) {
+
+                        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                        var subsId = data.DEFAULT_SUBS_ID;
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
+
+                        var subscription = data.DEFAULT_SUBSCRIPTION_v2;
+
+                        util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {
+                            if (err) {
+                                done(err);
+                            } else {
+
+                                request
+                                    .delete(publicPath + '/v2/subscriptions/' + subsId)
+                                    .set('x-auth-token', userProfile.token)
+                                    .set('X-API-KEY', buyInfo.apiKey)
+                                    .expect(204)
+                                    .end(function (err, res) {
+                                        if (err) {
+                                            done(err);
+                                        } else {
+
+                                            checkCBSubscription(res.subscriptionId ,null, done);
+                                        }
+                                    });
+                            }
+                        });
+                    });
                 });
             });
         });

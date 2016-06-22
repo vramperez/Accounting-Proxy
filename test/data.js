@@ -21,20 +21,30 @@ var data = {
     DEFAULT_UNSUBS_PATH: '/unsubscription',
     DEFAULT_UPDATE_SUBS_PATH: '/updatesubscription',
     DEFAULT_SUBS_ID: 'subsId',
-    DEFAULT_DURATION: 'P1M'
+    DEFAULT_DURATION: 'P1M',
+    DEFAULT_EXPIRES: '2016-10-10T14:00:00.00Z'
 };
 
 data.DEFAULT_SUBS_URLS = [
-    ['DELETE', data.DEFAULT_UNSUBS_PATH, 'unsubscribe'],
-    ['POST', data.DEFAULT_SUBS_PATH, 'subscribe'],
-    ['POST', data.DEFAULT_UPDATE_SUBS_PATH, 'updateSubscription']
+    ['DELETE', data.DEFAULT_UNSUBS_PATH, 'delete'],
+    ['POST', data.DEFAULT_SUBS_PATH, 'create'],
+    ['POST', data.DEFAULT_UPDATE_SUBS_PATH, 'update']
 ];
 
-data.DEFAULT_SUBSCRIPTION = {
+data.DEFAULT_SUBSCRIPTION_v1 = {
     apiKey: data.DEFAULT_API_KEYS[0],
     subscriptionId: data.DEFAULT_SUBS_ID,
     unit: data.DEFAULT_UNIT,
-    notificationUrl: data.DEFAULT_URLS[0]
+    notificationUrl: data.DEFAULT_URLS[0],
+    expires: null
+};
+
+data.DEFAULT_SUBSCRIPTION_v2 = {
+    apiKey: data.DEFAULT_API_KEYS[0],
+    subscriptionId: data.DEFAULT_SUBS_ID,
+    unit: data.DEFAULT_UNIT,
+    notificationUrl: data.DEFAULT_URLS[0],
+    expires: data.DEFAULT_EXPIRES
 };
 
 data.DEFAULT_SUBS_RESPONSE = {
@@ -218,7 +228,7 @@ data.newEntityResp = {
     "type": ""
 };
 
-data.createSubscriptionReq = {
+data.createSubscriptionReqV1 = {
     "entities": [
     {
         "type": "Room",
@@ -242,7 +252,7 @@ data.createSubscriptionReq = {
     "throttling": "PT5S"
 };
 
-data.createSubscriptionResp = {
+data.createSubscriptionRespV1 = {
     "subscribeResponse": {
         "duration": "P1M",
         "subscriptionId": data.DEFAULT_SUBS_ID
@@ -261,6 +271,22 @@ data.updateSubscriptionResp = {
     }
 };
 
+data.updateExpirationDateAfter = {
+    "expires": "2100-04-05T14:00:00.00Z"
+};
+
+data.updateExpirationDateBefore = {
+    "expires": "1990-04-05T14:00:00.00Z"
+};
+
+data.updateNotificationUrl = {
+    "notification": {
+        "http": {
+            "url": "http://localhost:1236"
+        }
+    }
+};
+
 data.cancelSubscriptionReq = {
     "subscriptionId": data.DEFAULT_SUBS_ID
 };
@@ -271,6 +297,37 @@ data.cancelSubscriptionResp = {
         "reasonPhrase": "OK"
     },
     "subscriptionId": data.DEFAULT_SUBS_ID
+};
+
+data.createSubscriptionReqV2 = {
+  "description": "One subscription to rule them all",
+  "subject": {
+    "entities": [
+      {
+        "idPattern": ".*",
+        "type": "Room"
+      }
+    ],
+    "condition": {
+      "attrs": [
+        "temperature"
+      ],
+      "expression": {
+        "q": "temperature>40"
+      }
+    }
+  },
+  "notification": {
+    "http": {
+      "url": "http://localhost:1234"
+    },
+    "attrs": [
+      "temperature",
+      "humidity"
+    ]
+  },
+  "expires": data.DEFAULT_EXPIRES,
+  "throttling": 5
 };
 
 module.exports = data;

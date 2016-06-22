@@ -113,7 +113,7 @@ describe('Testing orionModule_v1', function () {
                             assert.equal(err, addCBSubsErr);
                         } else if (subscriptionCount) {
 
-                            assert(spies.accounter.count.calledWith(apiKey, unit, {request: {duration}}, 'subscriptionCount'));
+                            assert(spies.accounter.count.calledWith(apiKey, unit, {request: {duration: duration}}, 'subscriptionCount'));
 
                             if (countErr) {
                                 assert.equal(err, countErr);

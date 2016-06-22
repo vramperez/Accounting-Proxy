@@ -45,7 +45,7 @@ var createEntity = function (req, res) {
 };
 
 var subscribeContext = function (req, res) {
-    res.status(200).json(data.createSubscriptionResp_v1);   
+    res.status(200).json(data.createSubscriptionRespV1);   
 };
 
 var unsubscribeContext = function (req, res) {

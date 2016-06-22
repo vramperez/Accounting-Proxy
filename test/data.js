@@ -228,7 +228,7 @@ data.newEntityResp = {
     "type": ""
 };
 
-data.createSubscriptionReq_v1 = {
+data.createSubscriptionReqV1 = {
     "entities": [
     {
         "type": "Room",
@@ -252,7 +252,7 @@ data.createSubscriptionReq_v1 = {
     "throttling": "PT5S"
 };
 
-data.createSubscriptionResp_v1 = {
+data.createSubscriptionRespV1 = {
     "subscribeResponse": {
         "duration": "P1M",
         "subscriptionId": data.DEFAULT_SUBS_ID
@@ -299,7 +299,7 @@ data.cancelSubscriptionResp = {
     "subscriptionId": data.DEFAULT_SUBS_ID
 };
 
-data.createSubscriptionReq_v2 = {
+data.createSubscriptionReqV2 = {
   "description": "One subscription to rule them all",
   "subject": {
     "entities": [

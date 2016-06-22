@@ -199,12 +199,12 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
         buyInfo.unit = unit;
 
-        var notificationUrl =  version === 'v1' ? data.createSubscriptionReq_v1.reference : data.createSubscriptionReq_v2.notification.http.url;
+        var notificationUrl =  version === 'v1' ? data.createSubscriptionReqV1.reference : data.createSubscriptionReqV2.notification.http.url;
         var expires = version === 'v1' ? '' : data.DEFAULT_EXPIRES;
         var requestPath = version === 'v1' ? publicPath + '/v1/subscribeContext' : publicPath + '/v2/subscriptions';
         var expectedStatus = version === 'v1' ? 200 : 201;
-        var expectedResp = version === 'v1' ? data.createSubscriptionResp_v1 : {};
-        var payload = version === 'v1' ? data.createSubscriptionReq_v1 : data.createSubscriptionReq_v2;
+        var expectedResp = version === 'v1' ? data.createSubscriptionRespV1 : {};
+        var payload = version === 'v1' ? data.createSubscriptionReqV1 : data.createSubscriptionReqV2;
 
         var expectedSubsInfo = {
             apiKey: buyInfo.apiKey,
@@ -263,16 +263,18 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
         var payload = version === 'v1' ? data.updateSubscriptionReq: '';
         var subscription = version === 'v1' ? data.DEFAULT_SUBSCRIPTION_v1 : data.DEFAULT_SUBSCRIPTION_v2;
 
-        if (notificationUrl) {
-            payload = JSON.stringify(data.updateNotificationUrl);
-        }
+        if (version === 'v2') {
 
-        if (expirationDateBefore === true) {
-            payload = JSON.stringify(data.updateExpirationDateBefore);
-        }
+            if (notificationUrl) {
+                payload = JSON.stringify(data.updateNotificationUrl);
+            } else {
 
-        if (expirationDateBefore === false) {
-            payload = JSON.stringify(data.updateExpirationDateAfter);
+                if (expirationDateBefore) {
+                    payload = JSON.stringify(data.updateExpirationDateBefore);
+                } else {
+                    payload = JSON.stringify(data.updateExpirationDateAfter);
+                }
+            }
         }
 
         util.addToDatabase(db, [service], [buyInfo], [subscription], [], [], [], null, function (err) {

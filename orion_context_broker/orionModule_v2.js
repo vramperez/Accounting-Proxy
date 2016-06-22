@@ -67,47 +67,47 @@ exports.subscribe = function (req, res, unit, options, callback) {
     var subscription = JSON.parse(JSON.stringify(req.body)); // Save the subscription
     var response = {};
 
-	// Change the notification endpoint to accounting endpoint
-	options.body.notification = {
-		http: {
-			url: 'http://localhost:' + config.resources.notification_port + '/subscriptions'
-		}
-	};
+    // Change the notification endpoint to accounting endpoint
+    options.body.notification = {
+        http: {
+            url: 'http://localhost:' + config.resources.notification_port + '/subscriptions'
+        }
+    };
 
-	// Send the request to the CB and redirect the response to the subscriber
-	request(options, function (err, resp, body) {
+    // Send the request to the CB and redirect the response to the subscriber
+    request(options, function (err, resp, body) {
 
-		if (err) {
+        if (err) {
             response = {
                 status: 504,
                 body: ''
             };
-			return callback('Error sending the subscription to the CB', response);
+            return callback('Error sending the subscription to the CB', response);
 
-		} else if (resp.statusCode !== 201) {
+        } else if (resp.statusCode !== 201) {
             response = {
                 status: resp.statusCode,
                 body: body
             };
-			return callback(null, response);
+            return callback(null, response);
 
-		} else {
+        } else {
 
-			var location = resp.headers['location'];
-			var subscriptionId = location.substr(location.lastIndexOf('/') + 1);
+            var location = resp.headers['location'];
+            var subscriptionId = location.substr(location.lastIndexOf('/') + 1);
             var expires = subscription.expires;
-			var duration = expires ? getDuration(moment(), expires) : null; // TODO: null --> unlimited duration
-			var notificationUrl = getNotificationUrl(subscription.notification);
+            var duration = expires ? getDuration(moment(), expires) : null; // TODO: null --> unlimited duration
+            var notificationUrl = getNotificationUrl(subscription.notification);
 
             response.status = resp.statusCode;
             response.body = body;
 
-			async.forEachOf(resp.headers, function (header, key, taskCallback) {
-				res.setHeader(key, header);
-				taskCallback();
-			}, function () {
+            async.forEachOf(resp.headers, function (header, key, taskCallback) {
+                res.setHeader(key, header);
+                taskCallback();
+            }, function () {
 
-				var apiKey = req.get("X-API-KEY");
+                var apiKey = req.get("X-API-KEY");
 
                 // Store the endpoint information of the subscriber to be notified
                 db.addCBSubscription(apiKey, subscriptionId, notificationUrl, expires, function (err) {
@@ -126,8 +126,8 @@ exports.subscribe = function (req, res, unit, options, callback) {
                     }
                 });
             });
-		}
-	});
+        }
+    });
 };
 
 /**
@@ -191,36 +191,36 @@ exports.unsubscribe = function (req, res, options, callback) {
 exports.updateSubscription = function (req, res, options, callback) {
 
     var subscriptionId = req.path.substr(req.path.lastIndexOf('/') + 1);
-	var update = JSON.parse(JSON.stringify(req.body)); // Save the update
+    var update = JSON.parse(JSON.stringify(req.body)); // Save the update
     var response = {};
 
-	request(options, function (err, resp, body) {
+    request(options, function (err, resp, body) {
 
-		if (err) {
+        if (err) {
             response = {
                 status: 504,
                 body: ''
             };
-			return callback('Error sending the subscription to the CB', response);
+            return callback('Error sending the subscription to the CB', response);
 
-		} else if (resp.statusCode !== 204) {
+        } else if (resp.statusCode !== 204) {
             response = {
                 status: resp.statusCode,
                 body: body
             };
-			return callback(null, response);
+            return callback(null, response);
 
-		} else {
+        } else {
 
             response.status = resp.statusCode;
             response.body = body;
 
-			async.forEachOf(resp.headers, function (header, key, taskCallback) {
+            async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
                 taskCallback();
             }, function () {
 
-				var notificationUrl = update.notification ? getNotificationUrl(update.notification) : undefined;
+                var notificationUrl = update.notification ? getNotificationUrl(update.notification) : undefined;
                 var expires = update.expires
 
                 db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
@@ -231,8 +231,8 @@ exports.updateSubscription = function (req, res, options, callback) {
                         return callback('Subscription "' + subscriptionId + '" not in database.', response);
                     } else {
 
-        				async.series([
-        					function (callback) {
+                        async.series([
+                            function (callback) {
 
                                 // Save new notification URL
                                 if (notificationUrl) {

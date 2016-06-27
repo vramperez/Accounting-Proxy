@@ -93,7 +93,7 @@ exports.getAccountingModules = function() {
  * @param {Object} req      Incoming request.
  * @param {Object} res      Outgoing response.
  * @param {Object} options  Options for make the request to the endpoint.
- * @param {[type]} unit     Unit for the accounting.
+ * @param {string} unit     Unit for the accounting.
  */
 var cbRequestHandler = function(req, res, options, unit, version) {
     var apiKey = req.get('X-API-KEY');
@@ -167,20 +167,31 @@ var requestHandler = function (options, res, apiKey, unit) {
  *
  * @param  {String} reqUrl Request URL
  */
-var getCBVersion = function (reqUrl) {
-    var v1RegEx = /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/;
-    var v2RegEx = /\/(v2)\/((\w+)\/?)*$/;
-    var version = null;
-
-    var path = url.parse(reqUrl).pathname;
+var getCBVersion = function (publicPath, reqUrl, callback) {
 
     if (!config.resources.contextBroker) {
-        return version;
+        return callback(null, null);
     } else {
-        version = v1RegEx.test(path) ? 'v1' : v2RegEx.test(path) ? 'v2' : null;
-    }
 
-    return version;
+        db.isCBService(publicPath, function (err, isCBService) {
+            if (err) {
+                return callback(err, null);
+            } else if (!isCBService) {
+                return callback(null, null);
+            } else {
+
+                var v1RegEx = /\/(v1|v1\/registry|ngsi10|ngsi9)\/((\w+)\/?)*$/;
+                var v2RegEx = /\/(v2)\/((\w+)\/?)*$/;
+                var version = null;
+
+                var path = url.parse(reqUrl).pathname;
+
+                version = v1RegEx.test(path) ? 'v1' : v2RegEx.test(path) ? 'v2' : null;
+
+                return callback(null, version);
+            }
+        });
+    }
 };
 
 /**
@@ -219,21 +230,24 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
         requestHandler(options, res, apiKey, unit);
     } else {
 
-        // Orion ContextBroker request
-        var cbVersion = getCBVersion(options.url);
+        getCBVersion(req.publicPath, options.url, function (err, version) {
+            if (err) {
+                logger.warn('[%s] ' + err, apiKey);
+                res.status(500).send();
 
-        if (!cbVersion) { // Normal request (no context broker request)
-            requestHandler(options, res, apiKey, unit);
+            } else if (!version) { // No Context Broker request
+                requestHandler(options, res, apiKey, unit);
 
-        } else  {
+            } else { // Context Broker request
 
-            if (createMehtods.indexOf(req.method) > -1 && !isJSON) {
-                res.status(415).json({error: 'Content-Type must be "application/json"'});
+                if (createMehtods.indexOf(req.method) > -1 && !isJSON) {
+                    res.status(415).json({error: 'Content-Type must be "application/json"'});
 
-            } else {
-                cbRequestHandler(req, res, options, unit, cbVersion);
+                } else {
+                    cbRequestHandler(req, res, options, unit, version);
+                }
             }
-        }
+        });
     }
 };
 

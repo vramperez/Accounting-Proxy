@@ -39,6 +39,7 @@ exports.init = function (callback) {
                     publicPath          TEXT, \
                     url                 TEXT, \
                     appId               TEXT, \
+                    isCBService         INT, \
                     PRIMARY KEY (publicPath) \
             )', callback);
         },
@@ -176,20 +177,21 @@ exports.getHref = function (unit, callback) {
  * @param  {string} publicPath      Service public path.
  * @param  {string} url             Endpoint url.
  */
-exports.newService = function (publicPath, url, appId, callback) {
+exports.newService = function (publicPath, url, appId, isCBService, callback) {
     db.run('INSERT OR REPLACE INTO services \
-            VALUES ($path, $url, $appId)',
+            VALUES ($path, $url, $appId, $isCBService)',
         {
             $path: publicPath,
             $url: url,
-            $appId: appId
+            $appId: appId,
+            $isCBService: isCBService ? 1 : 0
         }, function (err) {
             if (err) {
                 return callback('Error in database adding the new service.');
             } else {
                 return callback(null);
             }
-    });
+        });
 };
 
 /**
@@ -217,7 +219,7 @@ exports.deleteService = function (publicPath, callback) {
  * @param  {string} publicPath      Service public path.
  */
 exports.getService = function (publicPath, callback) {
-    db.get('SELECT url, appId \
+    db.get('SELECT *\
             FROM services \
             WHERE publicPath=$path', {
                 $path: publicPath
@@ -242,6 +244,30 @@ exports.getAllServices = function (callback) {
                     return callback('Error in database getting the services.', null);
                 } else {
                     return callback(null, services);
+                }
+    });
+};
+
+/**
+ * Returns true if the service is a Context Broker service. Otherwise returns false.
+ *
+ * @param  {string}    publicPath  The public path of the service.
+ */
+exports.isCBService = function (publicPath, callback) {
+    db.get('SELECT isCBService \
+            FROM services \
+            WHERE $publicPath=publicPath',
+            {
+                $publicPath: publicPath
+            }, function (err, isCBService) {
+                if (err) {
+                    return callback('Error in database gettings the service type.', null);
+                } else if (isCBService === null) {
+                    return callback(null, null);
+                } else {
+                    var result = isCBService === 0 ? false : true;
+
+                    return callback(null, result);
                 }
     });
 };

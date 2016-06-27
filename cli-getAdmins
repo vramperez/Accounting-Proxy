@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+// Displays all the administrators for the specified service.
+
+var program = require('commander'),
+    config = require('./config'),
+    logger = require('./log')
+    util = require('./util');
+
+var db = require(config.database.type);
+
+program
+    .description('Displays all the administrators for the specified service.')
+    .parse(process.argv);
+
+if (program.args.length !== 1) {
+    logger.error('Invalid number of arguments. Usage: ./cli getAdmins <publicPath>');
+
+} else {
+
+    var publicPath = program.args[0];
+
+    if (!util.pathRegExp.test(publicPath)) {
+        logger.error(util.invalidPathError);
+
+    } else { 
+
+        db.getAdmins(publicPath, function(err, admins) {
+            if (err) {
+                logger.error(err);
+
+            } else if (admins.length === 0) {
+                logger.info('No administrators available for the service ' + publicPath);
+
+            } else {
+                console.log('SERVICE: ' + publicPath + ' ADMINISTRATORS:');
+                for (var i = 0; i < admins.length; i++) {
+                    console.log('   ' + admins[i]);
+                }
+            }
+        });
+    }
+}

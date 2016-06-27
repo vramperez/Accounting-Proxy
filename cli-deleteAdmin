@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+
+// Deletes the administrator specified.
+
+var program = require('commander'),
+    config = require('./config'),
+    logger = require('./log');
+
+program
+    .description('Deletes the specified administrator.')
+    .parse(process.argv)
+
+var db = require(config.database.type);
+
+if (program.args.length !== 1) {
+    logger.error('Usage: ./cli deleteAdmin "userId"');
+
+} else {
+
+    var userId = program.args[0];
+
+    db.deleteAdmin(userId, function(err) {
+
+        if (err) {
+            logger.error(err);
+
+        } else {
+            logger.info('Deleted admin: ' + userId);
+        }
+    });
+}

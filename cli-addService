@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+
+// Adds a new service; map the public path with the service URL and the application Id.
+
+var util = require('./util'),
+    program = require('commander'),
+    config = require('./config'),
+    logger = require('./log');
+
+var db = require(config.database.type);
+var urlRegExp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
+
+program
+    .option('-c, --context-broker', 'Context Broker service')
+    .description(
+        'Adds a new service for monitoring. Binds the public path with the URL specified and the application ID.\n' + 
+        '  The public path patterns are the followong: \n' +
+        '    * /publicPath: only the first part of the path \n' +
+        '    * /this/is/the/final/resource/path: the complete resource path. In this case, the proxy will use this path to make the request. \n' + 
+        '   For instance, a public path such as /public/path is not valid.')
+    .parse(process.argv);
+
+if (program.args.length !== 3) {
+    logger.error('Invalid number of arguments. Usage: ./cli addService [-c] <publicPath> <URL> <appId>');
+
+} else {
+
+    var contextBroker = program.contextBroker !== undefined ? true : false;
+    var publicPath = contextBroker ? program.args[2] : program.args[0];
+    var url = contextBroker ? program.args[0] : program.args[1];
+    var appId = contextBroker ? program.args[1] : program.args[2];
+
+    db.init(function(err) {
+
+        if (err) {
+            logger.error(err);
+        } else {
+
+            util.administrationPath(publicPath, function (adminPath) {
+
+                if (adminPath) {
+                    logger.error(publicPath + ' is a reserved path.');
+
+                } else if (!util.pathRegExp.test(publicPath)) {
+                    logger.error(util.invalidPathError);
+
+                } else if (!urlRegExp.test(url)) {
+                    logger.error('Invalid url format.');
+
+                } else if (!appId) {
+                    logger.error('Undefined appId');
+                } else {
+
+                    db.newService(publicPath, url, appId, contextBroker, function(err) {
+                        if (err) {
+                            logger.error(err);
+                        } else {
+                            logger.info('Service successfully added.');
+                        }
+                    });
+                }
+            });
+        }
+    });
+}

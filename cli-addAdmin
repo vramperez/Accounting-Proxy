@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+
+// Adds a new administrator.
+
+var program = require('commander'),
+    config = require('./config'),
+    logger = require('./log');
+
+var db = require(config.database.type);
+
+program
+    .description('Adds a new administrator.')
+    .parse(process.argv);
+
+if (program.args.length !== 1) {
+    logger.error('Invalid number of arguments. Usage: ./cli addAdmin <userId>');
+
+} else {
+
+    var userId = program.args[0];
+
+    db.addAdmin(userId, function(err) {
+        if (err) {
+            logger.error(err);
+        } else {
+            logger.info('Added admin: ' + userId);
+        }
+    });
+}

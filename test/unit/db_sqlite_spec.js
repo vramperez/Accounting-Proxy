@@ -82,6 +82,7 @@ describe('Testing SQLITE database', function () {
                     publicPath          TEXT, \
                     url                 TEXT, \
                     appId               TEXT, \
+                    isCBService         INT, \
                     PRIMARY KEY (publicPath)             )',
             'CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
@@ -324,16 +325,18 @@ describe('Testing SQLITE database', function () {
         var path = data.DEFAULT_PUBLIC_PATHS[0];
         var url = data.DEFAULT_URLS[0];
         var appId = data.DEFAULT_APP_IDS[0];
+        var isCBService = true;
 
-        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId)';
+        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId, $isCBService)';
         var params = {
             '$path': path,
             '$url': url,
-            '$appId': appId
+            '$appId': appId,
+            '$isCBService': isCBService ? 1 : 0
         };
 
         var method = 'newService';
-        var args = [path, url, appId];
+        var args = [path, url, appId, isCBService];
 
         it('should call the callback with error when db fails adding the new service', function (done) {
             var errorMsg = 'Error in database adding the new service.';
@@ -392,7 +395,7 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "getService"', function () {
 
-        var sentence = 'SELECT url, appId \
+        var sentence = 'SELECT *\
             FROM services \
             WHERE publicPath=$path';
         var params = {'$path': data.DEFAULT_PUBLIC_PATHS[0]};
@@ -488,6 +491,65 @@ describe('Testing SQLITE database', function () {
 
         it('should call the callback without error when db returns all services', function (done) {
             testGetAllService(null, data.DEFAULT_SERVICES, done);
+        });
+    });
+
+    describe('Function "isCBService"', function () {
+
+        var sentence = 'SELECT isCBService             FROM services             WHERE $publicPath=publicPath';
+        var params = {'$publicPath': data.DEFAULT_PUBLIC_PATHS[0]};
+
+        var testIsCBService = function (error, isCBService, done) {
+
+            var get = function (sentence, params, callback) {
+                return callback(error, isCBService);
+            }
+
+            var implementations = {
+                get: get
+            };
+
+            var getSpy = sinon.spy(implementations, 'get');
+
+            var db = getDb(implementations);
+
+            db.isCBService(data.DEFAULT_PUBLIC_PATHS[0], function (err, result) {
+
+                assert(getSpy.calledWith(sentence, params));
+
+                if (err) {
+                    assert.equal(err, 'Error in database gettings the service type.');
+                    assert.equal(result, null);
+
+                } else {
+
+                    assert.equal(err, null);
+
+                    if (isCBService === null) {
+                        assert.equal(result, null);
+                    } else {
+                        assert.equal(result, isCBService === 1 ? true : false);
+                    }
+                }
+
+                done();
+            })
+        };
+
+        it('should call the callback with error when db fails getting the service type', function (done) {
+            testIsCBService(true, null, done);
+        });
+
+        it('should call the callback without error when there is no service for the public path passed', function (done) {
+            testIsCBService(false, null, done);
+        });
+
+        it('should call the callback without error and true when the service is a Context Broker service', function (done) {
+            testIsCBService(false, 1, done);
+        });
+
+        it('should call the callback without error and false when the service is not a Context Broker service', function (done) {
+            testIsCBService(false, 0, done);
         });
     });
 

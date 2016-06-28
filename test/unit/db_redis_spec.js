@@ -234,6 +234,8 @@ describe('Testing REDIS database', function () {
 
         var testNewService = function (error, done) {
 
+            var isCBService = true;
+
             var sadd = sinon.stub();
             var hmset = sinon.stub();
             var exec = function (callback) {
@@ -251,11 +253,15 @@ describe('Testing REDIS database', function () {
 
             var db = getDb({multi: multi});
 
-            db.newService(data.DEFAULT_PUBLIC_PATHS[0], data.DEFAULT_URLS[0], data.DEFAULT_APP_IDS[0], function (err) {
+            db.newService(data.DEFAULT_PUBLIC_PATHS[0], data.DEFAULT_URLS[0], data.DEFAULT_APP_IDS[0], isCBService, function (err) {
 
                 assert(multi.calledOnce);
                 assert(sadd.calledWith(['services', data.DEFAULT_PUBLIC_PATHS[0]]));
-                assert(hmset.calledWith(data.DEFAULT_PUBLIC_PATHS[0], {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}));;
+                assert(hmset.calledWith(data.DEFAULT_PUBLIC_PATHS[0], {
+                    url: data.DEFAULT_URLS[0],
+                    appId: data.DEFAULT_APP_IDS[0],
+                    isCBService: isCBService ? 1 : 0
+                }));
                 assert(execSpy.calledOnce);
 
                 if (error) {
@@ -505,6 +511,58 @@ describe('Testing REDIS database', function () {
 
         it('should call the callback without error when db returns all services', function (done) {
             testGetAllServices(false, false, done);
+        });
+    });
+
+    describe('Function "isCBService"', function () {
+
+        var testIsCBService = function (error, isCBService, done) {
+
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
+            var hget = function (hash, key, callback) {
+               return callback(error, isCBService);
+            };
+
+            var implementations = {
+                hget: hget
+            };
+
+            var hgetSpy = sinon.spy(implementations, 'hget');
+
+            var db = getDb(implementations);
+
+            db.isCBService(publicPath, function (err, res) {
+
+                assert(hgetSpy.calledWith(publicPath, 'isCBService'));
+
+                if (error) {
+                    assert.equal(err, 'Error in database gettings the service type.');
+                    assert.equal(res, null);
+
+                } else {
+                    assert.equal(err, null);
+                    assert.equal(res, parseInt(isCBService) === 0 ? false : true);
+                }
+
+                done();
+            });
+        };
+
+        it('should call the callback with error when db fails getting the service type', function (done) {
+            testIsCBService(true, null, done);
+        });
+
+        it('should call the callback without error when there is no service with the public path specified', function (done) {
+            testIsCBService(false, null, done);
+        });
+
+        it('should call the callback without error and return true if the service is a Context Broker service', function (done) {
+            testIsCBService(false, '1', done);
+        });
+
+        it('should call the callback without error and return false if the service is not a Context Broker service', function (done) {
+            testIsCBService(false, '0', done);
         });
     });
 

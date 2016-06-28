@@ -16,10 +16,9 @@ var printService = function (service) {
 };
 
 program
-    .option('-p, --public-path', 'returns only the information of the service specified')
+    .option('-p, --public-path', 'only displays the information of the service specified')
     .description(
-        'Displays the service information (public path, URL, application ID and the type (context broker service or not) for each\n' +
-        '  registered service.')
+        'Displays the URL, the application ID and the type (Context Broker or not) of all registered services.')
     .parse(process.argv);
 
 var publicPath = program.publicPath ? program.args[0] : false;

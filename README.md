@@ -1,4 +1,4 @@
-# accounting-proxy
+# Accounting-Proxy
 ## Index
 * [Deployment](#deployment)
 	* [Software requiremnts](#softwarerequirements)
@@ -10,6 +10,7 @@
 * [Authentication](#authentication)
 * [Authorization](#authorization)
 	* [Administrators](#administrators)
+* [Accounting](#accounting)
 * [Running](#running)
 * [Proxy API](#proxyapi)
 * [Development](#development)
@@ -127,7 +128,7 @@ Other accounting modules can be implemented and added here (see  [Accounting mod
  
 #### <a name="orionconfiguration"/> Orion Context Broker configuration
 
-In order to configure the Accounting Proxy working with Orion Context Broker, configure the `resources` section of `config.js` file in the root of the project folder.
+The Accounting Proxy supports Context Broker monitoring ([API v1](https://fiware-orion.readthedocs.io/en/develop/index.html) and [API v2](https://fiware-orion.readthedocs.io/en/develop/index.html)). In order to configure the Accounting Proxy working with Orion Context Broker, configure the `resources` section of `config.js` file in the root of the project folder.
 
 * `contextBroker`: set `true` this parameter.
 * `notification_port`: port where the accounting proxy server is listening to subscription notifications.
@@ -155,6 +156,12 @@ If the authentication process success, the Accounting-Proxy check the authorizat
 ### <a name="administrators"/> Administrators
 If the user is an administrator of the service, the administrator request must omit the "X-API-KEY" header. After the administrator request is authenticated, the request will be redirected to the service and no accounting will be made.
 
+## <a name="accounting"/> Accounting
+The accounting proxy supports accounting based on different units and there is a module for each accounting unit. Developers can implement their own accounting modules (see section [Development](#development)). By default, all Accounting Proxy instances have three accounting modules:
+* `call`: accounting value incremented in one for each call to the service.
+* `megabyte`: accounting value incremented based on the amount of data retrieved from the service (in megabytes).
+* `millisecond`: accounting value incremented based on the request time (in milliseconds).
+
 ## <a name="running"/> Running
 After [installation](#installation), just execute:
 ```
@@ -165,21 +172,27 @@ node accounting-proxy
 
 In order to manage servicies, use 'cli' tool. The available commands are:
 
-* `./cli addService <publicPath> <url> <appId>`: binds the public path with the url specified and the application ID. All request with an access token from a different application will be rejected. The public path valid patterns are the following:
+* `./cli addService [-c] <publicPath> <url> <appId>`: binds the public path with the url specified and the application ID (all request with an access token from a different application will be rejected). The public path valid patterns are the following:
 	-	`/publicPath`: only the first part of the path.
-	-	`/this/is/the/final/resource/path`: the complete resource path. In this case, the proxy will use this path to make the request.
+	-	`/this/is/the/final/resource/path?color=Blue&shape=rectangular`: the complete resource path (absolute path). In this case, the proxy will use this path to make the request. Use this type of public paths to register URLs with query strings.
 For instance, a public path such as `/public/path` is not valid.
-* `./cli getService <publicPath>`: returns the url and appID associated with the public path.
-* `./cli getAllServices`: display all the registered services (public path, URL and appId).
-* `./cli deleteService <publicPath>`: delete the service associated with the public path.
-* `./cli addAdmin <userId>`: add a new administrator.
-* `./cli deleteAdmin <userId>`: delete the specified admin.
-* `./cli bindAdmin <userId> <publicPath>`: add the specified administrator to the service specified by the public path.
-* `./cli unbindAdmin <userId> <publicPath>`: delete the specified administrator for the specified service by its public path.
-* `./cli unbindAdmin <userId> <publicPath>`: delete the specified administrator for the specified service by its public path.
-* `./cli getAdmins <publicPath>`: display all the administrators for the specified service.
 
-To display brief information: `./cli -h` or `./cli --help`.
+	- Options:
+		- `-c, --context-broker`: the service is an Orion Context broker service (`config.contextBroker` must be set to `true` in `config.js`).
+
+* `./cli getService [-p <publicPath>]`: returns the URL, the application ID and the type (Context Broker or not) of all registered services.
+	- Options:
+		- `-p, --publicPath <path>`: only displays the information of the service specified.
+
+* `./cli deleteService <publicPath>`: deletes the service associated with the public path.
+* `./cli addAdmin <userId>`: adds a new administrator.
+* `./cli deleteAdmin <userId>`: deletes the specified admin.
+* `./cli bindAdmin <userId> <publicPath>`: adds the specified administrator to the service specified by the public path.
+* `./cli unbindAdmin <userId> <publicPath>`: deletes the specified administrator for the specified service by its public path.
+* `./cli unbindAdmin <userId> <publicPath>`: deletes the specified administrator for the specified service by its public path.
+* `./cli getAdmins <publicPath>`: displays all the administrators for the specified service.
+
+To display brief information: `./cli -h` or `./cli --help`. In order to get information for a specific command type: `./cli help [cmd]`.
 
 ## <a name="proxyapi"/> Proxy API
 
@@ -307,6 +320,8 @@ The function `subscriptionCount` is an optional count function that only will be
 
 The function `getSpecification` should return a javascript object with the usage specification for the accounting unit according to the TMF635 usage management API ([TMF635 usage Management API](https://www.tmforum.org/resources/standard/tmf635-usage-management-api-rest-specification-r14-5-0/)).
 
+Finally, add the name of the developed accounting modulethe to the `config.modules` array in the `config.js` file (the accounting module name is the name of the file, e.g. `megabyte` and `megabyte.js`) and restart the Accounting Proxy.
+
 ### <a name="tests"/> Testing
 To run tests type:
 ```
@@ -336,4 +351,4 @@ File `test/config_tests.js` contains the configuration for the integration tests
 Test reporter generates a directory `./coverage` with all the coverage information (coverage reporter is generated by Istanbul) and a xunit.xml file in the root directory of the project.
 
 ---
-Last updated: _09/06/2016
+Last updated: _28/06/2016

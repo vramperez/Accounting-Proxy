@@ -34,6 +34,30 @@ var getDb = function (implementations) {
 
 describe('Testing REDIS database', function () {
 
+    var testGet = function (method, hash, key, param, error, result, expectedRes, done) {
+
+        var hget = function (hash, key, callback) {
+            return callback(error, result);
+        };
+
+        var implementations = {
+            hget: hget
+        };
+
+        var hgetSpy = sinon.spy(implementations, 'hget');
+
+        var db = getDb(implementations);
+
+        db[method](param, function (err, res) {
+
+            assert(hgetSpy.calledWith(hash, key));
+            assert.equal(err, error);
+            assert.equal(res, expectedRes);
+
+            done();
+        });
+    };
+
     describe('Function "init"', function () {
 
         it('should call the callback withour error when db initialization success', function (done) {
@@ -191,42 +215,16 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getHref"', function () {
 
-        var testGetHref = function (error, href, done) {
-
-            var hget = function (hash, key, callback) {
-                return callback(error, href);
-            };
-
-            var implementations = {
-                hget: hget
-            };
-
-            var hgetSpy = sinon.spy(implementations, 'hget');
-
-            var db = getDb(implementations);
-
-            db.getHref(data.DEFAULT_UNIT, function (err, res) {
-
-                assert(hgetSpy.calledWith('units', data.DEFAULT_UNIT));
-
-                if (error) {
-                    assert.equal(err, 'Error getting the href for unit "' + data.DEFAULT_UNIT + '" .');
-                    assert.equal(res, null);
-                } else {
-                    assert.equal(err, null);
-                    assert.equal(res, href);
-                }
-
-                done();
-            });
-        };
+        var method = 'getHref';
+        var hash = 'units';
+        var key = data.DEFAULT_UNIT;
 
         it('should call the callback with error when db fails getting the href', function (done) {
-            testGetHref(true, null, done);
+            testGet(method, hash, key, key, 'Error getting the href for unit "' + key + '" .', null, null, done);
         });
 
         it('should call the callback without error when db gets the usage specification href', function (done) {
-            testGetHref(false, data.DEFAULT_HREF, done); 
+            testGet(method, hash, key, key, null, data.DEFAULT_HREF, data.DEFAULT_HREF, done); 
         });
     });
 
@@ -516,94 +514,35 @@ describe('Testing REDIS database', function () {
 
     describe('Function "isCBService"', function () {
 
-        var testIsCBService = function (error, isCBService, done) {
-
-            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-
-            var hget = function (hash, key, callback) {
-               return callback(error, isCBService);
-            };
-
-            var implementations = {
-                hget: hget
-            };
-
-            var hgetSpy = sinon.spy(implementations, 'hget');
-
-            var db = getDb(implementations);
-
-            db.isCBService(publicPath, function (err, res) {
-
-                assert(hgetSpy.calledWith(publicPath, 'isCBService'));
-
-                if (error) {
-                    assert.equal(err, 'Error in database gettings the service type.');
-                    assert.equal(res, null);
-
-                } else {
-                    assert.equal(err, null);
-                    assert.equal(res, parseInt(isCBService) === 0 ? false : true);
-                }
-
-                done();
-            });
-        };
+        var method = 'isCBService';
+        var hash = data.DEFAULT_PUBLIC_PATHS[0];
+        var key = 'isCBService';
 
         it('should call the callback with error when db fails getting the service type', function (done) {
-            testIsCBService(true, null, done);
-        });
-
-        it('should call the callback without error when there is no service with the public path specified', function (done) {
-            testIsCBService(false, null, done);
+            testGet(method, hash, key, hash, 'Error in database gettings the service type.', null, null, done);
         });
 
         it('should call the callback without error and return true if the service is a Context Broker service', function (done) {
-            testIsCBService(false, '1', done);
+            testGet(method, hash, key, hash, null, '1', true, done);
         });
 
         it('should call the callback without error and return false if the service is not a Context Broker service', function (done) {
-            testIsCBService(false, '0', done);
+            testGet(method, hash, key, hash, null, '0', false, done);
         });
     });
 
     describe('Function "getAppId"', function () {
 
-        var testGetAppId = function (error, done) {
-
-            var hget = function (hash, key, callback) {
-                return callback(error, data.DEFAULT_APP_IDS[0]);
-            };
-
-            var implementations = {
-                hget: hget
-            };
-
-            var hgetSpy = sinon.spy(implementations, 'hget');
-
-            var db = getDb(implementations);
-
-            db.getAppId(data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
-
-                assert(hgetSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0], 'appId'));
-
-                if (error) {
-                    assert.equal(err, 'Error in database getting the appId.');
-                    assert.equal(res, null);
-                } else {
-                    assert.equal(err, null);
-                    assert.equal(res, data.DEFAULT_APP_IDS[0]);
-                }
-
-                done();
-            });
-        };
+        var method = 'getAppId';
+        var hash = data.DEFAULT_PUBLIC_PATHS[0];
+        var key = 'appId';
 
         it('should call the callback with error when db fails getting the appId', function (done) {
-            testGetAppId(true, done);
+            testGet(method, hash, key, hash, 'Error in database getting the appId.', null, null, done);
         });
 
         it('should call the callback without error when db returns the appId', function (done) {
-            testGetAppId(false, done);
+            testGet(method, hash, key, hash, null, null, null, done);
         });
     });
 

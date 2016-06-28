@@ -4,15 +4,25 @@ var async = require('async'),
     config = require('./config'),
     program = require('commander');
 
-program
-    .description('Configuration tool for the accounting proxy')
-    .version('0.0.2')
-    .command('addService <publicPath> <URL> <applicationId>', 'add new service to accounting proxy')
-    .command('getService', 'display service\'s information')
-    .command('deleteService <publicPath>', 'delete the service from the accounting proxy')
-    .command('addAdmin <userId>', 'add new administrator')
-    .command('deleteAdmin <userId>', 'delete the specified admin')
-    .command('bindAdmin <userId> <publicPath>', 'add a new administrator fot the service specified by the public path')
-    .command('unbindAdmin <userId> <publicPath>', 'delete the specified administrator for the specified service by its public path')
-    .command('getAdmins <publicPath>', 'display all the administrators for the specified service')
-    .parse(process.argv);
+var db = require(config.database.type);
+
+db.init(function(err) {
+
+    if (err) {
+        logger.error(err);
+    } else {
+
+        program
+            .description('Configuration tool for the accounting proxy')
+            .version('0.0.2')
+            .command('addService <publicPath> <URL> <applicationId>', 'add new service to accounting proxy')
+            .command('getService', 'display service\'s information')
+            .command('deleteService <publicPath>', 'delete the service from the accounting proxy')
+            .command('addAdmin <userId>', 'add new administrator')
+            .command('deleteAdmin <userId>', 'delete the specified admin')
+            .command('bindAdmin <userId> <publicPath>', 'add a new administrator fot the service specified by the public path')
+            .command('unbindAdmin <userId> <publicPath>', 'delete the specified administrator for the specified service by its public path')
+            .command('getAdmins <publicPath>', 'display all the administrators for the specified service')
+            .parse(process.argv);
+    }
+});

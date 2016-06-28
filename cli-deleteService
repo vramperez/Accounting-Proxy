@@ -15,6 +15,7 @@ program
 
 if (program.args.length !== 1) {
     logger.error('Invalid number of arguments. Usage: ./cli deleteService <publicPath>');
+    console.log(program.help());
 
 } else {
 

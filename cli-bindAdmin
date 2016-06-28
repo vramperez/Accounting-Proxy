@@ -15,6 +15,7 @@ program
 
 if (program.args.length !== 2) {
     logger.error('Invalid number of arguments. Usage: ./cli bindAdmin <userId> <publicPath>');
+    console.log(program.help());
 
 } else {
 

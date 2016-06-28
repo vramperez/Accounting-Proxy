@@ -23,6 +23,7 @@ program
 
 if (program.args.length !== 3) {
     logger.error('Invalid number of arguments. Usage: ./cli addService [-c] <publicPath> <URL> <appId>');
+    console.log(program.help());
 
 } else {
 
@@ -31,34 +32,30 @@ if (program.args.length !== 3) {
     var url = contextBroker ? program.args[0] : program.args[1];
     var appId = contextBroker ? program.args[1] : program.args[2];
 
-    db.init(function(err) {
+    util.administrationPath(publicPath, function (adminPath) {
 
-        if (err) {
-            logger.error(err);
+        if (adminPath) {
+            logger.error(publicPath + ' is a reserved path.');
+
+        } else if (!util.pathRegExp.test(publicPath)) {
+            logger.error(util.invalidPathError);
+
+        } else if (!urlRegExp.test(url)) {
+            logger.error('Invalid url format.');
+
+        } else if (!appId) {
+            logger.error('Undefined appId');
+
+        } else if (contextBroker && !config.resources.contextBroker) {
+            logger.error('Context Broker is not enabled. Please change the config.resources.contextBroker value to true in config.js');
+
         } else {
 
-            util.administrationPath(publicPath, function (adminPath) {
-
-                if (adminPath) {
-                    logger.error(publicPath + ' is a reserved path.');
-
-                } else if (!util.pathRegExp.test(publicPath)) {
-                    logger.error(util.invalidPathError);
-
-                } else if (!urlRegExp.test(url)) {
-                    logger.error('Invalid url format.');
-
-                } else if (!appId) {
-                    logger.error('Undefined appId');
+            db.newService(publicPath, url, appId, contextBroker, function(err) {
+                if (err) {
+                    logger.error(err);
                 } else {
-
-                    db.newService(publicPath, url, appId, contextBroker, function(err) {
-                        if (err) {
-                            logger.error(err);
-                        } else {
-                            logger.info('Service successfully added.');
-                        }
-                    });
+                    logger.info('Service successfully added.');
                 }
             });
         }

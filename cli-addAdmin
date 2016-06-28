@@ -14,6 +14,7 @@ program
 
 if (program.args.length !== 1) {
     logger.error('Invalid number of arguments. Usage: ./cli addAdmin <userId>');
+    console.log(program.help());
 
 } else {
 

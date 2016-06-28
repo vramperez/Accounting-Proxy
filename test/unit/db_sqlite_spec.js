@@ -11,6 +11,10 @@ var proxyquire = require('proxyquire'),
  */
 var getDb = function (implementations) {
 
+    var defaultRun = function (sentence) {};
+
+    implementations.run = implementations.run ? implementations.run : defaultRun;
+
     var sqlite_stub = {
         verbose: function () {
             return this;
@@ -34,7 +38,11 @@ var getDb = function (implementations) {
 var runTest = function (sentence, params, method, args, error, done) {
 
     var run = function (sentence, params, callback) {
-        return callback(error);
+        if (!params) {
+            return;
+        } else {
+            return callback(error);
+        }
     };
 
     var implementations = {
@@ -147,7 +155,11 @@ describe('Testing SQLITE database', function () {
 
             var implementations = {
                 run: function (sentence, callback) {
-                    return callback(null);
+                    if (!callback) {
+                        return;
+                    } else {
+                        return callback(null);
+                    }
                 }
             };
 
@@ -178,8 +190,10 @@ describe('Testing SQLITE database', function () {
             var run = function (sentence, params, callback) {
                 if (sentence === sentences[0]) {
                     return params(runRes1);
-                } else {
+                } else if (sentence === sentences[1]) {
                     return callback(runRes2);
+                } else {
+                    return;
                 }
             };
 
@@ -196,9 +210,9 @@ describe('Testing SQLITE database', function () {
                 assert.equal(err, errMsg);
 
                 if (params) {
-                    assert.equal(runSpy.getCall(0).args[0], sentences[0]);
-                    assert.equal(runSpy.getCall(1).args[0], sentences[1]);
-                    assert.deepEqual(runSpy.getCall(1).args[1], params);
+                    assert(runSpy.calledWith(sentences[0]));
+                    assert(runSpy.calledWith(sentences[1], params));
+
                 } else {
                     assert(runSpy.calledWith(sentences[0]));
                 }
@@ -351,45 +365,24 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "deleteService"', function () {
 
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
         var sentence = 'DELETE FROM services             WHERE publicPath=$path';
         var params = {
-            '$path': data.DEFAULT_PUBLIC_PATHS[0]
+            '$path': publicPath
         };
 
-        var testDeleteService = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.deleteService(data.DEFAULT_PUBLIC_PATHS[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'deleteService';
+        var args = [publicPath];
 
         it('should call the callback with error when db fails deleting the service', function (done) {
-            testDeleteService('Error', done);
+            var errorMsg = 'Error in database deleting the service.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db fails', function (done) {
-            testDeleteService(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 

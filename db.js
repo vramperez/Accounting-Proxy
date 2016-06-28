@@ -8,6 +8,8 @@ var sqlite = require('sqlite3').verbose(), // Debug enable
 var db = new TransactionDatabase (
         new sqlite.Database(config.database.name, sqlite.OPEN_READWRITE | sqlite.OPEN_CREATE));
 
+db.run('PRAGMA foreign_keys = 1;');
+db.run('PRAGMA encoding = "UTF-8";');
 
 /*
 * Initialize the database and creates the necessary tables.
@@ -15,12 +17,6 @@ var db = new TransactionDatabase (
 exports.init = function (callback) {
 
     async.series([
-        function (callback) {
-            db.run('PRAGMA foreign_keys = 1;', callback);
-        },
-        function (callback) {
-            db.run('PRAGMA encoding = "UTF-8";', callback);
-        },
         function (callback) {
             db.run('CREATE TABLE IF NOT EXISTS token ( \
                     token               TEXT, \
@@ -205,11 +201,11 @@ exports.deleteService = function (publicPath, callback) {
         {
             $path: publicPath
         }, function (err) {
-        if (err) {
-            return callback('Error in database deleting the service.');
-        } else {
-            return callback(null);
-        }
+            if (err) {
+                return callback('Error in database deleting the service.');
+            } else {
+                return callback(null);
+            }
     });
 };
 

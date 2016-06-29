@@ -320,7 +320,7 @@ The function `subscriptionCount` is an optional count function that only will be
 
 The function `getSpecification` should return a javascript object with the usage specification for the accounting unit according to the TMF635 usage management API ([TMF635 usage Management API](https://www.tmforum.org/resources/standard/tmf635-usage-management-api-rest-specification-r14-5-0/)).
 
-Finally, add the name of the developed accounting modulethe to the `config.modules` array in the `config.js` file (the accounting module name is the name of the file, e.g. `megabyte` and `megabyte.js`) and restart the Accounting Proxy.
+Finally, add the name of the developed accounting module to the `config.modules` array in the `config.js` file (the accounting module name is the name of the file, e.g. `megabyte` and `megabyte.js`) and restart the Accounting Proxy.
 
 ### <a name="tests"/> Testing
 To run tests type:

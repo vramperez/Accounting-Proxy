@@ -501,7 +501,7 @@ describe('Testing SQLITE database', function () {
             getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
-        it('should call the callback withou error when the is not an appId', function (done) {
+        it('should call the callback without error when the is not an appId', function (done) {
             getTest(method, sentence, params, args, null, null, null, done);
         });
 

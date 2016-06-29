@@ -20,6 +20,7 @@ userProfile.token = data.DEFAULT_TOKEN;
 var FIWAREStrategy_mock = util.getStrategyMock(userProfile);
 
 var DEFAULT_URL = 'http://localhost:' + testConfig.test_endpoint_port;
+var DEFAULT_TYPE = data.DEFAULT_IS_CB_SERVICE;
 
 var configMock = util.getConfigMock(true);
 
@@ -195,7 +196,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
     var testCreateSubs = function (version, unit, compareFunction, amount, done) {
 
         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
         buyInfo.unit = unit;
 
@@ -252,7 +253,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
         var subsId = data.DEFAULT_SUBS_ID;
 
         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
         buyInfo.unit = unit;
 
@@ -349,7 +350,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 it('should return 401 when the "X-API-KEY" header is not defined', function (done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
 
                     util.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
                         if (err) {
@@ -368,7 +369,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
 
                     var url = url ? url : DEFAULT_URL;
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit ? unit : buyInfo.unit;
 
@@ -414,7 +415,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     var testGetEntities = function (path, method, unit, compareFunction, amount, payload, expectedResp, done) {
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                         buyInfo.unit = unit;
 
@@ -543,7 +544,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     var testDeleteSubscription = function (method, done) {
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
 
                         var subscription = data.DEFAULT_SUBSCRIPTION_v1;
@@ -695,7 +696,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
                         var subsId = data.DEFAULT_SUBS_ID;
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
 
                         var subscription = data.DEFAULT_SUBSCRIPTION_v2;

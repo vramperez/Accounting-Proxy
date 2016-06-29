@@ -92,13 +92,14 @@ exports.getHref = function (unit, callback) {
  * @param  {string} publicPath      Path for the users.
  * @param  {string} url             Endpoint url.
  */
-exports.newService = function (publicPath, url, appId, callback) {
+exports.newService = function (publicPath, url, appId, isCBService, callback) {
     var multi = db.multi();
 
     multi.sadd(['services', publicPath]);
     multi.hmset(publicPath, {
         url: url,
-        appId: appId
+        appId: appId,
+        isCBService: isCBService ? 1 : 0
     });
     multi.exec(function (err) {
         if (err) {
@@ -210,6 +211,7 @@ exports.getService = function (publicPath, callback) {
         } else if (!service) {
             return callback(null, null);
         } else {
+            service.isCBService = parseInt(service.isCBService);
             return callback(null, service);
         }
     });
@@ -231,6 +233,7 @@ exports.getAllServices = function (callback) {
                         taskCallback(err);
                     } else {
                         service.publicPath = publicPath;
+                        service.isCBService = parseInt(service.isCBService);
                         toReturn.push(service);
                         taskCallback(null);
                     }
@@ -242,6 +245,24 @@ exports.getAllServices = function (callback) {
                     return callback(null, toReturn);
                 }
             });
+        }
+    });
+};
+
+/**
+ * Returns true if the service is a Context Broker service. Otherwise returns false.
+ *
+ * @param  {string}    publicPath  The public path of the service.
+ */
+exports.isCBService = function (publicPath, callback) {
+    db.hget(publicPath, 'isCBService', function (err, isCBService) {
+        if (err) {
+            return callback('Error in database gettings the service type.', null);
+        } else {
+
+            var result = parseInt(isCBService) === 0 ? false : true;
+
+            return callback(null, result);
         }
     });
 };

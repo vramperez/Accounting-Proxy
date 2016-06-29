@@ -20,6 +20,7 @@ userProfile.token = data.DEFAULT_TOKEN;
 var FIWAREStrategyMock = util.getStrategyMock(userProfile);
 
 var DEFAULT_URL = 'http://localhost:' + testConfig.test_endpoint_port;
+var DEFAULT_TYPE = data.DEFAULT_IS_NOT_CB_SERVICE;
 
 var configMock = util.getConfigMock(false);
 
@@ -192,7 +193,7 @@ describe('Testing the accounting API. Generic REST use', function () {
                 var testUserRequest = function (url, statusCode, done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url, appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: url, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                     var admin = {idAdmin: userProfile.id, publicPath: publicPath};
 
                     util.addToDatabase(db, [service], [], [], [admin], [], [], null, function (err) {
@@ -222,7 +223,7 @@ describe('Testing the accounting API. Generic REST use', function () {
                 it('should return 401 when the "X-API-KEY" header is undefined', function (done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL + '/rest/call', appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: DEFAULT_URL + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
 
                     util.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
                         if (err) {
@@ -241,7 +242,7 @@ describe('Testing the accounting API. Generic REST use', function () {
 
                     var url = url ? url : DEFAULT_URL;
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit ? unit : buyInfo.unit;
 
@@ -301,7 +302,7 @@ describe('Testing the accounting API. Generic REST use', function () {
                 var testCorrectRequest = function (unit, compareFunction, amount, done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId};
+                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit;
 

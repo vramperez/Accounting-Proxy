@@ -11,6 +11,10 @@ var proxyquire = require('proxyquire'),
  */
 var getDb = function (implementations) {
 
+    var defaultRun = function (sentence) {};
+
+    implementations.run = implementations.run ? implementations.run : defaultRun;
+
     var sqlite_stub = {
         verbose: function () {
             return this;
@@ -34,7 +38,11 @@ var getDb = function (implementations) {
 var runTest = function (sentence, params, method, args, error, done) {
 
     var run = function (sentence, params, callback) {
-        return callback(error);
+        if (!params) {
+            return;
+        } else {
+            return callback(error);
+        }
     };
 
     var implementations = {
@@ -64,6 +72,35 @@ var runTest = function (sentence, params, method, args, error, done) {
     db[method].apply(this, argsCopy);
 };
 
+var getTest = function (method, sentence, params, args, error, res, expectedRes, done) {
+
+    var get = function (sentence, params, callback) {
+        return callback(error, res);
+    };
+
+    var implementations = {
+        get: get
+    };
+
+    var getSpy = sinon.spy(implementations, 'get');
+
+    var db = getDb(implementations);
+
+    var assertions = function (err, result) {
+
+        assert(getSpy.calledWith(sentence, params));
+        assert.equal(err, error);
+        assert.deepEqual(result, expectedRes);
+
+        done();
+    };
+
+    var argsCopy = JSON.parse(JSON.stringify(args));
+    argsCopy.push(assertions);
+
+    db[method].apply(this, argsCopy);
+};
+
 describe('Testing SQLITE database', function () {
 
     describe('Function "init"', function () {
@@ -82,6 +119,7 @@ describe('Testing SQLITE database', function () {
                     publicPath          TEXT, \
                     url                 TEXT, \
                     appId               TEXT, \
+                    isCBService         INT, \
                     PRIMARY KEY (publicPath)             )',
             'CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
@@ -117,7 +155,11 @@ describe('Testing SQLITE database', function () {
 
             var implementations = {
                 run: function (sentence, callback) {
-                    return callback(null);
+                    if (!callback) {
+                        return;
+                    } else {
+                        return callback(null);
+                    }
                 }
             };
 
@@ -148,8 +190,10 @@ describe('Testing SQLITE database', function () {
             var run = function (sentence, params, callback) {
                 if (sentence === sentences[0]) {
                     return params(runRes1);
-                } else {
+                } else if (sentence === sentences[1]) {
                     return callback(runRes2);
+                } else {
+                    return;
                 }
             };
 
@@ -166,9 +210,9 @@ describe('Testing SQLITE database', function () {
                 assert.equal(err, errMsg);
 
                 if (params) {
-                    assert.equal(runSpy.getCall(0).args[0], sentences[0]);
-                    assert.equal(runSpy.getCall(1).args[0], sentences[1]);
-                    assert.deepEqual(runSpy.getCall(1).args[1], params);
+                    assert(runSpy.calledWith(sentences[0]));
+                    assert(runSpy.calledWith(sentences[1], params));
+
                 } else {
                     assert(runSpy.calledWith(sentences[0]));
                 }
@@ -268,54 +312,25 @@ describe('Testing SQLITE database', function () {
     describe('Function "getHref"', function () {
 
         var sentence = 'SELECT href             FROM units             WHERE $unit=unit';
-        var params = {'$unit': data.DEFAULT_UNIT};
+        var unit = data.DEFAULT_UNIT;
+        var params = {'$unit': unit};
+        var href = data.DEFAULT_HREF;
 
-        var testGetHref = function (error, href, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, href);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.stub(implementations, 'get', get);
-
-            var db = getDb(implementations);
-
-            db.getHref(data.DEFAULT_UNIT, function (err, hrefRes) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error getting the href for unit "' + data.DEFAULT_UNIT + '" .');
-                    assert.equal(hrefRes, null);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (href === undefined) {
-                        assert.equal(hrefRes, null);
-                    } else {
-                        assert.equal(hrefRes, href.href);
-                    }
-                }
-
-                done();
-            });
-        };
+        var method = 'getHref';
+        var args = [unit];
 
         it('should call the callback with error when db fails getting the href', function (done) {
-            testGetHref('Error', null, done);
+            var errorMsg = 'Error getting the href for unit "' + unit + '" .';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback without error when there is not an href', function (done) {
-           testGetHref(null, undefined, done); 
+           getTest(method, sentence, params, args, null, null, null, done); 
         });
 
         it('should call the callback without error when db returns the href', function (done) {
-            testGetHref(null, data.DEFAULT_HREF, done);
+            getTest(method, sentence, params, args, null, {href: href}, href, done);
         });
     });
 
@@ -324,16 +339,18 @@ describe('Testing SQLITE database', function () {
         var path = data.DEFAULT_PUBLIC_PATHS[0];
         var url = data.DEFAULT_URLS[0];
         var appId = data.DEFAULT_APP_IDS[0];
+        var isCBService = true;
 
-        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId)';
+        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId, $isCBService)';
         var params = {
             '$path': path,
             '$url': url,
-            '$appId': appId
+            '$appId': appId,
+            '$isCBService': isCBService ? 1 : 0
         };
 
         var method = 'newService';
-        var args = [path, url, appId];
+        var args = [path, url, appId, isCBService];
 
         it('should call the callback with error when db fails adding the new service', function (done) {
             var errorMsg = 'Error in database adding the new service.';
@@ -348,103 +365,52 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "deleteService"', function () {
 
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
         var sentence = 'DELETE FROM services             WHERE publicPath=$path';
         var params = {
-            '$path': data.DEFAULT_PUBLIC_PATHS[0]
+            '$path': publicPath
         };
 
-        var testDeleteService = function (error, done) {
-
-            var run = function (sentence, params, callback) {
-                return callback(error);
-            };
-
-            var implementations = {
-                run: run
-            };
-
-            var runSpy = sinon.spy(implementations, 'run');
-
-            var db = getDb(implementations);
-
-            db.deleteService(data.DEFAULT_PUBLIC_PATHS[0], function (err) {
-
-                assert(runSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database deleting the service.');
-                } else {
-                    assert.equal(err, null);
-                }
-
-                done();
-            });
-        };
+        var method = 'deleteService';
+        var args = [publicPath];
 
         it('should call the callback with error when db fails deleting the service', function (done) {
-            testDeleteService('Error', done);
+            var errorMsg = 'Error in database deleting the service.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
         });
 
         it('should call the callback without error when db fails', function (done) {
-            testDeleteService(null, done);
+            runTest(sentence, params, method, args, null, done);
         });
     });
 
     describe('Function "getService"', function () {
 
-        var sentence = 'SELECT url, appId \
+        var sentence = 'SELECT *\
             FROM services \
             WHERE publicPath=$path';
-        var params = {'$path': data.DEFAULT_PUBLIC_PATHS[0]};
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var params = {'$path': publicPath};
 
-        var testGetServie = function (error, service, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, service)
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.getService(data.DEFAULT_PUBLIC_PATHS[0], function (err, resService) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-
-                    assert.equal(err, 'Error in database getting the service.');
-                    assert.equal(service, null);
-
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!service) {
-                        assert.equal(resService, null);
-                    } else {
-                        assert.deepEqual(resService, service);
-                    }
-                }
-
-                done();
-            });
-        };
+        var args = [publicPath];
+        var method = 'getService';
 
         it('should call the callback with error when db fails getting the service', function (done) {
-            testGetServie('Error', null, done);
+            var errorMsg = 'Error in database getting the service.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback with error when there is not service', function (done) {
-            testGetServie(null, undefined, done);
+            getTest(method, sentence, params, args, null, null, null, done);
         });
 
         it('should call the callback without error when db returns the service', function (done) {
-            testGetServie(null, {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]}, done);
+            var result = {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]};
+
+            getTest(method, sentence, params, args, null, result, result, done);
         });
     });
 
@@ -491,59 +457,56 @@ describe('Testing SQLITE database', function () {
         });
     });
 
+    describe('Function "isCBService"', function () {
+
+        var sentence = 'SELECT isCBService             FROM services             WHERE $publicPath=publicPath';
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var params = {'$publicPath': publicPath};
+
+        var args = [publicPath];
+        var method = 'isCBService';
+
+        it('should call the callback with error when db fails getting the service type', function (done) {
+            var errorMsg = 'Error in database gettings the service type.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
+        });
+
+        it('should call the callback without error when there is no service for the public path passed', function (done) {
+            getTest(method, sentence, params, args, null, null, null, done);
+        });
+
+        it('should call the callback without error and true when the service is a Context Broker service', function (done) {
+            getTest(method, sentence, params, args, null, 1, true, done);
+        });
+
+        it('should call the callback without error and false when the service is not a Context Broker service', function (done) {
+            getTest(method, sentence, params, args, null, 0, false, done);
+        });
+    });
+
     describe('Function "getAppId"', function () {
 
         var sentence = 'SELECT appId             FROM services             WHERE $publicPath=publicPath';
-        var params = { '$publicPath': data.DEFAULT_PUBLIC_PATHS[0]};
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var params = { '$publicPath': publicPath};
+        var appId = data.DEFAULT_APP_IDS[0];
 
-        var testGetAppId = function (error, appId, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, appId);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.getAppId(data.DEFAULT_PUBLIC_PATHS[0], function (err, resAppId) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (err) {
-
-                    assert.equal(err, 'Error in database getting the appId.');
-                    assert.equal(resAppId, null);
-
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!appId) {
-                        assert.equal(resAppId, null);
-                    } else {
-                        assert.equal(resAppId, appId.appId);
-                    }
-                }
-
-                done();
-            });
-        };
+        var args = [publicPath];
+        var method = 'getAppId';
 
         it('should call the callback with error when db fails getting the appId', function (done) {
-            testGetAppId('Error', null, done);
+            var errorMsg = 'Error in database getting the appId.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
-        it('should call the callback withou error when the is not an appId', function (done) {
-            testGetAppId(null, undefined, done);
+        it('should call the callback without error when the is not an appId', function (done) {
+            getTest(method, sentence, params, args, null, null, null, done);
         });
 
         it('should call the callback without error when db returns the appId', function (done) {
-            testGetAppId(null, {appId: data.DEFAULT_APP_IDS[0]}, done);
+            getTest(method, sentence, params, args, null, {appId: appId}, appId, done);
         });
     });
 
@@ -700,57 +663,29 @@ describe('Testing SQLITE database', function () {
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
                 administer.idAdmin=$idAdmin AND services.publicPath=$publicPath';
+        var idAdmin = data.DEFAULT_ID_ADMIN;
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
         var params = {
-            '$idAdmin': data.DEFAULT_ID_ADMIN,
-            '$publicPath': data.DEFAULT_PUBLIC_PATHS[0]
+            '$idAdmin': idAdmin,
+            '$publicPath': publicPath
         };
+        var url = data.DEFAULT_URLS[0];
 
-        var testGetAdminUrl = function (error, result, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, result);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.getAdminURL(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error getting the admin url.');
-                    assert.equal(res, null);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!result) {
-                        assert.equal(res, null);
-                    } else {
-                        assert.equal(res, result.url);
-                    }
-                }
-
-                done();
-            });
-        };
+        var args = [idAdmin, publicPath];
+        var method = 'getAdminURL';
 
         it('should call the callback with error when db fails getting the admin url', function (done) {
-            testGetAdminUrl('Error', null, done);
+            var errorMsg = 'Error getting the admin url.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback without error when there are not admins for the service specified', function (done) {
-            testGetAdminUrl(null, undefined, done);
+            getTest(method, sentence, params, args, null, null, null, done);
         });
 
         it('should call the callback without error when db returns the URL', function (done) {
-           testGetAdminUrl(null, {url: data.DEFAULT_URLS[0]}, done); 
+           getTest(method, sentence, params, args, null, {url: url}, url, done); 
         });
     });
 
@@ -759,54 +694,24 @@ describe('Testing SQLITE database', function () {
         var sentence = 'SELECT * \
             FROM services \
             WHERE publicPath=$publicPath';
-        var params = {'$publicPath': data.DEFAULT_PUBLIC_PATHS[0]};
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var params = {'$publicPath': publicPath};
 
-        var testCheckPath = function (error, service, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, service);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.checkPath(data.DEFAULT_PUBLIC_PATHS[0], function (err, result) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error checking the path.');
-                    assert.equal(result, false);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!service) {
-                        assert.equal(result, false);
-                    } else {
-                        assert.equal(result, true);
-                    }
-                }
-
-                done();
-            });
-        };
+        var method = 'checkPath';
+        var args = [publicPath];
 
         it('should call the callback with error when db fails checking the url', function (done) {
-            testCheckPath('Error', null, done);;
+            var errorMsg = 'Error checking the path.';
+
+            getTest(method, sentence, params, args, errorMsg, false, false, done);;
         });
 
         it('should call the callback without error when there are not services', function (done) {
-            testCheckPath(null, undefined, done);
+            getTest(method, sentence, params, args, null, false, false, done);
         });
 
         it('should call the callback without error when there is no error checking the path', function (done) {
-           testCheckPath(null, {}, done); 
+           getTest(method, sentence, params, args, null, true, true, done); 
         });
     });
 
@@ -894,115 +799,61 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "checkRequest"', function () {
 
+        var apiKey = data.DEFAULT_API_KEYS[0];
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var customer = data.DEFAULT_USER_ID;
+
         var sentence = 'SELECT customer \
             FROM accounting \
             WHERE apiKey=$apiKey AND publicPath=$publicPath';
-        var params = {'$apiKey': data.DEFAULT_API_KEYS[0], '$publicPath': data.DEFAULT_PUBLIC_PATHS[0]};
+        var params = {'$apiKey': apiKey, '$publicPath': publicPath};
 
-        var testCheckRequest = function (error, user, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, user);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.checkRequest(data.DEFAULT_USER_ID, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database checking the request.');
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!user || user.customer !== data.DEFAULT_USER_ID) {
-                        assert.equal(res, false);
-                    } else {
-                        assert.equal(res, true);
-                    }
-                }
-
-                done();
-            });
-        };
+        var method = 'checkRequest';
+        var args = [customer, apiKey, publicPath];
 
         it('should call the callback with error when db fails checking the request', function (done) {
-            testCheckRequest('Error', null, done);
+            var errorMsg = 'Error in database checking the request.';
+
+            getTest(method, sentence, params, args, errorMsg, null, false, done);
         });
 
         it('should call the callback with error when there is not information available', function (done) {
-            testCheckRequest(null, undefined, done);
+            getTest(method, sentence, params, args, null, null, false, done);
         });
 
         it('should call the callback without error when there is not customer associated with api-key', function (done) {
-           testCheckRequest(null, {customer: 'other'}, done); 
+           getTest(method, sentence, params, args, null, {customer: 'other'}, false, done); 
         });
 
         it('should call the callback without error when there is not an error checking the request ', function (done) {
-           testCheckRequest(null, {customer: data.DEFAULT_USER_ID}, done);  
+           getTest(method, sentence, params, args, null, {customer: data.DEFAULT_USER_ID}, true, done);  
         });
     });
 
     describe('Function "getAccountingInfo"', function () {
 
+        var apiKey = data.DEFAULT_API_KEYS[0];
+
         var sentence = 'SELECT accounting.unit, services.url \
             FROM accounting , services \
             WHERE accounting.publicPath=services.publicPath AND apiKey=$apiKey';
-        var params = { '$apiKey': data.DEFAULT_API_KEYS[0]};
+        var params = { '$apiKey': apiKey};
 
-        var testGetAccountingInfo = function (error, accInfo, done) {
-
-            var get = function (sentence, params, callback)  {
-                return callback(error, accInfo);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.getAccountingInfo(data.DEFAULT_API_KEYS[0], function (err, res) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error in database getting the accounting info.');
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!accInfo) {
-                        assert.equal(accInfo, null);
-                    } else {
-                        assert.equal(accInfo, accInfo);
-                    }
-                }
-
-                done();
-            });
-        };
+        var method = 'getAccountingInfo';
+        var args = [apiKey];
 
         it('should call the callback with error when db fails getting the accounting info', function (done) {
-            testGetAccountingInfo('Error', null, done);
+            var errorMsg = 'Error in database getting the accounting info.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback without error when there is not accounting information', function (done) {
-            testGetAccountingInfo(null, undefined, done);
+            getTest(method, sentence, params, args, null, null, null, done);
         });
 
         it('should call the callback with error when db failsgetting the accounting information', function (done) {
-            testGetAccountingInfo(null, {}, done);
+            getTest(method, sentence, params, args, null, {}, {}, done);
         });
     });
 
@@ -1291,59 +1142,30 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "getCBSubscription"', function () {
 
+        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+
         var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, accounting.unit \
             FROM subscriptions , accounting\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId';
         var params = {
-            '$subscriptionId': data.DEFAULT_SUBSCRIPTION_ID
+            '$subscriptionId': subsId
         };
 
-        var testGetCBSubscription = function (error, subscriptionInfo, done) {
-
-            var get = function (sentence, params, callback) {
-                return callback(error, subscriptionInfo);
-            };
-
-            var implementations = {
-                get: get
-            };
-
-            var getSpy = sinon.spy(implementations, 'get');
-
-            var db = getDb(implementations);
-
-            db.getCBSubscription(data.DEFAULT_SUBSCRIPTION_ID, function (err, res) {
-
-                assert(getSpy.calledWith(sentence, params));
-
-                if (error) {
-                    assert.equal(err, 'Error getting the subscription.');
-                    assert.equal(res, null);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!subscriptionInfo) {
-                        assert.equal(res, null);
-                    } else {
-                        assert.equal(res, subscriptionInfo);
-                    }
-                }
-
-                done();
-            });
-        };
+        var method = 'getCBSubscription';
+        var args = [subsId];
 
         it('should call the callback with error when db fails getting the CB subscription', function (done) {
-            testGetCBSubscription('Error', null, done);
+            var errorMsg = 'Error getting the subscription.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback without error when there are not subscriptions', function (done) {
-            testGetCBSubscription(null, undefined, done);
+            getTest(method, sentence, params, args, null, null, null, done);
         });
 
         it('should call the callback without error when db gets the CB subscription', function (done) {
-            testGetCBSubscription(null, {}, done);
+            getTest(method, sentence, params, args, null, {}, {}, done);
         });
     });
 

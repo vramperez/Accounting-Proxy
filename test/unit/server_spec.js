@@ -58,7 +58,8 @@ var mocker = function (implementations, callback) {
             'url': implementations.url ? implementations.url : {},
             'express-winston': {logger: function (transports) {} },
             './orion_context_broker/cbHandler': implementations.contextBroker ? implementations.contextBroker : {},
-            './accounter': implementations.accounter ? implementations.accounter : {}
+            './accounter': implementations.accounter ? implementations.accounter : {},
+            './OAuth2_authentication': implementations.authenticator ? implementations.authenticator : {}
         });
 
         return callback(server, spies);
@@ -454,7 +455,7 @@ describe('Testing Server', function () {
     describe('Normal user request', function () {
 
 
-        var testUserRequest = function (contextBroker, isJson, operation, requestErr, countErr, done) {
+        var testUserRequest = function (contextBroker, isJson, operation, requestErr, countErr, getTypeError, isCBService, done) {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
             var url = data.DEFAULT_URLS[0];
@@ -521,6 +522,9 @@ describe('Testing Server', function () {
                     },
                     getAccountingInfo: function (apiKey, callback) {
                         return callback(null, accountingInfo);
+                    },
+                    isCBService: function (publicPath, callback) {
+                        return callback(getTypeError, isCBService)
                     }
                 },
                 requester: {
@@ -576,25 +580,7 @@ describe('Testing Server', function () {
                 assert(spies.db.getAccountingInfo.calledWith(apiKey));
                 assert(spies.req.is.calledWith('application/json'));
 
-                if (contextBroker) {
-                    assert(spies.url.parse.calledWith(options.url));
-
-                    if (!isJson) {
-                        assert(spies.res.status.calledWith(415));
-                        assert(spies.res.json.calledWith({error: 'Content-Type must be "application/json"'}));
-                    } else {
-                        assert(spies.url.parse.calledTwice);
-                        assert(spies.contextBroker.getOperation.calledWith(cbPath, implementations.req));
-
-                        if (operation) {
-                            assert(spies.logger.warn.calledWith('[%s] ' + 'Error', apiKey));
-                            assert(spies.res.status.calledWith(statusCode));
-                            assert(spies.res.send.calledWith(respBody));
-                        }
-                    }
-
-                } else {
-
+                if (!contextBroker || (contextBroker && isCBService === null && !getTypeError)) {
                     assert(spies.requester.request.calledWith(options));
 
                     if (requestErr) {
@@ -623,6 +609,32 @@ describe('Testing Server', function () {
 
                         }
                     }
+
+                } else {
+                    assert(spies.db.isCBService.calledWith(publicPath));
+
+                    if (getTypeError) {
+                        assert(spies.logger.warn.calledWith('[%s] ' + getTypeError));
+                        assert(spies.res.status.calledWith(500));
+                        assert(spies.res.send.calledOnce);
+
+                    } else {
+                        assert(spies.url.parse.calledWith(options.url));
+
+                        if (!isJson) {
+                            assert(spies.res.status.calledWith(415));
+                            assert(spies.res.json.calledWith({error: 'Content-Type must be "application/json"'}));
+                        } else {
+                            assert(spies.url.parse.calledTwice);
+                            assert(spies.contextBroker.getOperation.calledWith(cbPath, implementations.req));
+
+                            if (operation) {
+                                assert(spies.logger.warn.calledWith('[%s] ' + 'Error', apiKey));
+                                assert(spies.res.status.calledWith(statusCode));
+                                assert(spies.res.send.calledWith(respBody));
+                            }
+                        }
+                    }
                 }
 
                 done();
@@ -630,31 +642,39 @@ describe('Testing Server', function () {
         };
 
         it('should return 504 when there is an error sending the request to the service', function (done) {
-            testUserRequest(false, false, null, true, null, done);
+            testUserRequest(false, false, null, true, null, null, null, done);
         });
 
         it('should return 500 when there is an error making the accounting', function (done) {
-            testUserRequest(false, false, null, false, {msg: 'Error'}, done);
+            testUserRequest(false, false, null, false, {msg: 'Error'}, null, null, done);
         });
 
         it('should return the service response and make the accounting when there is no error', function (done) {
-            testUserRequest(false, false, null, false, null, done);
+            testUserRequest(false, false, null, false, null, null, null, done);
+        });
+
+        it('should return the service response and make the accounting when there is no error (context broker modules load)', function (done) {
+            testUserRequest(true, false, null, false, null, false, null, done);
+        });
+
+        it('should return 500 when the db fails getting the service type', function (done) {
+            testUserRequest(true, false, 'updateSubscription', false, null, 'Error', null, done);
         });
 
         it('should return 415 when the CB request mime type is not "application/json"', function (done) {
-            testUserRequest(true, false, 'updateSubscription', false, null, done);
+            testUserRequest(true, false, 'updateSubscription', false, null, false, true, done);
         });
 
         it('should return 415 when the CB request mime type is not "application/json"', function (done) {
-            testUserRequest(true, false, 'updateSubscription', false, null, done);
+            testUserRequest(true, false, 'updateSubscription', false, null, false, true, done);
         });
 
         it('should return the CB response and make the accounting when there is no error (updateSubscription)', function (done) {
-            testUserRequest(true, true, 'update', false, null, done);
+            testUserRequest(true, true, 'update', false, null, false, true, done);
         });
 
         it('should return the CB response and make the accounting when there is no error (GET entities)', function (done) {
-            testUserRequest(true, true, null, false, null, done);
+            testUserRequest(true, true, null, false, null, false, true, done);
         });
     });
 });

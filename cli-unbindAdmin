@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+
+// Unbinds the specified administrator from the specified service identified by its public path.
+
+var program = require('commander'),
+    config = require('./config'),
+    logger = require('./log')
+    util = require('./util');
+
+var db = require(config.database.type);
+
+program
+    .description('Deletes the specified administrator for the specified service by its public path')
+    .parse(process.argv);
+
+if (program.args.length !== 2) {
+    logger.error('Invalid number of arguments. Usage: ./cli unbindAdmin <userId> <publicPath>');
+    console.log(program.help());
+
+} else {
+
+    var userId = program.args[0];
+    var publicPath = program.args[1];
+
+    if (!util.pathRegExp.test(publicPath)) {
+        logger.error(util.invalidPathError);
+
+    } else {
+
+        db.unbindAdmin(userId, publicPath, function(err) {
+            if (err) {
+                logger.error(err);
+            } else {
+                logger.info('Administrator ' + userId + ' delete from service ' + publicPath);
+            }
+        });
+    }
+}

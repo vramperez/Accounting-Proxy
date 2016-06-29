@@ -1,246 +1,28 @@
 #!/usr/bin/env node
 
-var cli = require('commander'),
+var async = require('async'),
     config = require('./config'),
-    async = require('async'),
-    logger = require('./log');
+    program = require('commander');
 
 var db = require(config.database.type);
-var admin_paths = config.api.administration_paths;
-
-var urlRegExp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
-var pathRegExp = /^\/([\w#!:.?+=&%@!\-\/])/;
-var invalidPathError = 'Invalid path format.';
 
 db.init(function(err) {
+
     if (err) {
         logger.error(err);
+    } else {
+
+        program
+            .description('Configuration tool for the accounting proxy')
+            .version('0.0.2')
+            .command('addService <publicPath> <URL> <applicationId>', 'add new service to accounting proxy')
+            .command('getService', 'display service\'s information')
+            .command('deleteService <publicPath>', 'delete the service from the accounting proxy')
+            .command('addAdmin <userId>', 'add new administrator')
+            .command('deleteAdmin <userId>', 'delete the specified admin')
+            .command('bindAdmin <userId> <publicPath>', 'add a new administrator fot the service specified by the public path')
+            .command('unbindAdmin <userId> <publicPath>', 'delete the specified administrator for the specified service by its public path')
+            .command('getAdmins <publicPath>', 'display all the administrators for the specified service')
+            .parse(process.argv);
     }
 });
-
-var administrationPath = function(path, callback) {
-    var is_admin_path = false;
-
-    async.forEachOf(admin_paths, function(admin_path, key, taskCallback) {
-        if (path === admin_path  && ! is_admin_path) {
-            is_admin_path = true;
-        }
-        taskCallback();
-    }, function() {
-        return callback(is_admin_path);
-    });
-}
-
-cli
-    .description('Configuration tool for accounting proxy.')
-    .version('0.0.1');
-
-
-/**
- * Add new service; map the public path with the endpoint url.
- */
-cli
-    .command('addService [publicPath] [URL] [appId]')
-    .description('Add new service to proxy database.')
-    .action(function(publicPath, url, appId) {
-        administrationPath(publicPath, function(adminPath) {
-            if (adminPath) {
-                logger.error(publicPath + ' is a reserved path.')
-            } else {
-                if (pathRegExp.test(publicPath)) {
-                    if (urlRegExp.test(url)) {
-                        if (appId !== undefined) {
-                            db.newService(publicPath, url, appId, function(err) {
-                                if (err) {
-                                    logger.error(err);
-                                } else {
-                                    logger.info('Service successfully added.');
-                                }
-                            });
-                        } else {
-                            logger.error('Undefined appId');
-                        }
-                    } else {
-                        logger.error('Invalid url format.');
-                    }
-                }
-                else {
-                    logger.error(invalidPathError);
-                }
-            }
-        });
-    });
-
-/**
- * Return the enpoint url associated with the public path passed.
- */
-cli
-    .command('getService [publicPath]')
-    .description('Get service\'s information.')
-    .action(function(publicPath) {
-        if (pathRegExp.test(publicPath)){
-            db.getService(publicPath, function(err, service) {
-                if(err) {
-                    console.log(err);
-                } else if (service === null) {
-                    console.log('No service avaliable for path: ' + publicPath);
-                } else {
-                    console.log('URL: ' + service.url + ' APP-ID: ' + service.appId);
-                }
-            });
-        } else {
-            logger.error(invalidPathError);
-        } 
-    });
-
-/**
- * Display all the registered services (public path and url).
- */
-cli
-    .command('getAllServices')
-    .description('Display all the registered services (public path and url).')
-    .action(function() {
-        db.getAllServices(function(err, services) {
-            if (err) {
-                logger.error(err);
-            } else if (services.length === 0) {
-                console.log('No service registered. Use: "addService "publicPath" "URL" to register a new service.')
-            } else {
-                for (var i = 0; i < services.length; i++) {
-                    console.log('PUBLIC PATH: ' + services[i].publicPath + ' URL: ' + services[i].url + ' APP-ID: ' + services[i].appId);
-                }
-            }
-        });
-    });
-
-
-/**
- * Delete the service associated with the public path passed.
- */
-cli
-    .command('deleteService [publicPath]')
-    .description('Delete a service from proxy database.')
-    .action(function(path) {
-        if (pathRegExp.test(path)) {
-            db.deleteService(path, function(err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info('Service ' + path + ' deleted.')
-                }
-            });
-        } else {
-            logger.error(invalidPathError);
-        }
-    });
-
-/**
- * Add a new administrator.
- */
-cli
-    .command('addAdmin [admin]')
-    .description('Add a new administrator.')
-    .action(function(admin) {
-        if (admin === undefined) {
-            logger.error('Usage: addAdmin "admin"');
-        } else {
-            db.addAdmin(admin, function(err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info('Added admin: ' + admin);
-                }
-            });
-        }
-    });
-
-/**
- * Delete the administrator specified.
- */
-cli
-    .command('deleteAdmin [admin]')
-    .description('Delete the specified admin.')
-    .action(function(admin) {
-        if (admin == undefined) {
-            logger.error('Usage: deleteAdmin "admin"');
-        } else {
-            db.deleteAdmin(admin, function(err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info('Deleted admin: ' + admin);
-                }
-            });
-        }
-    });
-
-/**
- * Bind the specified administrator to the service specified by its public path.
- */
-cli
-    .command('bindAdmin [admin] [publicPath]')
-    .description('Add a new administrator for the service specified by the public path.')
-    .action(function(admin, publicPath) {
-        if (admin === undefined) {
-            logger.error('Usage: addAdmin "admin" "publicPath"');
-        } else if (pathRegExp.test(publicPath)) {
-            db.bindAdmin(admin, publicPath, function(err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info('Admin ' + admin + ' added to service ' + publicPath);
-                }
-            });
-        } else {
-            logger.error(invalidPathError);
-        }
-    });
-
-/**
- * Unbind the specified administrator from the specified service identified by its public path.
- */
-cli
-    .command('unbindAdmin [admin] [publicPath]')
-    .description('Delete the specified administrator for the specified service by its public path.')
-    .action(function(admin, publicPath) {
-        if (admin === undefined) {
-            logger.error('Usage: addAdmin "admin" "publicPath"');
-        } else if (pathRegExp.test(publicPath)) {
-            db.unbindAdmin(admin, publicPath, function(err) {
-                if (err) {
-                    logger.error(err);
-                } else {
-                    logger.info('Administrator ' + admin + ' delete from service ' + publicPath);
-                }
-            });
-        } else { 
-            logger.error(invalidPathError);
-        }
-    });
-
-/**
- * Display all the administrator for the specified service.
- */
-cli
-    .command('getAdmins [publicPath]')
-    .description('Display all the administrators for the specified service.')
-    .action(function(publicPath) {
-        if (pathRegExp.test(publicPath)) {
-            db.getAdmins(publicPath, function(err, admins) {
-                if (err) {
-                    logger.error(err);
-                } else if (admins.length === 0) {
-                    logger.info('No administrators available for the service ' + publicPath);
-                } else {
-                    console.log('SERVICE: ' + publicPath + ' ADMINISTRATORS:');
-                    for (var i = 0; i < admins.length; i++) {
-                        console.log('   ' + admins[i]);
-                    }
-                }
-            });
-        } else { 
-            logger.error(invalidPathError);
-        }
-    });
-
-cli.parse(process.argv);

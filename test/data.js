@@ -22,7 +22,9 @@ var data = {
     DEFAULT_UPDATE_SUBS_PATH: '/updatesubscription',
     DEFAULT_SUBS_ID: 'subsId',
     DEFAULT_DURATION: 'P1M',
-    DEFAULT_EXPIRES: '2016-10-10T14:00:00.00Z'
+    DEFAULT_EXPIRES: '2016-10-10T14:00:00.00Z',
+    DEFAULT_IS_CB_SERVICE: true,
+    DEFAULT_IS_NOT_CB_SERVICE: false
 };
 
 data.DEFAULT_SUBS_URLS = [
@@ -55,13 +57,15 @@ data.DEFAULT_SUBS_RESPONSE = {
 };
 
 data.DEFAULT_SERVICES = [{
-     publicPath: data.DEFAULT_PUBLIC_PATHS[0],
-     url: data.DEFAULT_URLS[0],
-     appId: data.DEFAULT_APP_IDS[0]
+    publicPath: data.DEFAULT_PUBLIC_PATHS[0],
+    url: data.DEFAULT_URLS[0],
+    appId: data.DEFAULT_APP_IDS[0],
+    isCBService: data.DEFAULT_IS_CB_SERVICE
 }, {
-     publicPath: data.DEFAULT_PUBLIC_PATHS[1],
-     url: data.DEFAULT_URLS[1],
-     appId: data.DEFAULT_APP_IDS[1]
+    publicPath: data.DEFAULT_PUBLIC_PATHS[1],
+    url: data.DEFAULT_URLS[1],
+    appId: data.DEFAULT_APP_IDS[1],
+    isCBService: data.DEFAULT_IS_NOT_CB_SERVICE
 }];
 
 data.DEFAULT_NOTIFICATION_INFO = [{

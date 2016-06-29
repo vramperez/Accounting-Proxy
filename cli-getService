@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+
+// If public path is specified, it returns the service URL, the application Id and the type of service. otherwise,
+//  returns the information of all services.
+
+var util = require('./util'),
+    program = require('commander'),
+    config = require('./config'),
+    logger = require('./log');
+
+var db = require(config.database.type);
+
+var printService = function (service) {
+    var isCBService = service.isCBService === 0 ? 'no' : 'yes';
+    console.log('URL: ' + service.url + ' APP-ID: ' + service.appId + ' CONTEXT-BROKER: ' + isCBService);
+};
+
+program
+    .option('-p, --public-path', 'only displays the information of the service specified')
+    .description(
+        'Displays the URL, the application ID and the type (Context Broker or not) of all registered services.')
+    .parse(process.argv);
+
+var publicPath = program.publicPath ? program.args[0] : false;
+
+if (publicPath) {
+
+    if (!util.pathRegExp.test(publicPath)) {
+        logger.error(util.invalidPathError);
+    } else {
+
+        db.getService(publicPath, function (err, service) {
+
+            if(err) {
+                console.log(err);
+
+            } else if (service === null) {
+                console.log('No service avaliable for path: ' + publicPath);
+
+            } else {
+                printService(service);
+            }
+        });
+    }
+
+} else {
+
+    db.getAllServices(function(err, services) {
+        if (err) {
+            logger.error(err);
+
+        } else if (services.length === 0) {
+            console.log('No service registered. Use: "addService "publicPath" "URL" to register a new service.');
+
+        } else {
+            for (var i = 0; i < services.length; i++) {
+                printService(services[i]);
+            }
+        }
+    });
+}

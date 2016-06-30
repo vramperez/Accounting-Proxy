@@ -260,15 +260,20 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
 var handler = function (req, res) {
     var apiKey = req.get('X-API-KEY');
 
-    db.getAdminURL(req.user.id, req.publicPath, function (err, endpointURL) {
+    db.getAdminURL(req.user.id, req.publicPath, req.method, function (err, adminRes) {
 
         if (err) {
             res.status(500).json({error: err});
 
-        } else if (endpointURL) { // Admin
-            prepareRequest(req, res, endpointURL + req.restURL, null, null);
+        } else if (adminRes.isAdmin) { // Admin request
 
-        } else{ // Not admin user
+            if (adminRes.errorCode === 'method') {
+                res.status(405).json({error: adminRes.errorMsg});
+            } else {
+                prepareRequest(req, res, adminRes.url + req.restURL, null, null);
+            }
+
+        } else { // Not admin request
 
             if (!apiKey) {
                 logger.log('debug', 'Undefined API_KEY');
@@ -276,12 +281,14 @@ var handler = function (req, res) {
 
             } else {
 
-                db.checkRequest(req.user.id, apiKey, req.publicPath, function (err, correct) {
+                db.checkRequest(req.user.id, apiKey, req.publicPath, req.method, function (err, result) {
 
                     if (err) {
                         res.status(500).send();
-                    } else if (! correct) { // Invalid apiKey or user for the requested service
-                        res.status(401).json({ error: 'Invalid API_KEY or user'});
+                    } else if (!result.isCorrect && result.errorCode === 'apiKey') {
+                        res.status(401).json({ error: result.errorMsg});
+                    } else if (!result.isCorrect && result.errorCode === 'method'){
+                        res.status(405).json({ error: result.errorMsg});
                     } else {
 
                         db.getAccountingInfo(apiKey, function(err, accountingInfo) {

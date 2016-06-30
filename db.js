@@ -36,6 +36,7 @@ exports.init = function (callback) {
                     url                 TEXT, \
                     appId               TEXT, \
                     isCBService         INT, \
+                    methods             TEXT, \
                     PRIMARY KEY (publicPath) \
             )', callback);
         },
@@ -172,15 +173,19 @@ exports.getHref = function (unit, callback) {
  *
  * @param  {string} publicPath      Service public path.
  * @param  {string} url             Endpoint url.
+ * @param  {list}   methodsList     List of http service methods.
  */
-exports.newService = function (publicPath, url, appId, isCBService, callback) {
+exports.newService = function (publicPath, url, appId, isCBService, methodsList, callback) {
+    var methods = methodsList.join(',').toUpperCase();
+
     db.run('INSERT OR REPLACE INTO services \
-            VALUES ($path, $url, $appId, $isCBService)',
+            VALUES ($path, $url, $appId, $isCBService, $methods)',
         {
             $path: publicPath,
             $url: url,
             $appId: appId,
-            $isCBService: isCBService ? 1 : 0
+            $isCBService: isCBService ? 1 : 0,
+            $methods: methods
         }, function (err) {
             if (err) {
                 return callback('Error in database adding the new service.');
@@ -225,6 +230,7 @@ exports.getService = function (publicPath, callback) {
                 } else if (!service) {
                     return callback(null, null);
                 } else {
+                    service.methods = service.methods.split(',');
                     return callback(null, service);
                 }
     });
@@ -239,7 +245,12 @@ exports.getAllServices = function (callback) {
                 if (err) {
                     return callback('Error in database getting the services.', null);
                 } else {
-                    return callback(null, services);
+                    async.each(services, function (service, taskCallback) {
+                        service.methods = service.methods.split(',');
+                        taskCallback(null);
+                    }, function () {
+                        return callback(null, services);
+                    });
                 }
     });
 };
@@ -386,7 +397,7 @@ exports.getAdmins = function (publicPath, callback) {
                     return callback('Error in database getting the administrators.', null);
                 } else {
                     async.map(admins, function(admin, taskCallback) {
-                        taskCallback(null, admin.idAdmin)
+                        taskCallback(null, admin.idAdmin);
                     }, callback);
                 }
     });
@@ -397,9 +408,10 @@ exports.getAdmins = function (publicPath, callback) {
  *
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
+ * @param  {string}   method     Http method.
  */
-exports.getAdminURL = function (idAdmin, publicPath, callback) {
-    db.get('SELECT services.url \
+exports.getAdminURL = function (idAdmin, publicPath, method, callback) {
+    db.get('SELECT services.url, services.methods \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
                 administer.idAdmin=$idAdmin AND services.publicPath=$publicPath',
@@ -410,9 +422,16 @@ exports.getAdminURL = function (idAdmin, publicPath, callback) {
                 if (err) {
                     return callback('Error getting the admin url.', null);
                 } else if (!result) {
-                    return callback(null, null);
+                    return callback(null, {isAdmin: false, errorCode: 'admin', url: null});
                 } else {
-                    return callback(null, result.url);
+
+                    var methods = result.methods.split(',');
+
+                    if (methods.indexOf(method) == -1) {
+                        return callback(null, {isAdmin: true, errorCode: 'method', url: null, errorMsg: 'Valid methods are: ' + methods});
+                    } else {
+                        return callback(null, {isAdmin: true, errorCode: 'ok', url: result.url});
+                    }
                 }
     });
 };
@@ -490,23 +509,32 @@ exports.getApiKeys = function (user, callback) {
  *
  * @param  {string} customer    User identifier.
  * @param  {string} apiKey      Identifies the product.
+ * @param  {string} method      Http method.
  */
-exports.checkRequest = function (customer, apiKey, publicPath, callback) {
-    db.get('SELECT customer \
-            FROM accounting \
-            WHERE apiKey=$apiKey AND publicPath=$publicPath',
+exports.checkRequest = function (customer, apiKey, publicPath, method, callback) {
+    db.get('SELECT accounting.customer, services.methods \
+            FROM accounting, services \
+            WHERE services.publicPath=accounting.publicPath \
+                AND services.publicPath=$publicPath \
+                AND accounting.apiKey=$apiKey ',
             {
                 $apiKey: apiKey,
                 $publicPath: publicPath
-            }, function (err, user) {
+            }, function (err, result) {
+
                 if (err) {
-                    return callback('Error in database checking the request.', false);
-                } else if (!user) {
-                    return callback(null, false);
-                } else if (user.customer !== customer) {
-                    return callback(null, false);
+                    return callback('Error in database checking the request.', null);
+                } else if (!result || result.customer !== customer) {
+                    return callback(null, {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'});
                 } else {
-                    return callback(null, true);
+
+                    var methods = result.methods.split(',') ;
+
+                    if (methods.indexOf(method) == -1) {
+                        return callback(null, {isCorrect: false, errorCode: 'method', errorMsg: 'Valid methods are: ' + methods});
+                    } else {
+                        return callback(null, {isCorrect: true});
+                    }
                 }
     });
 };

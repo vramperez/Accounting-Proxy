@@ -12,7 +12,7 @@ var db = require(config.database.type);
 
 var printService = function (service) {
     var isCBService = service.isCBService === 0 ? 'no' : 'yes';
-    console.log('URL: ' + service.url + ' APP-ID: ' + service.appId + ' CONTEXT-BROKER: ' + isCBService);
+    console.log('PUBLIC PATH: ' + service.publicPath + ' URL: ' + service.url + ' APP-ID: ' + service.appId + ' CONTEXT-BROKER: ' + isCBService + ' METHODS: ' + service.methods);
 };
 
 program

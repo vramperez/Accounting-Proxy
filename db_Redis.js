@@ -89,17 +89,20 @@ exports.getHref = function (unit, callback) {
 /**
  * Map the publicPath with the endpoint url.
  *
- * @param  {string} publicPath      Path for the users.
+ * @param  {string} publicPath      Service public path.
  * @param  {string} url             Endpoint url.
+ * @param  {list}   methodsList     List of http service methods.
  */
-exports.newService = function (publicPath, url, appId, isCBService, callback) {
+exports.newService = function (publicPath, url, appId, isCBService, methodsList, callback) {
+    var methods = methodsList.join(',').toUpperCase();
     var multi = db.multi();
 
     multi.sadd(['services', publicPath]);
     multi.hmset(publicPath, {
         url: url,
         appId: appId,
-        isCBService: isCBService ? 1 : 0
+        isCBService: isCBService ? 1 : 0,
+        methods: methods
     });
     multi.exec(function (err) {
         if (err) {
@@ -212,6 +215,7 @@ exports.getService = function (publicPath, callback) {
             return callback(null, null);
         } else {
             service.isCBService = parseInt(service.isCBService);
+            service.methods = service.methods.split(',');
             return callback(null, service);
         }
     });
@@ -234,6 +238,7 @@ exports.getAllServices = function (callback) {
                     } else {
                         service.publicPath = publicPath;
                         service.isCBService = parseInt(service.isCBService);
+                        service.methods = service.methods.split(',');
                         toReturn.push(service);
                         taskCallback(null);
                     }
@@ -400,19 +405,27 @@ exports.getAdmins = function (publicPath, callback) {
  *
  * @param  {string}   idAdmin    Administrator identifier.
  * @param  {string}   publicPath Public path of the service.
+ * @param  {string}   method     Http method.
  */
-exports.getAdminURL = function (idAdmin, publicPath, callback) {
+exports.getAdminURL = function (idAdmin, publicPath, method, callback) {
     db.smembers(publicPath + 'admins', function (err, admins) {
         if (err) {
             return callback('Error getting the admin url.', null);
         } else if (admins.indexOf(idAdmin) === -1) { // Not an admin
-            return callback(null, null);
+            return callback(null, {isAdmin: false, errorCode: 'admin', url: null});
         } else {
-            db.hget(publicPath, 'url', function (err, url) {
+            db.hgetall(publicPath, function (err, service) {
                 if (err) {
                     return callback('Error getting the admin url.', null);
                 } else {
-                    return callback(null, url);
+
+                    var methodsList = service.methods.split(',');
+
+                    if (methodsList.indexOf(method) == -1) {
+                        return callback(null, {isAdmin: true, errorCode: 'method', url: null, errorMsg: 'Valid methods are: ' + methodsList});
+                    } else {
+                        return callback(null, {isAdmin: true, errorCode: 'ok', url: service.url});
+                    }
                 }
             });
         }
@@ -508,16 +521,31 @@ exports.getApiKeys = function (user, callback) {
  *
  * @param  {string} customer    User identifier.
  * @param  {string} apiKey      Identifies the product.
+ * @param  {string} method      Http method.
  */
-exports.checkRequest = function (customer, apiKey, publicPath, callback) {
+exports.checkRequest = function (customer, apiKey, publicPath, method, callback) {
     db.hgetall(apiKey, function (err, accountingInfo) {
+
         if (err) {
-            return callback('Error in database checking the request.', false);
-        } else if (!accountingInfo) {
-            return callback(null, false);
+            return callback('Error in database checking the request.', null);
+        } else if (!accountingInfo || !(accountingInfo.customer === customer && accountingInfo.publicPath === publicPath)) {
+            return callback(null, {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'});
         } else {
-            return callback(null, accountingInfo.customer === customer &&
-                accountingInfo.publicPath === publicPath);
+
+            db.hget(publicPath, 'methods', function (err, methods) {
+                if (err) {
+                    return callback('Error in database checking the request.', null);
+                } else {
+
+                    var methodsList = methods.split(',');
+
+                    if (methodsList.indexOf(method) == -1){
+                        return callback(null, {isCorrect: false, errorCode: 'method', errorMsg: 'Valid methods are: ' + methods});
+                    } else {
+                        return callback(null, {isCorrect: true});
+                    }
+                }
+            })
         }
     });
 };

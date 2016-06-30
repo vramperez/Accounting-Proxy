@@ -15,7 +15,7 @@ db.init(function(err) {
         program
             .description('Configuration tool for the accounting proxy')
             .version('0.0.2')
-            .command('addService <publicPath> <URL> <applicationId>', 'add new service to accounting proxy')
+            .command('addService <publicPath> <URL> <applicationId> <httpMethod> [otherHttpMethods...]', 'add new service to accounting proxy')
             .command('getService', 'display service\'s information')
             .command('deleteService <publicPath>', 'delete the service from the accounting proxy')
             .command('addAdmin <userId>', 'add new administrator')

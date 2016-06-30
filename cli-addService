@@ -9,6 +9,19 @@ var util = require('./util'),
 
 var db = require(config.database.type);
 var urlRegExp = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
+var httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'CONNECT', 'HEAD', 'TRACE'];
+
+var checkHttpMethods = function (methods) {
+    var result = true;
+
+    for (var i = 0; i < methods.length && result; i++) {
+        if (httpMethods.indexOf(methods[i].toUpperCase()) == -1) {
+            result = false;
+        }
+    }
+
+    return result;
+};
 
 program
     .option('-c, --context-broker', 'the service is an Orion Context broker service')
@@ -21,16 +34,17 @@ program
         '       URLs with query strings. For instance, a public path such as `/public/path` is not valid.')
     .parse(process.argv);
 
-if (program.args.length !== 3) {
-    logger.error('Invalid number of arguments. Usage: ./cli addService [-c] <publicPath> <URL> <appId>');
+if (program.args.length < 4) {
+    logger.error('Invalid number of arguments. Usage: ./cli addService [-c] <publicPath> <URL> <appId> <httpMethod> [otherHttpMethods...]');
     console.log(program.help());
 
 } else {
 
-    var contextBroker = program.contextBroker !== undefined ? true : false;
-    var publicPath = contextBroker ? program.args[2] : program.args[0];
-    var url = contextBroker ? program.args[0] : program.args[1];
-    var appId = contextBroker ? program.args[1] : program.args[2];
+    var isContextBroker = program.contextBroker !== undefined ? true : false;
+    var publicPath = isContextBroker ? program.args[program.args.length-1] : program.args[0];
+    var url = isContextBroker ? program.args[0] : program.args[1];
+    var appId = isContextBroker ? program.args[1] : program.args[2];
+    var methods = isContextBroker ? program.args.slice(2, program.args.length-1) : program.args.slice(3);
 
     util.administrationPath(publicPath, function (adminPath) {
 
@@ -46,12 +60,15 @@ if (program.args.length !== 3) {
         } else if (!appId) {
             logger.error('Undefined appId');
 
-        } else if (contextBroker && !config.resources.contextBroker) {
+        } else if (isContextBroker && !config.resources.contextBroker) {
             logger.error('Context Broker is not enabled. Please change the config.resources.contextBroker value to true in config.js');
+
+        } else if (!checkHttpMethods(methods)) {
+            logger.error('Http method not valid. Http methods supported: ' + httpMethods);
 
         } else {
 
-            db.newService(publicPath, url, appId, contextBroker, function(err) {
+            db.newService(publicPath, url, appId, isContextBroker, methods, function(err) {
                 if (err) {
                     logger.error(err);
                 } else {

@@ -190,10 +190,11 @@ describe('Testing the accounting API. Generic REST use', function () {
                     testAuthentication('x-auth-token', userProfile.token, expectedResp, done);
                 });
 
-                var testUserRequest = function (url, statusCode, done) {
+                var testUserRequest = function (url, method, statusCode, done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: url, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                     var admin = {idAdmin: userProfile.id, publicPath: publicPath};
 
                     util.addToDatabase(db, [service], [], [], [admin], [], [], null, function (err) {
@@ -202,19 +203,23 @@ describe('Testing the accounting API. Generic REST use', function () {
                         } else {
 
                             request
-                                .get(publicPath + '/rest/call')
+                                [method](publicPath + '/rest/call')
                                 .set('x-auth-token', userProfile.token)
                                 .expect(statusCode, done);
                         }
                     });
                 };
 
+                it('should return 405 when the request method is not a valid http method for the service', function (done) {
+                    testUserRequest(DEFAULT_URL, 'patch', 405, done);
+                });
+
                 it('should return 504 when an error occur sending request to the endpoint', function (done) {
-                    testUserRequest('wrongURL', 504, done);
+                    testUserRequest('wrongURL', 'get', 504, done);
                 });
 
                 it('should return 200 when the request is correct', function (done) {
-                   testUserRequest(DEFAULT_URL, 200, done);
+                   testUserRequest(DEFAULT_URL, 'get', 200, done);
                 });
             });
 
@@ -223,7 +228,8 @@ describe('Testing the accounting API. Generic REST use', function () {
                 it('should return 401 when the "X-API-KEY" header is undefined', function (done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: DEFAULT_URL + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
 
                     util.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
                         if (err) {
@@ -238,11 +244,12 @@ describe('Testing the accounting API. Generic REST use', function () {
                     });
                 });
 
-                var testRequestHandler = function (apiKey, url, unit, statusCode, response, done) {
+                var testRequestHandler = function (apiKey, url, method, unit, statusCode, response, done) {
 
                     var url = url ? url : DEFAULT_URL;
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit ? unit : buyInfo.unit;
 
@@ -254,7 +261,7 @@ describe('Testing the accounting API. Generic REST use', function () {
                         } else {
 
                             request
-                                .get(publicPath + '/rest/call')
+                                [method](publicPath + '/rest/call')
                                 .set('x-auth-token', userProfile.token)
                                 .set('X-API-KEY', apiKey)
                                 .expect(statusCode, response, done);
@@ -263,19 +270,25 @@ describe('Testing the accounting API. Generic REST use', function () {
                 };
 
                 it('should return 401 when the API key or user is invalid', function (done) {
-                    var expectedResp = { error: 'Invalid API_KEY or user'};
+                    var expectedResp = { error: 'Invalid API key'};
 
-                    testRequestHandler('wrong', undefined, undefined, 401, expectedResp, done);
+                    testRequestHandler('wrong', undefined, 'get', undefined, 401, expectedResp, done);
+                });
+
+                it('should return 405 when the request method in not a valid http method for the service', function (done) {
+                    var expectedResp = { error: 'Valid methods are: ' + data.DEFAULT_HTTP_METHODS_LIST};
+
+                    testRequestHandler(undefined, undefined, 'patch', undefined, 405, expectedResp, done);
                 });
 
                 it('should return 504 when an error occur sending the request to the endpoint', function (done) {
                     var url = 'wrong_url';
 
-                    testRequestHandler(undefined, url, undefined, 504, {}, done);
+                    testRequestHandler(undefined, url, 'get', undefined, 504, {}, done);
                 });
 
                 it('should return 500 when an error occur making the accounting (wrong unit)', function (done) {
-                    testRequestHandler(undefined, undefined, 'wrongUnit', 500, {}, done);
+                    testRequestHandler(undefined, undefined, 'get', 'wrongUnit', 500, {}, done);
                 });
 
                 var checkAssertions = function (apiKey, compareFunction, accountingValue, response, callback) {
@@ -302,7 +315,8 @@ describe('Testing the accounting API. Generic REST use', function () {
                 var testCorrectRequest = function (unit, compareFunction, amount, done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit;
 

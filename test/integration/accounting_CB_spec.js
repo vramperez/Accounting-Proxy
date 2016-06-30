@@ -196,7 +196,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
     var testCreateSubs = function (version, unit, compareFunction, amount, done) {
 
         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+        var methods = data.DEFAULT_HTTP_METHODS_LIST;
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
         buyInfo.unit = unit;
 
@@ -253,7 +254,9 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
         var subsId = data.DEFAULT_SUBS_ID;
 
         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+        var methods = JSON.parse(JSON.stringify(data.DEFAULT_HTTP_METHODS_LIST));
+        methods.push('PATCH');
+        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
         buyInfo.unit = unit;
 
@@ -350,7 +353,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 it('should return 401 when the "X-API-KEY" header is not defined', function (done) {
 
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
 
                     util.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
                         if (err) {
@@ -365,11 +369,12 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     });
                 });
 
-                var testRequestHandler = function (apiKey, url, unit, statusCode, response, done) {
+                var testRequestHandler = function (apiKey, url, method, unit, statusCode, response, done) {
 
                     var url = url ? url : DEFAULT_URL;
                     var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                    var service = {publicPath: publicPath, url: url + '/rest/call', appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                     var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                     buyInfo.unit = unit ? unit : buyInfo.unit;
 
@@ -381,7 +386,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                         } else {
 
                             request
-                                .get(publicPath + '/v1/contextEntity/Room1')
+                                [method](publicPath + '/v1/contextEntity/Room1')
                                 .set('x-auth-token', userProfile.token)
                                 .set('X-API-KEY', apiKey)
                                 .expect(statusCode, response, done);
@@ -390,19 +395,25 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 };
 
                 it('should return 401 when the API key or user is not valid', function (done) {
-                    var expectedResp = { error: 'Invalid API_KEY or user'};
+                    var expectedResp = { error: 'Invalid API key'};
 
-                    testRequestHandler('wrong', undefined, undefined, 401, expectedResp, done);
+                    testRequestHandler('wrong', undefined, 'get', undefined, 401, expectedResp, done);
+                });
+
+                it('should return 405 when the request method is not a valid http method for the service', function (done) {
+                    var methods = data.DEFAULT_HTTP_METHODS_LIST;
+
+                    testRequestHandler(undefined, undefined, 'patch', undefined, 405, {error: 'Valid methods are: ' + methods}, done);
                 });
 
                 it('should fail (504) when an error occur sending the request to the endpoint', function (done) {
                     var url = 'wrongURL';
 
-                    testRequestHandler(undefined, url, undefined, 504, {}, done);
+                    testRequestHandler(undefined, url, 'get', undefined, 504, {}, done);
                 });
 
                 it('should fail (500) when an error occur making the accounting (wrong unit)', function (done) {
-                    testRequestHandler(undefined, undefined, 'wrongUnit', 500, {}, done);
+                    testRequestHandler(undefined, undefined, 'get', 'wrongUnit', 500, {}, done);
                 });
             });
 
@@ -415,7 +426,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     var testGetEntities = function (path, method, unit, compareFunction, amount, payload, expectedResp, done) {
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                        var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
                         buyInfo.unit = unit;
 
@@ -544,7 +556,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                     var testDeleteSubscription = function (method, done) {
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                        var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
 
                         var subscription = data.DEFAULT_SUBSCRIPTION_v1;
@@ -696,7 +709,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
 
                         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
                         var subsId = data.DEFAULT_SUBS_ID;
-                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE};
+                        var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                        var service = {publicPath: publicPath, url: DEFAULT_URL, appId: userProfile.appId, isCBService: DEFAULT_TYPE, methods: methods};
                         var buyInfo = JSON.parse(JSON.stringify(data.DEFAULT_BUY_INFORMATION[0]));
 
                         var subscription = data.DEFAULT_SUBSCRIPTION_v2;

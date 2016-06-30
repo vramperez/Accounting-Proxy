@@ -175,7 +175,7 @@ describe('Testing the usage notifier', function () {
 
                 var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
                 var apiKey = data.DEFAULT_API_KEYS[0];
-                var service = data.DEFAULT_SERVICES[0];
+                var service = data.DEFAULT_SERVICES_LIST[0];
                 var buy = data.DEFAULT_BUY_INFORMATION[0];
                 var accounting = {
                     apiKey: apiKey,
@@ -205,7 +205,7 @@ describe('Testing the usage notifier', function () {
                     accounting: [unit]
                 };
 
-                var service = data.DEFAULT_SERVICES[0];
+                var service = data.DEFAULT_SERVICES_LIST[0];
                 var buy = data.DEFAULT_BUY_INFORMATION[0];
                 var accounting = {
                     apiKey: apiKey,

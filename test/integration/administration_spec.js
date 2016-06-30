@@ -179,11 +179,11 @@ describe('Testing the administration API', function (done) {
 
                 var testGetApiKeys = function (numApiKeys, done) {
 
-                    var services = [ data.DEFAULT_SERVICES[0] ];
+                    var services = [ data.DEFAULT_SERVICES_LIST[0] ];
                     var buyInfos = [ data.DEFAULT_BUY_INFORMATION[0] ];
 
                     if (numApiKeys === 2) {
-                        services.push(data.DEFAULT_SERVICES[1]);
+                        services.push(data.DEFAULT_SERVICES_LIST[1]);
                         buyInfos.push(data.DEFAULT_BUY_INFORMATION[1]);
                     }
 
@@ -261,7 +261,7 @@ describe('Testing the administration API', function (done) {
 
                     var oldToken = 'oldToken';
                     var newToken = data.DEFAULT_TOKEN;
-                    var service = data.DEFAULT_SERVICES[0];
+                    var service = data.DEFAULT_SERVICES_LIST[0];
                     var admin = {idAdmin: userProfile.id, publicPath: service.publicPath};
                     var url = 'http://localhost' + service.publicPath;
 
@@ -315,7 +315,7 @@ describe('Testing the administration API', function (done) {
                 it('should save the buy information when the request is correct', function (done) {
 
                     var expectedApiKey = '829d47524220aa859d5e8c683a22035df1bc44ea';
-                    var service = data.DEFAULT_SERVICES[0];
+                    var service = data.DEFAULT_SERVICES_LIST[0];
                     var buy = {
                         orderId: data.DEFAULT_ORDER_IDS[0],
                         productId: data.DEFAULT_PRODUCT_IDS[0],

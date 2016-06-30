@@ -101,7 +101,7 @@ exports.getSpies = function (implementations, callback) {
 var loadServices = function (services, callback) {
     if (services.length != 0) {
         async.eachSeries(services, function (service, taskCallback) {
-            dbMock.newService(service.publicPath, service.url, service.appId, service.isCBService, taskCallback);
+            dbMock.newService(service.publicPath, service.url, service.appId, service.isCBService, service.methods, taskCallback);
         }, callback);
     } else {
         return callback();

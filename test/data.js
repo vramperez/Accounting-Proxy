@@ -24,8 +24,11 @@ var data = {
     DEFAULT_DURATION: 'P1M',
     DEFAULT_EXPIRES: '2016-10-10T14:00:00.00Z',
     DEFAULT_IS_CB_SERVICE: true,
-    DEFAULT_IS_NOT_CB_SERVICE: false
+    DEFAULT_IS_NOT_CB_SERVICE: false,
+    DEFAULT_HTTP_METHODS_LIST: ['GET', 'POST', 'PUT', 'DELETE']
 };
+
+data.DEFAULT_HTTP_METHODS_STRING = data.DEFAULT_HTTP_METHODS_LIST.join(',');
 
 data.DEFAULT_SUBS_URLS = [
     ['DELETE', data.DEFAULT_UNSUBS_PATH, 'delete'],
@@ -56,16 +59,32 @@ data.DEFAULT_SUBS_RESPONSE = {
     }
 };
 
-data.DEFAULT_SERVICES = [{
+data.DEFAULT_SERVICES_LIST = [{
     publicPath: data.DEFAULT_PUBLIC_PATHS[0],
     url: data.DEFAULT_URLS[0],
     appId: data.DEFAULT_APP_IDS[0],
-    isCBService: data.DEFAULT_IS_CB_SERVICE
+    isCBService: false,
+    methods: data.DEFAULT_HTTP_METHODS_LIST
 }, {
     publicPath: data.DEFAULT_PUBLIC_PATHS[1],
     url: data.DEFAULT_URLS[1],
     appId: data.DEFAULT_APP_IDS[1],
-    isCBService: data.DEFAULT_IS_NOT_CB_SERVICE
+    isCBService: true,
+    methods: data.DEFAULT_HTTP_METHODS_LIST
+}];
+
+data.DEFAULT_SERVICES_STRING = [{
+    publicPath: data.DEFAULT_PUBLIC_PATHS[0],
+    url: data.DEFAULT_URLS[0],
+    appId: data.DEFAULT_APP_IDS[0],
+    isCBService: '0',
+    methods: data.DEFAULT_HTTP_METHODS_STRING
+}, {
+    publicPath: data.DEFAULT_PUBLIC_PATHS[1],
+    url: data.DEFAULT_URLS[1],
+    appId: data.DEFAULT_APP_IDS[1],
+    isCBService: '1',
+    methods: data.DEFAULT_HTTP_METHODS_STRING
 }];
 
 data.DEFAULT_NOTIFICATION_INFO = [{

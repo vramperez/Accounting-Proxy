@@ -212,10 +212,11 @@ describe('Testing Server', function () {
 
     describe('Function "handler"', function () {
 
-        var testHandler = function (getAdminURLErr, apiKey, checkReqErr, correctReq, getAccInfoErr, done) {
+        var testHandler = function (adminInfo, getAdminURLErr, apiKey, checkReqErr, checkReqRes, getAccInfoErr, done) {
 
             var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
             var userId = data.DEFAULT_USER_ID;
+            var method = data.DEFAULT_HTTP_METHODS_LIST[0];
 
             var implementations = {
                 req: {
@@ -238,11 +239,11 @@ describe('Testing Server', function () {
                     send: function () {}
                 },
                 db: {
-                    getAdminURL: function (userId, path, callback) {
-                        return callback(getAdminURLErr, null);
+                    getAdminURL: function (userId, path, method, callback) {
+                        return callback(getAdminURLErr, adminInfo);
                     },
-                    checkRequest: function (userId, apiKey, path, callback) {
-                        return callback(checkReqErr, correctReq);
+                    checkRequest: function (userId, apiKey, path, method, callback) {
+                        return callback(checkReqErr, checkReqRes);
                     },
                     getAccountingInfo: function (apiKey, callback) {
                         return callback(getAccInfoErr, null);
@@ -271,6 +272,13 @@ describe('Testing Server', function () {
                     assert(spies.res.status.calledWith(500));
                     assert(spies.res.json.calledWith({error: getAdminURLErr}));
 
+                } else if (adminInfo.isAdmin) {
+
+                    if (adminInfo.errorCode === 'method') {
+                        assert(spies.res.status.calledWith(405));
+                        assert(spies.res.json.calledWith({error: adminInfo.errorMsg}));
+                    }
+
                 } else { 
 
                     if (!apiKey) {
@@ -288,10 +296,17 @@ describe('Testing Server', function () {
                             assert(spies.res.status.calledWith(500));
                             assert(spies.res.send.calledOnce);
 
-                        } else if (!correctReq) {
+                        } else if (!checkReqRes.isCorrect) {
 
-                            assert(spies.res.status.calledWith(401));
-                            assert(spies.res.json.calledWith({error: 'Invalid API_KEY or user'}));
+                            if (checkReqRes.errorCode === 'apiKey') {
+                                assert(spies.res.status.calledWith(401));
+                                assert(spies.res.json.calledWith({error: checkReqRes.errorMsg}));
+
+                            } else if (checkReqRes.errorCode === 'method') {
+                                assert(spies.res.status.calledWith(405));
+                                assert(spies.res.json.calledWith({error: checkReqRes.errorMsg}));
+
+                            }
 
                         } else {
 
@@ -308,27 +323,41 @@ describe('Testing Server', function () {
         };
 
         it('should return 500 when db fails getting admin URLs', function (done) {
-            testHandler(true, null, false, false, false, done);
+            testHandler({isAdmin: false}, true, null, false, false, false, done);
         });
 
         it('should return 401 when there is no API-Key in the reques headers', function (done) {
-            testHandler(false, undefined, false, false, false, done);
+            testHandler({isAdmin: false}, false, undefined, false, null, false, done);
         });
 
         it('should return 500 when db fails checking the request', function (done) {
-            testHandler(false, data.DEFAULT_API_KEYS[0], true, false, false, done);
+            testHandler({isAdmin: false}, false, data.DEFAULT_API_KEYS[0], true, null, false, done);
+        });
+
+        it('should return 405 when request method is not a valid http method and the user is an admin', function (done) {
+            var adminInfo = {isAdmin: true, errorCode: 'method', errorMsg: 'Error'};
+
+            testHandler(adminInfo, false, data.DEFAULT_API_KEYS[0], true, null, false, done); 
         });
 
         it('should return 401 when the apiKey or user is invalid', function (done) {
-            testHandler(false, data.DEFAULT_API_KEYS[0], false, false, false, done);
+            var checkReqRes = {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Error'};
+
+            testHandler({isAdmin: false}, false, data.DEFAULT_API_KEYS[0], false, checkReqRes, false, done);
+        });
+
+        it('should return 405 when the request method is not a valid http method', function (done) {
+            var checkReqRes = {isCorrect: false, errorCode: 'method', errorM: 'Error'};
+
+            testHandler({isAdmin: false}, false, data.DEFAULT_API_KEYS[0], false, checkReqRes, false, done);
         });
 
         it('should return 500 when db fails getting the accounting information', function (done) {
-            testHandler(false, data.DEFAULT_API_KEYS[0], false, true, true, done);
+            testHandler({isAdmin: false}, false, data.DEFAULT_API_KEYS[0], false, true, true, done);
         });
 
         it('should return 500 whenthere is no accounting information', function (done) {
-            testHandler(false, data.DEFAULT_API_KEYS[0], false, true, false, done);
+            testHandler({isAdmin: false}, false, data.DEFAULT_API_KEYS[0], false, true, false, done);
         });
     });
 
@@ -384,8 +413,8 @@ describe('Testing Server', function () {
                     json: function (json) {}
                 },
                 db: {
-                    getAdminURL: function (userId, path, callback) {
-                        return callback(null, url);
+                    getAdminURL: function (userId, path, method, callback) {
+                        return callback(null, {isAdmin: true, url: url});
                     }
                 },
                 requester: {
@@ -454,7 +483,6 @@ describe('Testing Server', function () {
 
     describe('Normal user request', function () {
 
-
         var testUserRequest = function (contextBroker, isJson, operation, requestErr, countErr, getTypeError, isCBService, done) {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
@@ -514,10 +542,10 @@ describe('Testing Server', function () {
                     json: function (msg) {}
                 },
                 db: {
-                    getAdminURL: function (userId, path, callback) {
-                        return callback(null, null);
+                    getAdminURL: function (userId, path, method, callback) {
+                        return callback(null, {isAdmin: false});
                     },
-                    checkRequest: function (userId, apiKey, path, callback) {
+                    checkRequest: function (userId, apiKey, path, method, callback) {
                         return callback(null, true);
                     },
                     getAccountingInfo: function (apiKey, callback) {

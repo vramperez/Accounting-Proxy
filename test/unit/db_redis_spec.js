@@ -233,6 +233,10 @@ describe('Testing REDIS database', function () {
         var testNewService = function (error, done) {
 
             var isCBService = true;
+            var url = data.DEFAULT_URLS[0];
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+            var appId = data.DEFAULT_APP_IDS[0];
+            var httpMethods = data.DEFAULT_HTTP_METHODS_LIST;
 
             var sadd = sinon.stub();
             var hmset = sinon.stub();
@@ -251,14 +255,15 @@ describe('Testing REDIS database', function () {
 
             var db = getDb({multi: multi});
 
-            db.newService(data.DEFAULT_PUBLIC_PATHS[0], data.DEFAULT_URLS[0], data.DEFAULT_APP_IDS[0], isCBService, function (err) {
+            db.newService(publicPath, url, appId, isCBService, httpMethods, function (err) {
 
                 assert(multi.calledOnce);
-                assert(sadd.calledWith(['services', data.DEFAULT_PUBLIC_PATHS[0]]));
-                assert(hmset.calledWith(data.DEFAULT_PUBLIC_PATHS[0], {
-                    url: data.DEFAULT_URLS[0],
-                    appId: data.DEFAULT_APP_IDS[0],
-                    isCBService: isCBService ? 1 : 0
+                assert(sadd.calledWith(['services', publicPath]));
+                assert(hmset.calledWith(publicPath, {
+                    url: url,
+                    appId: appId,
+                    isCBService: isCBService ? 1 : 0,
+                    methods: data.DEFAULT_HTTP_METHODS_STRING
                 }));
                 assert(execSpy.calledOnce);
 
@@ -390,7 +395,7 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getService"', function () {
 
-        var testGetService = function (error, service, done) {
+        var testGetService = function (error, service, result, done) {
 
             var hgetall = function (hash, callback) {
                 return callback(error, service);
@@ -407,41 +412,36 @@ describe('Testing REDIS database', function () {
             db.getService(data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
 
                 assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
-
-                if (error) {
-                    assert.equal(err, 'Error in database getting the service.');
-                    assert.equal(res, null);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if(!service) {
-                        assert.equal(res, null);
-                    } else {
-                        assert.equal(res, service);
-                    }
-                }
+                assert.equal(err, error);
+                assert.deepEqual(res, result);
 
                 done();
             });
         };
 
         it('should call the callback with error when db fails executing the statements', function (done) {
-            testGetService(true, null, done);
+            var errorMsg = 'Error in database getting the service.';
+
+            testGetService(errorMsg, null, null, done);
         });
 
-        it('should call the callback with error when there is not service', function (done) {
-            testGetService(false, null, done);
+        it('should call the callback without error when there is no service', function (done) {
+            testGetService(null, null, null, done);
         });
 
         it('should call the callback without error when db gets the service', function (done) {
-            testGetService(null, {}, done);
+            var service = {isCBService: '0', methods: data.DEFAULT_HTTP_METHODS_STRING};
+            var result = JSON.parse(JSON.stringify(service));
+            result.isCBService = parseInt(result.isCBService);
+            result.methods = result.methods.split(',');
+
+            testGetService(null, service, result, done);
         });
     });
 
     describe('Function "getAllServices"', function () {
 
-        var testGetAllServices = function (smembersErr, hgetallErr, done) {
+        var testGetAllServices = function (smembersErr, hgetallErr, services, result, done) {
 
             var errMsg = 'Error in database getting the services.';
             var hgetallFirstCall = true;
@@ -454,9 +454,9 @@ describe('Testing REDIS database', function () {
 
                 if (hgetallFirstCall) {
                     hgetallFirstCall = false;
-                    return callback(hgetallErr, data.DEFAULT_SERVICES[0]);
+                    return callback(hgetallErr, services[0]);
                 } else {
-                    return callback(hgetallErr, data.DEFAULT_SERVICES[1]);
+                    return callback(hgetallErr, services[1]);
                 }
             };
 
@@ -477,14 +477,14 @@ describe('Testing REDIS database', function () {
                 if (smembersErr) {
 
                     assert.equal(err, errMsg);
-                    assert.equal(res, null);
+                    assert.equal(res, result);
 
                 } else if (hgetallErr) {
 
                     assert(hgetallSpy.calledOnce);
                     assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
                     assert.equal(err, errMsg);
-                    assert.equal(res, null);
+                    assert.deepEqual(res, result);
 
                 } else {
 
@@ -492,23 +492,29 @@ describe('Testing REDIS database', function () {
                     assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0]));
                     assert(hgetallSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[1]));
                     assert.equal(err, null);
-                    assert.deepEqual(res, data.DEFAULT_SERVICES);
+                    assert.deepEqual(res, result);
                 }
 
                 done();
             });
         };
 
-        it('should call the callback with error when db fails executinng "smsmeber"', function (done) {
-            testGetAllServices(true, false, done);
+        it('should call the callback with error when db fails getting the all the services', function (done) {
+            testGetAllServices(true, false, null, null, done);
         });
 
-        it('should call the callback with error when db fails executing "hgetall"', function (done) {
-           testGetAllServices(false, true, done); 
+        it('should call the callback with error when db fails getting the information of each service', function (done) {
+            var services = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING));
+
+            testGetAllServices(false, true, services, null, done);
         });
 
         it('should call the callback without error when db returns all services', function (done) {
-            testGetAllServices(false, false, done);
+            var services = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING));
+            var result = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_LIST));
+
+
+            testGetAllServices(false, false, services, result, done);
         });
     });
 
@@ -592,13 +598,14 @@ describe('Testing REDIS database', function () {
             var sremCall = 0;
             var hgetallCall = 0;
             var errMsg = 'Error in database removing admin: "' + data.DEFAULT_ID_ADMIN + '" .';
+            var services = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING));
 
             var smembers = function (hash, callback) {
                 return callback(smembersErr, data.DEFAULT_PUBLIC_PATHS);
             };
 
             var hgetall = function (hash, callback) {
-                callback(null, data.DEFAULT_SERVICES[hgetallCall]);
+                callback(null, services[hgetallCall]);
                 hgetallCall = hgetallCall + 1; 
                 return;
             };
@@ -636,7 +643,7 @@ describe('Testing REDIS database', function () {
                 if (smembersErr) {
                     assert.equal(err, errMsg);
                 } else {
-                    assert(sremSpy.calledWith(data.DEFAULT_SERVICES[0].publicPath + 'admins'));
+                    assert(sremSpy.calledWith(services[0].publicPath + 'admins'));
 
                     if (sremErr1) { 
                         assert.equal(err, errMsg);
@@ -739,19 +746,27 @@ describe('Testing REDIS database', function () {
         });
 
         it('should call the callback with error when db fails getting admins', function (done) {
-            testBindAdmin(false, {}, true, {}, false, done);
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+
+            testBindAdmin(false, service, true, {}, false, done);
         });
 
         it('should call the callback with error when the admin does not exists', function (done) {
-            testBindAdmin(false, {}, false, [], false, done);
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+
+            testBindAdmin(false, service, false, [], false, done);
         });
 
         it('should call the callback with error when db fails adding the administrator', function (done) {
-            testBindAdmin(false, {}, false, [data.DEFAULT_ID_ADMIN], true, done);
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+
+            testBindAdmin(false, service, false, [data.DEFAULT_ID_ADMIN], true, done);
         });
 
         it('should call the callback with error when db binds the administrator', function (done) {
-            testBindAdmin(false, {}, false, [data.DEFAULT_ID_ADMIN], false, done);
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+
+            testBindAdmin(false, service, false, [data.DEFAULT_ID_ADMIN], false, done);
         });
     });
 
@@ -837,68 +852,71 @@ describe('Testing REDIS database', function () {
 
     describe('FUnction "getAdminURL"', function () {
 
-        var testGetAdminUrl = function (smembersErr, admins, hgetErr, done) {
+        var testGetAdminUrl = function (smembersErr, admins, hgetErr, method, service, result, done) {
 
-            var errMsg = 'Error getting the admin url.';
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+            var adminId = data.DEFAULT_ID_ADMIN;
+            var url = data.DEFAULT_URLS[0];
+
+            var errMsg = smembersErr || hgetErr;
 
             var smembers = function (hash, callback) {
                 return callback(smembersErr, admins);
             };
 
-            var hget = function (hash, key, callback) {
-                return callback(hgetErr, data.DEFAULT_URLS[0]);
+            var hgetall = function (hash, callback) {
+                return callback(hgetErr, service);
             };
 
             var implementations = {
                 smembers: smembers,
-                hget: hget
+                hgetall: hgetall
             };
 
             var smembersSpy = sinon.spy(implementations, 'smembers');
-            var hgetSpy = sinon.spy(implementations, 'hget');
+            var hgetSpy = sinon.spy(implementations, 'hgetall');
 
             var db = getDb(implementations);
 
-            db.getAdminURL(data.DEFAULT_ID_ADMIN, data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.getAdminURL(adminId, publicPath, method, function (err, res) {
 
-                assert(smembersSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0] + 'admins'));
+                assert(smembersSpy.calledWith(publicPath + 'admins'));
 
-                if (smembersErr) {
-                    assert.equal(err, errMsg);
-                    assert.equal(res, null);
-                } else if (admins.indexOf(data.DEFAULT_ID_ADMIN) === -1) {
-                    assert.equal(err, null);
-                    assert.equal(res, null);
-                } else {
-                    assert(hgetSpy.calledWith(data.DEFAULT_PUBLIC_PATHS[0], 'url'));
-
-                    if (hgetErr) {
-                        assert.equal(err, errMsg);
-                        assert.equal(res, null);
-                    } else {
-                        assert.equal(err, null);
-                        assert.equal(res, data.DEFAULT_URLS[0]);
-                    }
-                }
+                assert.equal(err, errMsg);
+                assert.deepEqual(res, result);
 
                 done();
             });
         };
 
         it('should call the callback with error when db fails getting the administrators', function (done) {
-            testGetAdminUrl(true, null, false, done);
+            testGetAdminUrl('Error getting the admin url.', null, null, null, null, null, done);
         });
 
-        it('should call the callback without error when admin id is invalid', function (done) {
-            testGetAdminUrl(false, [], false, done);
+        it('should call the callback with error when admin id is not valid', function (done) {
+            var result = {isAdmin: false, errorCode: 'admin', url: null};
+
+            testGetAdminUrl(null, [], null, null, null, result, done);
         });
 
-        it('should call the callback with error when db fails getting the url', function (done) {
-            testGetAdminUrl(false, [data.DEFAULT_ID_ADMIN], true, done);
+        it('should call the callback with error when db fails getting the service', function (done) {
+            testGetAdminUrl(null, [data.DEFAULT_ID_ADMIN], 'Error getting the admin url.', null, null, null, done);
+        });
+
+        it('should call the callback with error when the method is not a valid method', function (done) {
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+            var result = {isAdmin: true, errorCode: 'method', url: null, errorMsg: 'Valid methods are: ' + service.methods};
+            var method = 'WRONG';
+
+            testGetAdminUrl(null, [data.DEFAULT_ID_ADMIN], null, method, service, result, done);
         });
 
         it('should return the admin URL when the admin id is correct', function (done) {
-            testGetAdminUrl(false, [data.DEFAULT_ID_ADMIN], false, done);
+            var service = JSON.parse(JSON.stringify(data.DEFAULT_SERVICES_STRING[0]));
+            var result = {isAdmin: true, errorCode: 'ok', url: service.url};
+            var method = data.DEFAULT_HTTP_METHODS_LIST[0];
+
+            testGetAdminUrl(null, [data.DEFAULT_ID_ADMIN], null, method, service, result, done);
         });
     });
 
@@ -1108,66 +1126,84 @@ describe('Testing REDIS database', function () {
 
     describe('Function "checkRequest"', function (done) {
 
-        var testCheckRequest = function (error, accountingInfo, done) {
+        var userId = data.DEFAULT_USER_ID;
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+
+        var testCheckRequest = function (hgetallErr, hgetErr, accountingInfo, method, result, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var errorMsg = hgetallErr || hgetErr ? 'Error in database checking the request.' : null;
 
             var hgetall = function (hash, callback) {
-                return callback(error, accountingInfo);
+                return callback(hgetallErr, accountingInfo);
+            };
+
+            var hget = function (hash, key, callback) {
+                var methods = hgetErr ? null : data.DEFAULT_HTTP_METHODS_STRING;
+                return callback(hgetErr, methods);
             };
 
             var implementations = {
-                hgetall: hgetall
+                hgetall: hgetall,
+                hget: hget
             };
 
             var hgetallSpy = sinon.spy(implementations, 'hgetall');
+            var hgetSpy = sinon.spy(implementations, 'hget');
 
             var db = getDb(implementations);
 
-            db.checkRequest(data.DEFAULT_USER_ID, data.DEFAULT_API_KEYS[0], data.DEFAULT_PUBLIC_PATHS[0], function (err, res) {
+            db.checkRequest(userId, apiKey, publicPath, method, function (err, res) {
 
-                assert(hgetallSpy.calledWith(data.DEFAULT_API_KEYS[0]));
+                assert(hgetallSpy.calledWith(apiKey));
 
-                if (error) {
-                    assert.equal(err, 'Error in database checking the request.');
-                    assert.equal(res, false);
-                } else {
-
-                    assert.equal(err, null);
-
-                    if (!accountingInfo) {
-                        assert.equal(res, false);
-                    } else {
-                        assert.equal(res, accountingInfo.customer === data.DEFAULT_USER_ID && accountingInfo.publicPath === data.DEFAULT_PUBLIC_PATHS[0]);
-                    }
+                if (!hgetallErr && (accountingInfo && accountingInfo.customer === userId && accountingInfo.publicPath === publicPath)) {
+                    assert(hgetSpy.calledWith(publicPath, 'methods'));
                 }
+
+                assert.equal(err, errorMsg);
+                assert.deepEqual(res, result);
 
                 done();
             });
         };
 
         it('should call the callback with error when db fails getting accounting information', function (done) {
-            testCheckRequest(true, null, done);
+            testCheckRequest(true, false, null, null, null, done);
         });
 
         it('should call the callback with error when there is not accounting information for the request', function (done) {
-            testCheckRequest(false, null, done);
+            var result = {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'};
+
+            testCheckRequest(false, false, null, null, result, done);
         });
 
-        it('should return false when the request is not valid', function (done) {
-            var accountingInfo = {
-                customer: 'wrong',
-                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
-            };
+        it('should call the callback with error when the customer is not correct', function (done) {
+            var accountingInfo = { customer: 'wrong', publicPath: publicPath};
+            var result = {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'};
 
-            testCheckRequest(false, accountingInfo, done);
+            testCheckRequest(false, false, null, null, result, done);
         });
 
-        it('should return true when the request is valid', function (done) {
-           var accountingInfo = {
-                customer:  data.DEFAULT_USER_ID,
-                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
-            };
+        it('should call the callback with error when db fails getting the service http methods', function (done) {
+            var accountingInfo = { customer: userId, publicPath: publicPath};
 
-            testCheckRequest(false, accountingInfo, done); 
+            testCheckRequest(false, true, accountingInfo, null, null, done);
+        });
+
+        it('should call the callback with error  when the method is not a valid method', function (done) {
+            var accountingInfo = { customer: userId, publicPath: publicPath};
+            var result = {isCorrect: false, errorCode: 'method', errorMsg: 'Valid methods are: ' + data.DEFAULT_HTTP_METHODS_STRING};
+
+            testCheckRequest(false, false, accountingInfo, 'WRONG', result, done);
+        });
+
+        it('should call the callback withput error when the request is valid', function (done) {
+            var accountingInfo = { customer: userId, publicPath: publicPath};
+            var result = {isCorrect: true};
+            var method = data.DEFAULT_HTTP_METHODS_LIST[0];
+
+            testCheckRequest(false, false, accountingInfo, method, result, done);
         });
     });
 

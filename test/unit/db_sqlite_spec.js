@@ -120,6 +120,7 @@ describe('Testing SQLITE database', function () {
                     url                 TEXT, \
                     appId               TEXT, \
                     isCBService         INT, \
+                    methods             TEXT, \
                     PRIMARY KEY (publicPath)             )',
             'CREATE TABLE IF NOT EXISTS accounting ( \
                     apiKey              TEXT, \
@@ -340,17 +341,19 @@ describe('Testing SQLITE database', function () {
         var url = data.DEFAULT_URLS[0];
         var appId = data.DEFAULT_APP_IDS[0];
         var isCBService = true;
+        var httpMethods = data.DEFAULT_HTTP_METHODS_LIST;
 
-        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId, $isCBService)';
+        var sentence = 'INSERT OR REPLACE INTO services             VALUES ($path, $url, $appId, $isCBService, $methods)';
         var params = {
             '$path': path,
             '$url': url,
             '$appId': appId,
-            '$isCBService': isCBService ? 1 : 0
+            '$isCBService': isCBService ? 1 : 0,
+            '$methods': httpMethods.join(',').toUpperCase()
         };
 
         var method = 'newService';
-        var args = [path, url, appId, isCBService];
+        var args = [path, url, appId, isCBService, httpMethods];
 
         it('should call the callback with error when db fails adding the new service', function (done) {
             var errorMsg = 'Error in database adding the new service.';
@@ -408,9 +411,10 @@ describe('Testing SQLITE database', function () {
         });
 
         it('should call the callback without error when db returns the service', function (done) {
-            var result = {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0]};
+            var result = {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0], methods: data.DEFAULT_HTTP_METHODS_STRING};
+            var expectedResult = {url: data.DEFAULT_URLS[0], appId: data.DEFAULT_APP_IDS[0], methods: data.DEFAULT_HTTP_METHODS_LIST};
 
-            getTest(method, sentence, params, args, null, result, result, done);
+            getTest(method, sentence, params, args, null, result, expectedResult, done);
         });
     });
 
@@ -441,7 +445,7 @@ describe('Testing SQLITE database', function () {
                     assert.equal(resServices, null);
                 } else {
                     assert.equal(err, null);
-                    assert.equal(resServices, data.DEFAULT_SERVICES);
+                    assert.deepEqual(resServices, data.DEFAULT_SERVICES_LIST);
                 }
 
                 done();
@@ -453,7 +457,9 @@ describe('Testing SQLITE database', function () {
         });
 
         it('should call the callback without error when db returns all services', function (done) {
-            testGetAllService(null, data.DEFAULT_SERVICES, done);
+            var services = data.DEFAULT_SERVICES_STRING;
+
+            testGetAllService(null, services, done);
         });
     });
 
@@ -659,19 +665,21 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "getAdminURL"', function () {
 
-        var sentence = 'SELECT services.url \
+        var idAdmin = data.DEFAULT_ID_ADMIN;
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var httpMethods = data.DEFAULT_HTTP_METHODS_STRING;
+        var url = data.DEFAULT_URLS[0];
+
+        var sentence = 'SELECT services.url, services.methods \
             FROM administer, services \
             WHERE administer.publicPath=services.publicPath AND \
                 administer.idAdmin=$idAdmin AND services.publicPath=$publicPath';
-        var idAdmin = data.DEFAULT_ID_ADMIN;
-        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
         var params = {
             '$idAdmin': idAdmin,
             '$publicPath': publicPath
         };
-        var url = data.DEFAULT_URLS[0];
 
-        var args = [idAdmin, publicPath];
+        var args = [idAdmin, publicPath, httpMethods.split(',')[0]];
         var method = 'getAdminURL';
 
         it('should call the callback with error when db fails getting the admin url', function (done) {
@@ -681,11 +689,25 @@ describe('Testing SQLITE database', function () {
         });
 
         it('should call the callback without error when there are not admins for the service specified', function (done) {
-            getTest(method, sentence, params, args, null, null, null, done);
+            var expectedResult = {isAdmin: false, errorCode: 'admin', url: null};
+
+            getTest(method, sentence, params, args, null, null, expectedResult, done);
+        });
+
+        it('should call the callback with error when the method is not a valid http method', function (done) {
+            var result = {url: url, methods: httpMethods};
+            var expectedResult = {isAdmin: true, errorCode: 'method', url: null, errorMsg: 'Valid methods are: ' + httpMethods};
+            var wrongArgs = JSON.parse(JSON.stringify(args));
+            wrongArgs[2] = 'WRONG';
+
+            getTest(method, sentence, params, wrongArgs, null, result, expectedResult, done);
         });
 
         it('should call the callback without error when db returns the URL', function (done) {
-           getTest(method, sentence, params, args, null, {url: url}, url, done); 
+            var result = {url: url, methods: httpMethods};
+            var expectedResult = {isAdmin: true, errorCode: 'ok', url: url};
+
+            getTest(method, sentence, params, args, null, result, expectedResult, done); 
         });
     });
 
@@ -802,31 +824,50 @@ describe('Testing SQLITE database', function () {
         var apiKey = data.DEFAULT_API_KEYS[0];
         var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
         var customer = data.DEFAULT_USER_ID;
+        var httpMethods = data.DEFAULT_HTTP_METHODS_STRING;
 
-        var sentence = 'SELECT customer \
-            FROM accounting \
-            WHERE apiKey=$apiKey AND publicPath=$publicPath';
+        var sentence = 'SELECT accounting.customer, services.methods \
+            FROM accounting, services \
+            WHERE services.publicPath=accounting.publicPath \
+                AND services.publicPath=$publicPath \
+                AND accounting.apiKey=$apiKey ';
         var params = {'$apiKey': apiKey, '$publicPath': publicPath};
 
         var method = 'checkRequest';
-        var args = [customer, apiKey, publicPath];
+        var args = [customer, apiKey, publicPath, httpMethods.split(',')[0]];
 
         it('should call the callback with error when db fails checking the request', function (done) {
             var errorMsg = 'Error in database checking the request.';
 
-            getTest(method, sentence, params, args, errorMsg, null, false, done);
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
         });
 
         it('should call the callback with error when there is not information available', function (done) {
-            getTest(method, sentence, params, args, null, null, false, done);
+            var expectedResult = {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'};
+
+            getTest(method, sentence, params, args, null, null, expectedResult, done);
         });
 
-        it('should call the callback without error when there is not customer associated with api-key', function (done) {
-           getTest(method, sentence, params, args, null, {customer: 'other'}, false, done); 
+        it('should call the callback with error when the customer associated with the API key is other customer', function (done) {
+            var expectedResult = {isCorrect: false, errorCode: 'apiKey', errorMsg: 'Invalid API key'};
+
+            getTest(method, sentence, params, args, null, {customer: 'other'}, expectedResult, done);
+        });
+
+        it('should call the callback with error when the method is not a valid http method', function (done) {
+            var result = {customer: data.DEFAULT_USER_ID, methods: httpMethods};
+            var expectedResult = {isCorrect: false, errorCode: 'method', errorMsg: 'Valid methods are: ' + httpMethods};
+            var wrongArgs = JSON.parse(JSON.stringify(args));
+            wrongArgs[3] = 'WRONG';
+
+            getTest(method, sentence, params, wrongArgs, null, result, expectedResult, done);
         });
 
         it('should call the callback without error when there is not an error checking the request ', function (done) {
-           getTest(method, sentence, params, args, null, {customer: data.DEFAULT_USER_ID}, true, done);  
+            var result = {customer: data.DEFAULT_USER_ID, methods: httpMethods};
+            var expectedResult = {isCorrect: true};
+
+            getTest(method, sentence, params, args, null, result, expectedResult, done);  
         });
     });
 

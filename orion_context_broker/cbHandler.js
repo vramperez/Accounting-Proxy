@@ -68,6 +68,15 @@ exports.subscriptionHandler = function (req, res, options, operation, unit, vers
 };
 
 /**
+ * Redirects the subscription information to the appropriate module for cancellation.
+ *
+ * @param  {Object}    subscriptionInfo  Subscription information for cancellation.
+ */
+exports.cancelSubscription = function (subscriptionInfo, callback) {
+    orionModules[subscriptionInfo.version].cancelSubscription(subscriptionInfo, callback);
+};
+
+/**
  * Handles the notification from the CB; make the accounting and notify the user.
  *
  * @param  {Object} req Incoming request.

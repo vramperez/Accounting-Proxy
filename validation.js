@@ -6,14 +6,10 @@ var Joi = require('joi');
 
 // Validate if the body is correct for each type of request
 exports.validate = function(type, body, callback) {
-    var validation_schema;
 
-    switch (type) {
-        case 'product':
-            validation_schema = schemas.product;
-            break;
-    }
-    Joi.validate(body, validation_schema, function(err, data) {
+    var validationSchema = schemas[type];
+
+    Joi.validate(body, validationSchema, function(err, data) {
         if (err) {
             return callback(err.details[0].message);
         } else {

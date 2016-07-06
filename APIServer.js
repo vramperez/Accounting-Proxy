@@ -1,9 +1,12 @@
-var crypto = require('crypto'),
+var async = require('async'),
+    cbHandler = require('./orion_context_broker/cbHandler'),
     config = require('./config'),
-    validation = require('./validation'),
-    url = require('url'),
+    crypto = require('crypto'),
     db = require(config.database.type),
-    logger = require('winston');
+    logger = require('winston'),
+    notifier = require('./notifier'),
+    url = require('url'),
+    validation = require('./validation');
 
 "use strict";
 
@@ -36,8 +39,6 @@ var isAdmin = function (userId, path, callback) {
  * @param  {Object} res     Outgoing response.
  */
 exports.checkURL = function (req, res) {
-    req.setEncoding('utf-8');
-
     var bodyUrl = req.body.url;
     var apiKey = req.get('X-API-KEY');
 
@@ -81,29 +82,97 @@ exports.checkURL = function (req, res) {
  * @param  {Object} res     Outgoing request.
  */
 exports.newBuy = function (req, res) {
-    req.setEncoding('utf-8');
     var body = req.body;
 
-    validation.validate('product', body, function (err) { // Check if the json is correct
+    validation.validate('newBuy', body, function (err) { // Check if the json is correct
         if (err) {
-            res.status(400).json({error: 'Invalid json. ' + err});
+            res.status(422).json({error: 'Invalid json: ' + err});
         } else {
-            generateApiKey(body.productId, body.orderId, body.customer, function (apiKey) {
-                db.newBuy({
-                    apiKey: apiKey,
-                    publicPath: url.parse(body.productSpecification.url).path,
-                    orderId: body.orderId,
-                    productId: body.productId,
-                    customer: body.customer,
-                    unit: body.productSpecification.unit,
-                    recordType: body.productSpecification.recordType
-                }, function (err) {
+
+            var apiKey = generateApiKey(body.productId, body.orderId, body.customer);
+
+            db.newBuy({
+                apiKey: apiKey,
+                publicPath: url.parse(body.productSpecification.url).path,
+                orderId: body.orderId,
+                productId: body.productId,
+                customer: body.customer,
+                unit: body.productSpecification.unit,
+                recordType: body.productSpecification.recordType
+            }, function (err) {
+                if (err) {
+                    res.status(500).send();
+                } else {
+                    res.status(201).json({'API-KEY': apiKey});
+                }
+            });
+        }
+    });
+};
+
+/**
+ * Cancel all the Context Broker subscriptions associated with the API key.
+ *
+ * @param  {string}    apiKey    API key.
+ */
+var cancelSubscriptions = function (apiKey, callback) {
+    db.getCBSubscriptions(apiKey, function (err, subscriptions) {
+        if (err) {
+            return callback(err);
+        } else {
+
+            async.eachSeries(subscriptions, function (subscription, taskCallback) {
+
+                db.getCBSubscription(subscription.subscriptionId, function (err, subsInfo) {
                     if (err) {
-                        res.status(400).send();
+                        return callback(err);
                     } else {
-                        res.status(201).json({'API-KEY': apiKey});
+                        cbHandler.cancelSubscription(subsInfo, callback);
                     }
-                });
+                })
+            });
+        }
+    });
+};
+
+/**
+ * Notify the accounting information to the usage management API and delete the buy and all the
+ *  accounting information associated.
+ *
+ * @param      {Object}  req     Incoming request.
+ * @param      {Object}  res     Outgoing response.
+ */
+exports.deleteBuy = function (req, res) {
+    var body = req.body;
+
+    validation.validate('deleteBuy', body, function (err) {
+        if (err) {
+            res.status(422).json({error: 'Invalid json: ' + err});
+        } else {
+
+            var apiKey = generateApiKey(body.productId, body.orderId, body.customer);
+
+            async.series([
+                function (callback) {
+                    if (config.resources.contextBroker) {
+                        cancelSubscriptions(apiKey, callback);
+                    } else {
+                        callback();
+                    }
+                },
+                function (callback) {
+                    notifier.notifyUsage(apiKey, callback);
+                },
+                function (callback) {
+                    db.deleteBuy(apiKey, callback);
+                },
+            ], function (err) {
+                if (err) {
+                    logger.error(err);
+                    res.status(500).send();
+                } else {
+                    res.status(204).send();
+                }
             });
         }
     });
@@ -144,12 +213,11 @@ exports.getUnits = function (req, res) {
  * @param  {string} orderId     order identifier.
  * @param  {string} customer    user identifier.
  */
-var generateApiKey = function (productId, orderId, customer, callback) {
+var generateApiKey = function (productId, orderId, customer) {
     var sha1 = crypto.createHash('sha1');
 
     sha1.update(productId + orderId + customer);
-    var apiKey = sha1.digest('hex');
-    return callback(apiKey);
+    return sha1.digest('hex');
 };
 
 /**

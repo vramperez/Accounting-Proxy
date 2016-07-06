@@ -166,7 +166,7 @@ var notifyUsageSpecification = function (token, callback) {
  * Notify the accounting value.
  *
  */
-var notifyUsage = function (callback) {
+var notifyAllUsage = function (callback) {
 
     db.getToken(function (err, token) {
         if (err) {
@@ -175,11 +175,10 @@ var notifyUsage = function (callback) {
             return callback(null);
         } else {
 
-            db.getNotificationInfo(function (err, notificationInfo) {
-
+            db.getAllNotificationInfo(function (err, notificationInfo) {
                 if (err) {
                     return callback(err);
-                } else if (notificationInfo === null) { // no info to notify
+                } else if (!notificationInfo) { // no info to notify
                     return callback(null);
                 } else {
 
@@ -208,4 +207,46 @@ var notifyUsage = function (callback) {
     });
 };
 
+/**
+ * Notifies the accounting information for the API key passed as argument.
+ *
+ * @param      {string}    apiKey    API key.
+ */
+var notifyUsage = function (apiKey, callback) {
+
+    db.getToken(function (err, token) {
+        if (err) {
+            return callback(err);
+        } else if (!token) {
+            return callback('There is no available token.');
+        } else {
+
+            db.getNotificationInfo(apiKey, function (err, notificationInfo) {
+                if (err) {
+                    return callback(err);
+                } else if (!notificationInfo) {
+                    return callback(null); // There is no accounting info to notify
+                } else {
+
+                    notifyUsageSpecification(token, function (err) {
+                        if (err) {
+                            return callback(err);
+                        } else {
+
+                            sendUsage(token, notificationInfo, function (err) {
+                                if (err) {
+                                    return callback(err);
+                                } else {
+                                    return callback(null);
+                                }
+                            })
+                        }
+                    });
+                }
+            });
+        }
+    });
+};
+
+exports.notifyAllUsage = notifyAllUsage;
 exports.notifyUsage = notifyUsage;

@@ -480,6 +480,48 @@ exports.newBuy = function (buyInformation, callback) {
 };
 
 /**
+ * Deletes all the accounting information associated with the API key passed as argument.
+ *
+ * @param      {string}    apiKey    The API key.
+ */
+exports.deleteBuy = function (apiKey, callback) {
+    var multi = db.multi();
+
+    db.hgetall(apiKey, function (err, accountingInfo) {
+        if (err) {
+            return callback('Error deleting the API key.');
+        } else {
+            multi.srem(accountingInfo.publicPath, apiKey);
+            multi.srem(accountingInfo.customer, apiKey);
+            multi.srem('apiKeys', apiKey);
+            multi.del(apiKey);
+
+            // Delete subscriptions associated with the API key
+            db.smembers(apiKey + 'subs', function (err, subscriptions) {
+                if (err) {
+                    return callback('Error deleting the API key.');
+                } else {
+                    async.each(subscriptions, function (subsId, taskCallback) {
+                        multi.del(subsId);
+                        taskCallback();
+                    }, function () {
+
+                        multi.del(apiKey + 'subs');
+                        multi.exec(function (err) {
+                            if (err) {
+                                return callback('Error deleting the API key.');
+                            } else {
+                                return callback(null);
+                            }
+                        });
+                    })
+                }
+            });
+        }
+    });
+};
+
+/**
  * Return the api-keys, productId and orderId associated with the user passed as argument.
  *
  * @param  {string}   user     Customer identifier.
@@ -580,7 +622,7 @@ exports.getAccountingInfo = function (apiKey, callback) {
  * Return the necessary information to notify the WStore (accounting value).
  *
  */
-exports.getNotificationInfo = function (callback) {
+exports.getAllNotificationInfo = function (callback) {
     var notificationInfo = [];
 
     db.smembers('apiKeys', function (err, apiKeys) {
@@ -594,16 +636,8 @@ exports.getNotificationInfo = function (callback) {
                     } else if (parseFloat(accountingInfo.value) === 0) {
                         taskCallback(null);
                     } else {
-                        notificationInfo.push({
-                            apiKey: apiKey,
-                            orderId: accountingInfo.orderId,
-                            productId: accountingInfo.productId,
-                            customer: accountingInfo.customer,
-                            value: accountingInfo.value,
-                            correlationNumber: accountingInfo.correlationNumber,
-                            recordType: accountingInfo.recordType,
-                            unit: accountingInfo.unit
-                        });
+                        accountingInfo.apiKey = apiKey;
+                        notificationInfo.push(accountingInfo);
                         taskCallback(null);
                     }
                 });
@@ -621,10 +655,27 @@ exports.getNotificationInfo = function (callback) {
 };
 
 /**
+ * Returns the accounting information associated with the API key passed as argument.
+ *
+ */
+exports.getNotificationInfo = function (apiKey, callback) {
+    db.hgetall(apiKey, function (err, accountingInfo) {
+        if (err) {
+            return callback('Error in database getting the notification information.', null);
+        } else if (accountingInfo.value === 0) {
+            return callback(null, null);
+        } else {
+            accountingInfo.apiKey = apiKey;
+            return callback(null, accountingInfo);
+        }
+    });
+};
+
+/**
  * Add the amount passed as argument to the actual amount of the user
  *
  * @param  {string} apiKey      Idenfies the product.
- * @param  {float} amount       Amount to account.
+ * @param  {float}  amount      Amount to account.
  */
 exports.makeAccounting = function (apiKey, amount, callback) {
     var multi = db.multi();
@@ -686,14 +737,15 @@ exports.resetAccounting = function (apiKey, callback) {
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  * @param {string} expires          Subscription expiration date (ISO8601).
  */
-exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, callback) {
+exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, version, callback) {
     var multi = db.multi();
 
     multi.sadd([apiKey + 'subs', subscriptionId]);
     multi.hmset(subscriptionId, {
         apiKey: apiKey,
         notificationUrl: notificationUrl,
-        expires: expires
+        expires: expires,
+        version: version
     });
     multi.exec(function (err) {
         if (err) {
@@ -716,16 +768,58 @@ exports.getCBSubscription = function (subscriptionId, callback) {
         } else if (!subscriptionInfo) {
             return callback(null, null);
         } else {
-            db.hget(subscriptionInfo.apiKey, 'unit', function (err, unit) {
+            db.hgetall(subscriptionInfo.apiKey, function (err, accounting) {
                 if (err) {
                     return callback('Error getting the subscription.', null);
                 } else {
-                    return callback(null, {
-                        apiKey: subscriptionInfo.apiKey,
-                        notificationUrl: subscriptionInfo.notificationUrl,
-                        expires: subscriptionInfo.expires,
-                        unit: unit
+                    db.hget(accounting.publicPath, 'url', function (err, url) {
+                        if (err) {
+                            return callback('Error getting the subscription.', null);
+                        } else {
+                            return callback(null, {
+                                apiKey: subscriptionInfo.apiKey,
+                                notificationUrl: subscriptionInfo.notificationUrl,
+                                expires: subscriptionInfo.expires,
+                                unit: accounting.unit,
+                                subscriptionId: subscriptionId,
+                                version: subscriptionInfo.version,
+                                url: url
+                            });
+                        }
                     });
+                }
+            });
+        }
+    });
+};
+
+/**
+ * Returns the subscription information of all subscriptions associated with the API key.
+ *
+ * @param      {string}    apiKey    API key.
+ */
+exports.getCBSubscriptions = function (apiKey, callback) {
+    var subscriptions = [];
+
+    db.smembers(apiKey + 'subs', function (err, subscriptionIds) {
+        if (err) {
+            return callback('Error in database getting the subscriptions.', null);
+        } else {
+            async.each(subscriptionIds, function (subscriptionId, taskCallback) {
+                db.hgetall(subscriptionId, function (err, subscriptionInfo) {
+                    if (err) {
+                        taskCallback(err);
+                    } else {
+                        subscriptionInfo.subscriptionId = subscriptionId;
+                        subscriptions.push(subscriptionInfo);
+                        taskCallback(null);
+                    }
+                });
+            }, function (err) {
+                if (err) {
+                    return callback('Error in database getting the subscriptions.', null);
+                } else {
+                    return callback(null, subscriptions);
                 }
             });
         }
@@ -743,7 +837,7 @@ exports.updateNotificationUrl = function (subscriptionId, notificationUrl, callb
         notificationUrl: notificationUrl
     }, function (err) {
         if (err) {
-            return callback('Error in database updating the notificationURL');
+            return callback('Error in database updating the notificationURL.');
         } else {
             return callback(null);
         }
@@ -761,7 +855,7 @@ exports.updateExpirationDate = function (subscriptionId, expires, callback) {
         expires: expires
     }, function (err) {
         if (err) {
-            return callback('Error in database updating the expiration date');
+            return callback('Error in database updating the expiration date.');
         } else {
             return callback(null);
         }

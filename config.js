@@ -97,8 +97,9 @@ config.api = {
     administration_paths: {
         keys: '/accounting_proxy/keys',
         units: '/accounting_proxy/units',
-        newBuy: '/accounting_proxy/buys',
-        checkURL: '/accounting_proxy/urls'
+        newBuy: '/accounting_proxy/newBuy',
+        checkURL: '/accounting_proxy/urls',
+        deleteBuy: '/accounting_proxy/deleteBuy'
     }
 };
 

@@ -49,7 +49,7 @@ exports.init = function (callback) {
             loadAccountingModules(callback)
         },
         function (callback) {
-            notifier.notifyUsage(callback);
+            notifier.notifyAllUsage(callback);
         }
     ], function (err) {
         if (err) {
@@ -62,7 +62,7 @@ exports.init = function (callback) {
             }
 
             cron.scheduleJob(config.usageAPI.schedule, function () {
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
                     if (err) {
                         logger.error('Error while notifying the accounting: ' + err);
                     }
@@ -99,7 +99,6 @@ var cbRequestHandler = function(req, res, options, unit, version) {
     var apiKey = req.get('X-API-KEY');
 
     cbHandler.getOperation(url.parse(options.url).pathname, req, function (operation) {
-
         if (operation === 'create' || operation === 'delete' || operation === 'update') {
 
             cbHandler.subscriptionHandler(req, res, options, operation, unit, version, function (err, response) {
@@ -338,6 +337,7 @@ app.set('port', config.accounting_proxy.port);
 
 app.post(admin_paths.checkURL, oauth2.headerAuthentication, api.checkIsJSON, bodyParser.json(), api.checkURL);
 app.post(admin_paths.newBuy, api.checkIsJSON, bodyParser.json(), api.newBuy);
+app.post(admin_paths.deleteBuy, api.checkIsJSON, bodyParser.json(), api.deleteBuy);
 app.get(admin_paths.units, api.getUnits);
 app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 

@@ -2,7 +2,8 @@ var request = require('request'),
     config = require('../config'),
     accounter = require('../accounter'),
     async = require('async'),
-    moment = require('moment');
+    moment = require('moment'),
+    url = require('url');
 
 var db = require('../' + config.database.type);
 
@@ -110,7 +111,7 @@ exports.subscribe = function (req, res, unit, options, callback) {
                 var apiKey = req.get("X-API-KEY");
 
                 // Store the endpoint information of the subscriber to be notified
-                db.addCBSubscription(apiKey, subscriptionId, notificationUrl, expires, function (err) {
+                db.addCBSubscription(apiKey, subscriptionId, notificationUrl, expires, 'v2', function (err) {
 
                     if (err) {
                         return callback(err, response);
@@ -278,6 +279,30 @@ exports.updateSubscription = function (req, res, options, callback) {
                     }
                 });
             });
+        }
+    });
+};
+
+/**
+ * Send the request to cancel the subscription.
+ *
+ * @param  {Object}    subscriptionInfo  Subscription information
+ */
+exports.cancelSubscription = function (subscriptionInfo, callback) {
+    
+    var serviceUrl = url.parse(subscriptionInfo.url);
+    var cancelUrl = serviceUrl.protocol + '//' + serviceUrl.host + '/v2/subscriptions/' + subscriptionInfo.subscriptionId;
+
+    var options = {
+        url: cancelUrl,
+        method: 'DELETE'
+    };
+
+    request(options, function (err, resp, body) {
+        if (err || resp.statusCode != 204) {
+            return callback('Error cancelling the subscription with Id: ' + subscriptionInfo.subscriptionId);
+        } else {
+            return callback(null);
         }
     });
 };

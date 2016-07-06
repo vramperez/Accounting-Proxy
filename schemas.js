@@ -6,7 +6,7 @@ var Joi = require('joi'),
 
 var schemas = {};
 
-schemas.product = {
+schemas.newBuy = {
     orderId: Joi.string().min(1).required(),
     productId: Joi.string().min(1).required(),
     customer: Joi.string().min(1).required(),
@@ -15,6 +15,12 @@ schemas.product = {
         unit: Joi.any().valid(config.modules.accounting),
         recordType: Joi.string().min(1).required()
     })
+};
+
+schemas.deleteBuy = {
+    orderId: Joi.string().min(1).required(),
+    productId: Joi.string().min(1).required(),
+    customer: Joi.string().min(1).required()
 };
 
 module.exports = schemas;

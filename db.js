@@ -61,6 +61,7 @@ exports.init = function (callback) {
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
                     expires             TEXT, \
+                    version             TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE\
             )', callback);
@@ -481,7 +482,26 @@ exports.newBuy = function (buyInformation, callback) {
             } else {
                 return callback(null);
             }
-        });
+    });
+};
+
+/**
+ * Deletes all the accounting information associated with the API key passed as argument.
+ *
+ * @param      {string}    apiKey    The API key.
+ */
+exports.deleteBuy = function (apiKey, callback) {
+    db.run('DELETE FROM accounting \
+            WHERE apiKey=$apiKey',
+            {
+                $apiKey: apiKey
+            }, function (err) {
+                if (err) {
+                    return callback('Error deleting the API key.');
+                } else {
+                    return callback(null);
+                }
+    });
 };
 
 /**
@@ -562,10 +582,10 @@ exports.getAccountingInfo = function (apiKey, callback) {
 };
 
 /**
- * Return the necessary information to notify the WStore (accounting value).
+ * Returns the accounting information of all users.
  *
  */
-exports.getNotificationInfo = function (callback) {
+exports.getAllNotificationInfo = function (callback) {
     db.all('SELECT apiKey, orderId, productId, customer, value, correlationNumber, recordType, unit \
             FROM accounting \
             WHERE value!=0', 
@@ -573,6 +593,27 @@ exports.getNotificationInfo = function (callback) {
                 if (err) {
                     return callback('Error in database getting the notification information.', null);
                 } else if (notificationInfo.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, notificationInfo);
+                }
+    });
+};
+
+/**
+ * Returns the accounting information associated with the API key passed as argument.
+ *
+ */
+exports.getNotificationInfo = function (apiKey, callback) {
+    db.get('SELECT orderId, productId, customer, value, correlationNumber, recordType, unit \
+            FROM accounting \
+            WHERE apiKey=$apiKey AND value!=0',
+            {
+                $apiKey: apiKey
+            }, function (err, notificationInfo) {
+                if (err) {
+                    return callback('Error in database getting the notification information.',  null);
+                } else if (!notificationInfo) {
                     return callback(null, null);
                 } else {
                     return callback(null, notificationInfo);
@@ -663,14 +704,15 @@ exports.resetAccounting = function (apiKey, callback) {
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
  * @param {string} expires          Subscription expiration date (ISO8601).
  */
-exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, callback) {
+exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, version, callback) {
     db.run('INSERT OR REPLACE INTO subscriptions \
-        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires)',
+        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires, $version)',
         {
             $subscriptionId: subscriptionId,
             $apiKey: apiKey,
             $notificationUrl: notificationUrl,
-            $expires: expires
+            $expires: expires,
+            $version: version
         }, function (err) {
             if (err) {
                 return callback('Error in database adding the subscription "' + subscriptionId + '" .');
@@ -686,9 +728,11 @@ exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, e
  * @param  {string} subscriptionId      Identifies the subscription.
  */
 exports.getCBSubscription = function (subscriptionId, callback) {
-    db.get('SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, accounting.unit \
-            FROM subscriptions , accounting\
-            WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId',
+    db.get('SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, \
+                subscriptions.subscriptionId, subscriptions.version, accounting.unit, services.url\
+            FROM subscriptions , accounting, services\
+            WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId \
+                AND services.publicPath=accounting.publicPath',
             {
                 $subscriptionId: subscriptionId
             }, function (err, subscriptionInfo) {
@@ -698,6 +742,28 @@ exports.getCBSubscription = function (subscriptionId, callback) {
                     return callback(null, null);
                 } else {
                     return callback(null, subscriptionInfo);
+                }
+    });
+};
+
+/**
+ * Returns the subscription information of all subscriptions associated with the API key.
+ *
+ * @param      {string}    apiKey    API key.
+ */
+exports.getCBSubscriptions = function (apiKey, callback) {
+    db.all('SELECT *\
+            FROM subscriptions \
+            WHERE apiKey=$apiKey',
+            {
+                $apiKey: apiKey
+            }, function (err, subscriptions) {
+                if (err) {
+                    return callback('Error in database getting the subscriptions.', null);
+                } else if (subscriptions.length === 0) {
+                    return callback(null, null);
+                } else {
+                    return callback(null, subscriptions);
                 }
     });
 };

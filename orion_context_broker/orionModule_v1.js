@@ -1,7 +1,8 @@
-var request = require('request'),
+var accounter = require('../accounter'),
+    async = require('async'),
     config = require('../config'),
-    accounter = require('../accounter'),
-    async = require('async');
+    request = require('request'),
+    url = require('url');
 
 var db = require('../' + config.database.type);
 
@@ -50,7 +51,7 @@ exports.subscribe = function (req, res, unit, options, callback) {
                 var apiKey = req.get('X-API-KEY');
 
                 // Store the endpoint information of the subscriber to be notified
-                db.addCBSubscription(apiKey, subscriptionId, referenceUrl, '', function (err) {
+                db.addCBSubscription(apiKey, subscriptionId, referenceUrl, '', 'v1', function (err) {
 
                     if (err) {
                         return callback(err, response);
@@ -201,6 +202,35 @@ exports.updateSubscription = function (req, res, options, callback) {
                 body: body
             };
             return callback(null, response);
+        }
+    });
+};
+
+/**
+ * Send the request to cancel the subscription.
+ *
+ * @param  {Object}    subscriptionInfo  Subscription information
+ */
+exports.cancelSubscription = function (subscriptionInfo, callback) {
+
+    var serviceUrl = url.parse(subscriptionInfo.url);
+    var cancelUrl = serviceUrl.protocol + '//' + serviceUrl.host + '/v1/unsubscribeContext';
+    var body = {
+        'subscriptionId': subscriptionInfo.subscriptionId
+    };
+
+    var options = {
+        url: cancelUrl,
+        method: 'POST',
+        json: true,
+        body: body
+    };
+
+    request(options, function (err, resp, body) {
+        if (err || body.statusCode.code != 200) {
+            return callback('Error cancelling the subscription with Id: ' + subscriptionInfo.subscriptionId);
+        } else {
+            return callback(null);
         }
     });
 };

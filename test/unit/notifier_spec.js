@@ -34,7 +34,7 @@ var mocker = function (implementations, callback) {
 
 describe('Testing Notifier', function () {
 
-    describe('Function "notifyUsage"', function () {
+    describe('Function "notifyAllUsage"', function () {
 
         var testGetToken = function (errMsg, token, done) {
 
@@ -50,7 +50,7 @@ describe('Testing Notifier', function () {
 
             mocker(implementations, function (notifier, spies) {
 
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
@@ -74,7 +74,7 @@ describe('Testing Notifier', function () {
                 getToken: function (callback) {
                     return callback(null, 'token');
                 },
-                getNotificationInfo: function (callback) {
+                getAllNotificationInfo: function (callback) {
                     return callback(errMsg, notificationInfo);
                 }
             };
@@ -84,10 +84,10 @@ describe('Testing Notifier', function () {
             };
 
             mocker(implementations, function (notifier, spies) {
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
-                    assert(spies.db.getNotificationInfo.calledOnce);
+                    assert(spies.db.getAllNotificationInfo.calledOnce);
                     done();
                 });
             });
@@ -107,7 +107,7 @@ describe('Testing Notifier', function () {
                 getToken: function (callback) {
                     return callback(null, data.DEFAULT_TOKEN);
                 },
-                getNotificationInfo: function (callback) {
+                getAllNotificationInfo: function (callback) {
                     return callback(null, data.DEFAULT_NOTIFICATION_INFO);
                 },
                 getHref: function (unit, callback) {
@@ -142,11 +142,11 @@ describe('Testing Notifier', function () {
 
             mocker(implementations, function (notifier, spies) {
 
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
-                    assert(spies.db.getNotificationInfo.calledOnce);
+                    assert(spies.db.getAllNotificationInfo.calledOnce);
 
                     if (unit === data.DEFAULT_UNIT) {
                         assert(spies.db.getHref.calledOnce);
@@ -186,7 +186,7 @@ describe('Testing Notifier', function () {
                 getToken: function (callback) {
                     return callback(null, data.DEFAULT_TOKEN);
                 },
-                getNotificationInfo: function (callback) {
+                getAllNotificationInfo: function (callback) {
                     return callback(null, []);
                 },
                 getHref: function (unit, callback) {
@@ -255,11 +255,11 @@ describe('Testing Notifier', function () {
 
             mocker(implementations, function (notifier, spies) {
 
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
-                    assert(spies.db.getNotificationInfo.calledOnce);
+                    assert(spies.db.getAllNotificationInfo.calledOnce);
                     assert(spies.db.getHref.calledWith(unit));
                     assert(spies.server.getAccountingModules.calledOnce);
                     assert(spies.accModule.getSpecification.calledOnce);
@@ -343,7 +343,7 @@ describe('Testing Notifier', function () {
                 getToken: function (callback) {
                     return callback(null, token);
                 },
-                getNotificationInfo: function (callback) {
+                getAllNotificationInfo: function (callback) {
                     return callback(null, data.DEFAULT_NOTIFICATION_INFO);
                 },
                 getHref: function (unit, callback) {
@@ -399,11 +399,11 @@ describe('Testing Notifier', function () {
             };
 
             mocker(implementations, function (notifier, spies) {
-                notifier.notifyUsage(function (err) {
+                notifier.notifyAllUsage(function (err) {
 
                     assert.equal(err, errMsg);
                     assert(spies.db.getToken.calledOnce);
-                    assert(spies.db.getNotificationInfo.calledOnce);
+                    assert(spies.db.getAllNotificationInfo.calledOnce);
                     assert(spies.db.getHref.calledWith(data.DEFAULT_UNIT));
 
                     if (requestResp) {
@@ -472,6 +472,124 @@ describe('Testing Notifier', function () {
             };
 
             testSendUsage(null, null, reqResp, null, done);
+        });
+    });
+
+    describe('Function notifyUsage', function () {
+
+        var testNotifyUsage = function (getTokenErr, hasToken, getNotificationErr, hasNotificationInfo, getHrefErr, requestErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var token = hasToken ? data.DEFAULT_TOKEN : null;
+            var notificationInfo = hasNotificationInfo ? data.DEFAULT_NOTIFICATION_INFO[0] : null;
+            var units = [data.DEFAULT_UNIT, 'call'];
+
+            var implementations = {
+                config: {
+                    modules: {
+                        accounting: units
+                    },
+                    usageAPI: {
+                        host: 'localhost',
+                        port: 9000
+                    }
+                },
+                db: {
+                    getToken: function (callback) {
+                        return callback(getTokenErr, token);
+                    },
+                    getNotificationInfo: function (apiKey, callback) {
+                        return callback(getNotificationErr, notificationInfo);
+                    },
+                    getHref: function (unit, callback) {
+                        return callback(getHrefErr, 'href');
+                    },
+                    resetAccounting: function (apiKey, callback) {
+                        return callback(null);
+                    }
+                },
+                requester: {
+                    request: function (options, callback) {
+                        return callback(requestErr, {statusCode: 201}, {});
+                    }
+                },
+                logger: {
+                    info: function (msg) {}
+                }
+            };
+
+            mocker(implementations, function (notifier, spies) {
+
+                notifier.notifyUsage(apiKey, function (err) {
+
+                    assert(spies.db.getToken.calledOnce);
+
+                    if (getTokenErr) {
+                        assert.equal(err, getTokenErr);
+                    } else if (!token) {
+                        assert.equal(err, 'There is no available token.');
+                    } else {
+
+                        assert(spies.db.getNotificationInfo.calledWith(apiKey));
+
+                        if (getNotificationErr) {
+                            assert.equal(err, getNotificationErr);
+                        } else if (!notificationInfo) {
+                            assert.equal(err, null);
+                        } else {
+
+                            assert(spies.db.getHref.calledWith(units[0]));
+
+                            if (getHrefErr) {
+                                assert.equal(err, getHrefErr);
+                            } else {
+                                for (var i = 1; i < units.length; i += 1) {
+                                    assert(spies.db.getHref.calledWith(units[i]));                                    
+                                }
+                                assert(spies.logger.info.calledWith('Notifying the accounting...'));
+                                assert(spies.requester.request.calledOnce);
+
+                                if (requestErr) {
+                                    assert.equal(err, 'Error notifying usage to the Usage Management API: ' + requestErr.code);
+                                } else {
+                                    assert(spies.db.resetAccounting.calledOnce);
+                                    assert.equal(err, null);
+                                }
+                            }
+                        }
+                    }
+
+                    done();
+                });
+            });
+        };
+
+        it('should call the callback with error when db fails getting the token', function (done) {
+            testNotifyUsage('Error', false, false, false, false, false, done);
+        });
+
+        it('should call the callback with error when there is no token for usage notification', function (done) {
+            testNotifyUsage(false, false, false, false, false, false, done);
+        });
+
+        it('should call the callback with error when db fails getting the notification information', function (done) {
+            testNotifyUsage(false, true, 'Error', false, false, false, done);
+        });
+
+        it('should call the callback without error when there is no usage information to notify', function (done) {
+            testNotifyUsage(false, true, false, false, false, false, done);
+        });
+
+        it('should call the callback with error when there is an error sending the usage specifications', function (done) {
+            testNotifyUsage(false, true, false, true, 'Error', false, done);
+        });
+
+        it('should call the callback when there is an error notifying the usage information', function (done) {
+            testNotifyUsage(false, true, false, true, false, {code: 400}, done);
+        });
+
+        it('should call the callback without error when there is no error notifying the usage information', function (done) {
+            testNotifyUsage(false, true, false, true, false, false, done);
         });
     });
 });

@@ -179,6 +179,61 @@ describe('Testing ContextBroker Handler', function () {
         });
     });
 
+    describe('Function "cancelSubscription"', function (done) {
+
+        var testCancelSubscription = function (error, subscriptionInfo, done) {
+
+            var orionModuleV1 = {
+                cancelSubscription: function (subscriptionInfo, callback) {
+                    return callback(error);
+                }
+            };
+
+            var orionModuleV2 = {
+                cancelSubscription: function (subscriptionInfo, callback) {
+                    return callback(error);
+                }
+            };
+
+            var implementations = {
+                orionModuleV1: orionModuleV1,
+                orionModuleV2: orionModuleV2
+            };
+
+            mocker(implementations, function (cbHandler, spies) {
+
+                cbHandler.cancelSubscription(subscriptionInfo, function (err) {
+
+                    if (subscriptionInfo.version === 'v1') {
+                        assert(spies.orionModuleV1.cancelSubscription.calledWith(subscriptionInfo));
+                    } else {
+                        assert(spies.orionModuleV2.cancelSubscription.calledWith(subscriptionInfo));
+                    }
+
+                    assert.equal(err, error);
+
+                    done();
+                });
+            });
+        };
+
+        it('should call the callback with error when there is an error cancelling a v1 subscription', function (done) {
+            testCancelSubscription(true, {version: 'v1'}, done);
+        });
+
+        it('should call the callback without error when there is no error cancelling a v1 subscription', function (done) {
+            testCancelSubscription(false, {version: 'v1'}, done);
+        });
+
+        it('should call the callback with error when there is an error cancelling a v2 subscription', function (done) {
+            testCancelSubscription(true, {version: 'v2'}, done);
+        });
+
+        it('should call the callback without error when there is no error cancelling a v2 subscription', function (done) {
+            testCancelSubscription(false, {version: 'v2'}, done);
+        });
+    });
+
     describe('Function "notificationHandler"', function (done) {
 
         var testNotificationHandler = function (getCBSubsErr, countErr, requestErr, done) {

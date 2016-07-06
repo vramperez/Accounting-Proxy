@@ -662,7 +662,7 @@ exports.getNotificationInfo = function (apiKey, callback) {
     db.hgetall(apiKey, function (err, accountingInfo) {
         if (err) {
             return callback('Error in database getting the notification information.', null);
-        } else if (accountingInfo.value === 0) {
+        } else if (parseFloat(accountingInfo.value) === 0) {
             return callback(null, null);
         } else {
             accountingInfo.apiKey = apiKey;
@@ -809,6 +809,8 @@ exports.getCBSubscriptions = function (apiKey, callback) {
                 db.hgetall(subscriptionId, function (err, subscriptionInfo) {
                     if (err) {
                         taskCallback(err);
+                    } else if (!subscriptionInfo){
+                        taskCallback(null);
                     } else {
                         subscriptionInfo.subscriptionId = subscriptionId;
                         subscriptions.push(subscriptionInfo);
@@ -818,6 +820,8 @@ exports.getCBSubscriptions = function (apiKey, callback) {
             }, function (err) {
                 if (err) {
                     return callback('Error in database getting the subscriptions.', null);
+                } else if (subscriptions.length === 0) {
+                    return callback(null, null);
                 } else {
                     return callback(null, subscriptions);
                 }

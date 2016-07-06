@@ -21,7 +21,8 @@ var mocker = function (implementations, callback) {
             '../config': config,
             '../accounter': implementations.accounter ? implementations.accounter : {},
             'moment': implementations.moment ? implementations.moment.moment : {},
-            '.././db': implementations.db ? implementations.db : {}
+            '.././db': implementations.db ? implementations.db : {},
+            'url': implementations.url ? implementations.url : {}
         });
 
         return callback(orionModule, spies);
@@ -79,7 +80,7 @@ describe('Testing orionModule_v2', function () {
                     }
                 },
                 db: {
-                    addCBSubscription: function (apiKey, subsId, notificationUrl, expires, callback) {
+                    addCBSubscription: function (apiKey, subsId, notificationUrl, expires, version, callback) {
                         return callback(addCBSubscriptionErr);
                     }
                 },
@@ -127,7 +128,7 @@ describe('Testing orionModule_v2', function () {
                         assert(spies.moment.moment.calledWith(expires));
                         assert(spies.momentFunctions.diff.calledOnce);
 
-                        assert(spies.db.addCBSubscription.calledWith(apiKey, subsId, url, expires));
+                        assert(spies.db.addCBSubscription.calledWith(apiKey, subsId, url, expires, 'v2'));
 
                         if (addCBSubscriptionErr) {
                             assert.equal(err, addCBSubscriptionErr);
@@ -514,6 +515,67 @@ describe('Testing orionModule_v2', function () {
 
         it('should call the callback without error when there is no error updating the expiration date', function (done) {
             testUpdateExpirationDate(null, null, done);
+        });
+    });
+
+    describe('Function "cancelSubscription"', function () {
+
+        var testCancelSubscription = function (error, statusCode, done) {
+
+            var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+            var protocol = 'http';
+            var host = 'localhost:9000';
+            var url = protocol + '//' + host + '/v2/subscriptions/' + subsId;
+            var subscriptionInfo = {
+                url: data.DEFAULT_URLS[0],
+                subscriptionId: subsId
+            };
+            var errorMsg = 'Error cancelling the subscription with Id: ' + subsId;
+
+            var options = {
+                url: url,
+                method: 'DELETE',
+            };
+
+            var implementations = {
+                requester: {
+                    request: function (options, callback) {
+                        return callback(error, {statusCode: statusCode}, {});
+                    }
+                },
+                url: {
+                    parse: function (url) {
+                        return {
+                            protocol: protocol,
+                            host: host
+                        }
+                    }
+                }
+            };
+
+            mocker(implementations, function(orionModule, spies) {
+                orionModule.cancelSubscription(subscriptionInfo, function (err) {
+                    assert(spies.requester.request.calledWith(options));
+                    assert(spies.url.parse.calledWith(subscriptionInfo.url));
+
+                    var result = error ? errorMsg : null;
+                    assert.equal(err, result);
+
+                    done();
+                });
+            });
+        };
+
+        it('should call the callback with error when there is an error sending the request to Context Broker', function (done) {
+            testCancelSubscription(true, null, done);
+        });
+
+        it('should call the callback with error when there is an error cancelling the subscription in Context Broker', function (done) {
+            testCancelSubscription(true, 400, done);
+        });
+
+        it('should call the callback without error when there is no error cancelling the subscription', function (done) {
+            testCancelSubscription(false, 204, done);
         });
     });
 });

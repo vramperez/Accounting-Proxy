@@ -92,7 +92,7 @@ exports.addToken = function (token, callback) {
 
     db.run('DELETE FROM token', function (err) {
         if (err) {
-            return callback(error);
+            return callback('Error adding the acces token "' + token + '" .');
         } else {
             db.run('INSERT INTO token \
                 VALUES ($token)',
@@ -100,7 +100,7 @@ exports.addToken = function (token, callback) {
                     $token: token
                 }, function (err) {
                     if (err) {  
-                        return callback(error);
+                        return callback('Error adding the acces token "' + token + '" .');
                     } else {
                         return callback(null);
                     }
@@ -114,7 +114,7 @@ exports.addToken = function (token, callback) {
  */
 exports.getToken = function (callback) {
     db.get('SELECT * \
-            FROM token', 
+            FROM token',
         function (err, token) {
             if (err) {
                 return callback('Error getting the access token.', null);

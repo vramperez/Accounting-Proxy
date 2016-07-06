@@ -80,7 +80,7 @@ describe('Testing Server', function () {
                     }
                 },
                 notifier: {
-                    notifyUsage: function (callback) {
+                    notifyAllUsage: function (callback) {
                         notifyCallCount += 1;
 
                         if (notifyCallCount === 1) {
@@ -147,7 +147,7 @@ describe('Testing Server', function () {
                         assert(spies.logger.info.calledWith('Loading modules for Orion Context Broker...'));
                         assert(spies.contextBroker.run.calledOnce);
                         assert(spies.cron.scheduleJob.calledWith(implementations.config.usageAPI.schedule));
-                        assert(spies.notifier.notifyUsage.calledTwice);
+                        assert(spies.notifier.notifyAllUsage.calledTwice);
                         assert(spies.logger.error.calledWith('Error while notifying the accounting: ' + notifyErrCron));
                         assert(spies.app.get.calledWith('port'));
                         assert(spies.app.listen.calledWith(port));

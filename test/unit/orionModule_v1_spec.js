@@ -20,7 +20,8 @@ var mocker = function (implementations, callback) {
         	'request': implementations.requester ? implementations.requester.request : {},
         	'../config': config,
         	'../accounter': implementations.accounter ? implementations.accounter : {},
-        	'.././db': implementations.db ? implementations.db : {}
+        	'.././db': implementations.db ? implementations.db : {},
+            'url': implementations.url ? implementations.url : {}
         });
 
         return callback(orionModule, spies);
@@ -35,6 +36,7 @@ describe('Testing orionModule_v1', function () {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
             var options = {};
+            var url = data.DEFAULT_URLS[0];
             var resp = {
                 statusCode: 200,
                 headers: {
@@ -47,7 +49,7 @@ describe('Testing orionModule_v1', function () {
             var implementations = {
                 req: {
                     body: {
-                        reference: data.DEFAULT_URLS[0]
+                        reference: url
                     },
                     get: function (header) {
                         return apiKey;
@@ -66,7 +68,7 @@ describe('Testing orionModule_v1', function () {
                     }
                 },
                 db: {
-                    addCBSubscription: function (apiKey, subsId, ref, expires, callback) {
+                    addCBSubscription: function (apiKey, subsId, ref, expires, version, callback) {
                         return callback(addCBSubsErr);
                     }
                 },
@@ -108,6 +110,7 @@ describe('Testing orionModule_v1', function () {
                             assert(spies.res.setHeader.calledWith(header, resp.headers[header]));
                         }
                         assert(spies.req.get.calledWith('X-API-KEY'));
+                        assert(spies.db.addCBSubscription.calledWith(apiKey, subsRes.subscribeResponse.subscriptionId, url, '', 'v1'));
 
                         if (addCBSubsErr) {
                             assert.equal(err, addCBSubsErr);
@@ -373,4 +376,71 @@ describe('Testing orionModule_v1', function () {
             testUpdateSubscription(false, false, true, true, true, false, done);
         });
 	});
+
+    describe('Function "cancelSubscription"', function () {
+
+        var testCancelSubscription = function (error, statusCode, done) {
+
+            var protocol = 'http';
+            var host = 'localhost:9000';
+            var subsId = data.DEFAULT_SUBS_ID;
+            var body = {
+                'subscriptionId': subsId
+            };
+            var subscriptionInfo = {
+                url: data.DEFAULT_URLS[0],
+                subscriptionId: subsId
+            };
+            var errorMsg = 'Error cancelling the subscription with Id: ' + subsId;
+
+            var options = {
+                url: protocol + '//' + host + '/v1/unsubscribeContext',
+                method: 'POST',
+                json: true, 
+                body: body
+            };
+
+            var implementations = {
+                requester: {
+                    request: function (options, callback) {
+                        return callback(error, {}, {statusCode: {code: statusCode}}); 
+                    }
+                },
+                url: {
+                    parse: function (url) {
+                        return {
+                            protocol: protocol,
+                            host: host
+                        };
+                    }
+                }
+            };
+
+            mocker(implementations, function (orionModule, spies) {
+
+                orionModule.cancelSubscription(subscriptionInfo, function (err) {
+
+                    assert(spies.requester.request.calledWith(options));
+                    assert(spies.url.parse.calledWith(subscriptionInfo.url));
+
+                    var result = error ? errorMsg : null;
+                    assert.equal(err,  result);
+
+                    done();
+                });
+            });
+        };
+
+        it('should call the callback with error when there is an error sending the request to Context Broker', function (done) {
+            testCancelSubscription(true, null, done);
+        });
+
+        it('should call the callback with error when there is an error cancelling the subscription in Context Broker', function (done) {
+            testCancelSubscription(true, 400, done);
+        });
+
+        it('should call the callback without error when there is no error sending the request to the Context Broker', function (done) {
+            testCancelSubscription(false, 200, done);
+        });
+    });
 });

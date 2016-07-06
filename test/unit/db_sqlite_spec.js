@@ -139,6 +139,7 @@ describe('Testing SQLITE database', function () {
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
                     expires             TEXT, \
+                    version             TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE            )',
             'CREATE TABLE IF NOT EXISTS admins ( \
@@ -768,6 +769,27 @@ describe('Testing SQLITE database', function () {
         });
     });
 
+    describe('Function "deleteBuy"', function () {
+
+        var apiKey = data.DEFAULT_API_KEYS[0];
+
+        var sentence = 'DELETE FROM accounting             WHERE apiKey=$apiKey';
+        var params = {'$apiKey': apiKey};
+
+        var method = 'deleteBuy';
+        var args = [apiKey];
+
+        it('should call the callback with error when there is an error deleting the API key', function (done) {
+            var errorMsg = 'Error deleting the API key.';
+
+            runTest(sentence, params, method, args, errorMsg, done);
+        });
+
+        it('should call the callback without error when there is no error deleting the API key', function (done) {
+            runTest(sentence, params, method, args, null, done);
+        });
+    });
+
     describe('Function "getApiKeys"', function () {
 
         var sentence = 'SELECT apiKey, productId, orderId \
@@ -898,13 +920,13 @@ describe('Testing SQLITE database', function () {
         });
     });
 
-    describe('Function "getNotificationInfo"', function () {
+    describe('Function "getAllNotificationInfo"', function () {
 
         var sentence = 'SELECT apiKey, orderId, productId, customer, value, correlationNumber, recordType, unit \
             FROM accounting \
             WHERE value!=0';
 
-        var testGetNotificationInfo = function (error, notificationInfo, done) {
+        var testGetAllNotificationInfo = function (error, notificationInfo, done) {
 
             var all = function (sentence, callback) {
                 return callback(error, notificationInfo);
@@ -918,7 +940,7 @@ describe('Testing SQLITE database', function () {
 
             var db = getDb(implementations);
 
-            db.getNotificationInfo(function (err, res) {
+            db.getAllNotificationInfo(function (err, res) {
 
                 assert(allSpy.calledWith(sentence));
 
@@ -941,26 +963,47 @@ describe('Testing SQLITE database', function () {
         };
 
         it('should call the callback with error when db fails getting notification info', function (done) {
-            testGetNotificationInfo('Error', null, done);
+            testGetAllNotificationInfo('Error', null, done);
         });
 
         it('should call the callback without error when there is not information to notify', function (done) {
-            testGetNotificationInfo(null, [], done);
+            testGetAllNotificationInfo(null, [], done);
         });
 
         it('should call the callback without error when db return the information to notify', function (done) {
-            var notificationInfo = {
-                apiKey: data.DEFAULT_API_KEYS[0],
-                orderId: data.DEFAULT_ORDER_IDS[0],
-                productId: data.DEFAULT_PRODUCT_IDS[0],
-                customer: data.DEFAULT_USER_ID,
-                value: 0,
-                correlationNumber: 0,
-                recordType: data.DEFAULT_RECORD_TYPE,
-                unit: data.DEFAULT_UNIT
-            }
+            var notificationInfo = data.DEFAULT_NOTIFICATION_INFO;
             
-            testGetNotificationInfo(null, notificationInfo, done);
+            testGetAllNotificationInfo(null, notificationInfo, done);
+        });
+    });
+
+    describe('Function "getNotificationInfo"', function (done) {
+
+        var apiKey = data.DEFAULT_API_KEYS[0];
+
+        var sentence = 'SELECT orderId, productId, customer, value, correlationNumber, recordType, unit \
+            FROM accounting \
+            WHERE apiKey=$apiKey AND value!=0';
+        var params = {'$apiKey': apiKey};
+
+        var method = 'getNotificationInfo';
+        var args = [apiKey];
+
+        it('should call the callback with error when there is an error getting the notification information', function (done) {
+            var errorMsg = 'Error in database getting the notification information.';
+
+            getTest(method, sentence, params, args, errorMsg, null, null, done);
+        });
+
+        it('should call the callback withput error when there is no notification information available', function (done) {
+            getTest(method, sentence, params, args, null, null, null, done);
+        });
+
+        it('should call the callback without error and return the notification information when there is notification information', function (done) {
+            var notificationInfo = data.DEFAULT_NOTIFICATION_INFO;
+            var result = notificationInfo;
+
+            getTest(method, sentence, params, args, null, notificationInfo, result, done);
         });
     });
 
@@ -1157,18 +1200,20 @@ describe('Testing SQLITE database', function () {
         var subsId = data.DEFAULT_SUBSCRIPTION_ID;
         var notificationUrl = data.DEFAULT_NOTIFICATION_URL;
         var expires = data.DEFAULT_EXPIRES;
+        var version = 'v1';
 
         var sentence = 'INSERT OR REPLACE INTO subscriptions \
-        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires)';
+        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires, $version)';
         var params = {
             '$subscriptionId': subsId,
             '$apiKey': apiKey,
             '$notificationUrl': notificationUrl,
-            '$expires': expires
+            '$expires': expires,
+            '$version': version
         };
 
         var method = 'addCBSubscription';
-        var args = [apiKey, subsId, notificationUrl, expires];
+        var args = [apiKey, subsId, notificationUrl, expires, version];
 
         it('should call the callback with error when db fails adding the new CB subscription', function (done) {
             var errorMsg = 'Error in database adding the subscription "' + subsId + '" .';
@@ -1185,9 +1230,11 @@ describe('Testing SQLITE database', function () {
 
         var subsId = data.DEFAULT_SUBSCRIPTION_ID;
 
-        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, accounting.unit \
-            FROM subscriptions , accounting\
-            WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId';
+        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, \
+                subscriptions.subscriptionId, subscriptions.version, accounting.unit, services.url\
+            FROM subscriptions , accounting, services\
+            WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId \
+                AND services.publicPath=accounting.publicPath';
         var params = {
             '$subscriptionId': subsId
         };
@@ -1207,6 +1254,53 @@ describe('Testing SQLITE database', function () {
 
         it('should call the callback without error when db gets the CB subscription', function (done) {
             getTest(method, sentence, params, args, null, {}, {}, done);
+        });
+    });
+
+    describe('Function "getCBsubscriptions"', function () {
+
+        var apiKey = data.DEFAULT_API_KEYS[0];
+
+        var sentence = 'SELECT *            FROM subscriptions             WHERE apiKey=$apiKey';
+        var params = {'$apiKey': apiKey};
+
+        var testGetCBSubscriptions = function (sentence, params, error, subscriptions, result, done) {
+
+            var all = function (sentence, params, callback) {
+                return callback(error, subscriptions);
+            };
+
+            var implementations = {
+                all: all
+            };
+
+            var allSpy = sinon.spy(implementations, 'all');
+
+            var db = getDb(implementations);
+
+            db.getCBSubscriptions(apiKey, function (err, res) {
+
+                assert(allSpy.calledWith(sentence, params));
+
+                assert.equal(err, error);
+                assert.deepEqual(result, result);
+
+                done();
+            });
+        };
+
+        it('should call the callback with error when there is an error getting all the subscriptions', function (done) {
+            var errorMsg = 'Error in database getting the subscriptions.';
+
+            testGetCBSubscriptions(sentence, params, errorMsg, null, null, done);
+        });
+
+        it('should call the callback without error when there is no subscription', function (done) {
+            testGetCBSubscriptions(sentence, params, null, [], null, done);
+        });
+
+        it('should call the callback without error and return the subscriptions information when there are subscriptions', function (done) {
+            testGetCBSubscriptions(sentence, params, null, [{}], [{}], done);
         });
     });
 

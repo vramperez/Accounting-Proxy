@@ -1036,6 +1036,101 @@ describe('Testing REDIS database', function () {
         });
     });
 
+    describe('Function "deleteBuy"', function () {
+
+        var testDeleteBuy = function (hgetallErr, smembersErr, execErr, done) {
+
+            var errorMsg = 'Error deleting the API key.';
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var subscriptions = ['subs1', 'subs2'];
+            var accountingInfo = {
+                publicPath: data.DEFAULT_PUBLIC_PATHS[0],
+                customer: data.DEFAULT_USER_ID
+            };
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, accountingInfo);
+            };
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, subscriptions);
+            };
+
+            var srem = sinon.stub();
+            var del = sinon.stub();
+            var exec = function (callback) {
+                return callback(execErr);
+            };
+
+            var multiImplementations = {
+                srem: srem,
+                del: del,
+                exec: exec
+            };
+
+            var multi = sinon.stub().returns(multiImplementations);
+
+            var implementations = {
+                multi: multi,
+                hgetall: hgetall,
+                smembers: smembers
+            };
+
+            var execSpy = sinon.spy(multiImplementations, 'exec');
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+
+            var db = getDb(implementations);
+
+            db.deleteBuy(apiKey, function (err) {
+
+                assert(hgetallSpy.calledWith(apiKey));
+
+                if (hgetallErr) {
+                    assert.equal(err, errorMsg);
+
+                } else {
+                    assert(srem.calledWith(accountingInfo.publicPath, apiKey));
+                    assert(srem.calledWith(accountingInfo.customer, apiKey));
+                    assert(srem.calledWith('apiKeys', apiKey));
+                    assert(del.calledWith(apiKey));
+                    assert(smembersSpy.calledWith(apiKey + 'subs'));
+
+                    if (smembersErr) {
+                        assert(err, errorMsg);
+
+                    } else {
+                        subscriptions.forEach(function (subsId) {
+                            assert(del.calledWith(subsId));
+                        });
+                        assert(del.calledWith(apiKey + 'subs'));
+
+                        var res = execErr ? errorMsg : null;
+                        assert.equal(err, res);
+                    }
+                }
+
+                done();
+            });
+        };
+
+        it('should call the callback with error when db fails getting the accouting information', function (done) {
+            testDeleteBuy(true, false, false, done);
+        });
+
+        it('should call the callback with error when db fails getting all the subscriptions associated with the API key', function (done) {
+            testDeleteBuy(false, true, false, done);
+        });
+
+        it('should call the callback with error when there is an error executing the operations', function (done) {
+            testDeleteBuy(false, false, true, done);
+        });
+
+        it('should call the callback without error when there is no errors deleting the API key', function (done) {
+            testDeleteBuy(false, false, false, done);
+        });
+    });
+
     describe('Function "getApiKeys"', function (done) {
 
         var apiKeysInfo = {};
@@ -1289,9 +1384,9 @@ describe('Testing REDIS database', function () {
         });
     });
 
-    describe('Function "getNotificationInfo"', function () {
+    describe('Function "getAllNotificationInfo"', function () {
 
-        var testGetNotificatoinInfo = function (smembersErr, hgetallErr, accountingInfo, notificationInfo, done) {
+        var testGetAllNotificatoinInfo = function (smembersErr, hgetallErr, accountingInfo, notificationInfo, done) {
 
             var smembers = function (hash, callback) {
                 return callback(smembersErr, data.DEFAULT_API_KEYS);
@@ -1315,7 +1410,7 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.getNotificationInfo(function (err, res) {
+            db.getAllNotificationInfo(function (err, res) {
 
                 assert(smembersSpy.calledWith('apiKeys'));
 
@@ -1346,11 +1441,11 @@ describe('Testing REDIS database', function () {
         };
 
         it('should call the callback with error when db fails getting apiKeys', function (done) {
-            testGetNotificatoinInfo(true, false, null, null, done);
+            testGetAllNotificatoinInfo(true, false, null, null, done);
         });
 
         it('should call the callback with error when db fails getting accounting information', function (done) {
-            testGetNotificatoinInfo(false, true, null, null, done);
+            testGetAllNotificatoinInfo(false, true, null, null, done);
         });
 
         it('should call the callback without error when there is no accounting information to notify', function (done) {
@@ -1358,7 +1453,7 @@ describe('Testing REDIS database', function () {
             accountingInfo[data.DEFAULT_API_KEYS[0]] = {value: 0};
             accountingInfo[data.DEFAULT_API_KEYS[1]] = {value: 0};
 
-            testGetNotificatoinInfo(false, false, accountingInfo, null, done);
+            testGetAllNotificatoinInfo(false, false, accountingInfo, null, done);
         });
 
         it('should call the callback without error when db returns the accounting information to notify', function (done) {
@@ -1384,7 +1479,51 @@ describe('Testing REDIS database', function () {
                 unit: data.DEFAULT_UNIT
             };
 
-            testGetNotificatoinInfo(false, false, accountingInfo, [accountingInfo[data.DEFAULT_API_KEYS[0]], accountingInfo[data.DEFAULT_API_KEYS[1]]], done);
+            testGetAllNotificatoinInfo(false, false, accountingInfo, [accountingInfo[data.DEFAULT_API_KEYS[0]], accountingInfo[data.DEFAULT_API_KEYS[1]]], done);
+        });
+    });
+
+    describe('Function "getNotificationInfo"', function () {
+
+        var apiKey = data.DEFAULT_API_KEYS[0];
+
+        var testGetNotificationInfo = function (error, accountingInfo, result, done) {
+
+            var hgetall = function (hash, callback) {
+                return callback(error, accountingInfo);
+            };
+
+            var implementations = {
+                hgetall: hgetall
+            };
+
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getNotificationInfo(apiKey, function (err, res) {
+
+                assert(hgetallSpy.calledWith(apiKey));
+
+                assert.equal(err, error);
+                assert.deepEqual(res, result);
+
+                done();
+            });
+        };
+
+        it('should call the callback with error when there is an error getting the notification informations', function (done) {
+            var errorMsg = 'Error in database getting the notification information.';
+
+            testGetNotificationInfo(errorMsg, null, null, done);
+        });
+
+        it('should call the callback without error when there is no notification information available', function (done) {
+            testGetNotificationInfo(null, {value: 0}, null, done);
+        });
+
+        it ('shoudl call the callback without error and return the accounting information when there is no error', function (done) {
+            testGetNotificationInfo(null, {value: 1}, {value: 1, apiKey: apiKey}, done);
         });
     });
 
@@ -1508,6 +1647,12 @@ describe('Testing REDIS database', function () {
 
         var testAddCBSubscription = function (error, done) {
 
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var subsId = data.DEFAULT_SUBSCRIPTION_ID;
+            var url = data.DEFAULT_NOTIFICATION_URL;
+            var expires = data.DEFAULT_EXPIRES;
+            var version = 'v1';
+
             var sadd = sinon.stub();
             var hmset = sinon.stub();
             var exec = function (callback) {
@@ -1526,18 +1671,19 @@ describe('Testing REDIS database', function () {
 
             var db = getDb({multi: multi});
 
-            db.addCBSubscription(data.DEFAULT_API_KEYS[0], data.DEFAULT_SUBSCRIPTION_ID, data.DEFAULT_NOTIFICATION_URL, data.DEFAULT_EXPIRES, function (err) {
+            db.addCBSubscription(apiKey, subsId, url, expires, version, function (err) {
 
                 assert(multi.calledOnce);
-                assert(sadd.calledWith([data.DEFAULT_API_KEYS[0] + 'subs', data.DEFAULT_SUBSCRIPTION_ID]));
-                assert(hmset.calledWith(data.DEFAULT_SUBSCRIPTION_ID, {
-                    apiKey: data.DEFAULT_API_KEYS[0],
-                    notificationUrl: data.DEFAULT_NOTIFICATION_URL,
-                    expires: data.DEFAULT_EXPIRES
+                assert(sadd.calledWith([apiKey + 'subs', subsId]));
+                assert(hmset.calledWith(subsId, {
+                    apiKey: apiKey,
+                    notificationUrl: url,
+                    expires: expires,
+                    version: version
                 }));
                 assert(execSpy.calledOnce);
 
-                error ? (err, 'Error in database adding the subscription "' + data.DEFAULT_SUBSCRIPTION_ID + '" .') : assert.equal(err, null);
+                error ? (err, 'Error in database adding the subscription "' + subsId + '" .') : assert.equal(err, null);
 
                 done();
             });
@@ -1554,22 +1700,37 @@ describe('Testing REDIS database', function () {
 
     describe('Function "getCBSubscription"', function () {
 
+        var apiKey = data.DEFAULT_API_KEYS[0];
+        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+        var unit = data.DEFAULT_UNIT;
+        var url = data.DEFAULT_URLS[0];
+
         var subscriptionInfo = {
-            apiKey: data.DEFAULT_API_KEYS[0],
+            apiKey: apiKey,
             notificationUrl: data.DEFAULT_NOTIFICATION_URL,
-            expires: data.DEFAULT_EXPIRES
+            expires: data.DEFAULT_EXPIRES,
+            unit: data.DEFAULT_UNIT,
+            subscriptionId: data.DEFAULT_SUBSCRIPTION_ID,
+            version: 'v1',
+            url: url
         };
 
-        var testGetCBSubscription = function (hgetallErr, subscriptionInfo, hgetErr, done) {
+        var testGetCBSubscription = function (hgetallErr1, hgetallErr2, subscriptionInfo, accounting, hgetErr, result, done) {
 
-            var errMsg = 'Error getting the subscription.';
+            var errorMsg = 'Error getting the subscription.';
+
+            var subsId = data.DEFAULT_SUBSCRIPTION_ID;
 
             var hgetall = function (hash, callback) {
-                return callback(hgetallErr, subscriptionInfo);
+                if (hash === subsId) {
+                    return callback(hgetallErr1, subscriptionInfo);
+                } else {
+                    return callback(hgetallErr2, accounting);
+                }
             };
 
             var hget = function (hash, key, callback) {
-                return callback(hgetErr, data.DEFAULT_UNIT);
+                return callback(hgetErr, url);
             };
 
             var implementations = {
@@ -1582,39 +1743,42 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.getCBSubscription(data.DEFAULT_SUBSCRIPTION_ID, function (err, res) {
+            db.getCBSubscription(subsId, function (err, res) {
 
-                assert(hgetallSpy.calledWith(data.DEFAULT_SUBSCRIPTION_ID));
+                assert(hgetallSpy.calledWith(subsId));
 
-                if (hgetallErr) {
+                if (hgetallErr1) {
 
-                    assert.equal(err, 'Error getting the subscription.');
-                    assert.equal(res, null);
+                    assert.equal(err, errorMsg);
+                    assert.equal(res, result);
 
                 } else if (!subscriptionInfo) {
 
                     assert.equal(err, null);
-                    assert.equal(res, null);
+                    assert.equal(res, result);
 
                 } else {
 
-                    assert(hgetSpy.calledWith(data.DEFAULT_API_KEYS[0], 'unit'));
+                    assert(hgetallSpy.calledWith(apiKey));
 
-                    if (hgetErr) {
+                    if (hgetallErr2) {
+                        assert.equal(err, errorMsg);
+                        assert.equal(res, result);
 
-                        assert.equal(err, errMsg);
-                        assert.equal(res, null);
+                    } else{
+                        assert(hgetSpy.calledWith(publicPath, 'url'));
 
-                    } else {
+                        if (hgetErr) {
 
-                        assert.equal(err, null);
-                        assert.deepEqual(res, {
-                            apiKey: subscriptionInfo.apiKey,
-                            notificationUrl: subscriptionInfo.notificationUrl,
-                            expires: subscriptionInfo.expires,
-                            unit: data.DEFAULT_UNIT
-                        });
+                            assert.equal(err, errorMsg);
+                            assert.equal(res, result);
 
+                        } else {
+
+                            assert.equal(err, null);
+                            assert.deepEqual(res, result);
+
+                        }
                     }
                 }
 
@@ -1623,19 +1787,101 @@ describe('Testing REDIS database', function () {
         };
 
         it('should call the callback with error when db fails getting subscription info', function (done) {
-            testGetCBSubscription(true, null, false, done);
+            testGetCBSubscription(true, false, null, null, false, null, done);
         });
 
         it('should call the callback without error when there are not CB subscriptions', function (done) {
-            testGetCBSubscription(false, null, false, done);
+            testGetCBSubscription(false, false, null, null, false, null, done);
+        });
+
+        it('should call the callback with error when there is an error getting the accoutning unit', function (done) {
+            testGetCBSubscription(false, true, subscriptionInfo, null, false, null, done);
         });
 
         it('should call the callback with error when db fails getting the unit', function (done) {
-            testGetCBSubscription(false, subscriptionInfo, true, done);
+            testGetCBSubscription(false, false, subscriptionInfo, {publicPath: publicPath}, true, null, done);
         });
 
         it('should call the callback without error when db returns the CB subscriptions', function (done) {
-            testGetCBSubscription(false, subscriptionInfo, false, done);
+            testGetCBSubscription(false, false, subscriptionInfo, {publicPath: publicPath, unit: unit}, false, subscriptionInfo, done);
+        });
+    });
+
+    describe('Function "getCBSubscriptions"', function () {
+
+        var subscriptions = ['subs1', 'subs2'];
+
+        var testGetCBSubscriptions = function (smembersErr, hgetallErr, subscriptionInfo, result, done) {
+
+            var errorMsg = 'Error in database getting the subscriptions.';
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var subscriptionInfo = subscriptionInfo ? data.DEFAULT_SUBSCRIPTION_v1 : null;
+
+            var smembers = function (hash, callback) {
+                return callback(smembersErr, subscriptions);
+            };
+
+            var hgetall = function (hash, callback) {
+                return callback(hgetallErr, subscriptionInfo);
+            };
+
+            var implementations = {
+                smembers: smembers,
+                hgetall: hgetall
+            };
+
+            var smembersSpy = sinon.spy(implementations, 'smembers');
+            var hgetallSpy = sinon.spy(implementations, 'hgetall');
+
+            var db = getDb(implementations);
+
+            db.getCBSubscriptions(apiKey, function (err, res) {
+
+                assert(smembersSpy.calledWith(apiKey + 'subs'));
+
+                if (smembersErr) {
+                    assert.equal(err, errorMsg);
+                    assert.deepEqual(res, result);
+
+                } else if (hgetallErr) {
+                    hgetallSpy.calledOnce;
+                    hgetallSpy.alwaysCalledWith(subscriptions[0]);
+                    assert.equal(err, errorMsg);
+                    assert.deepEqual(res, result);
+
+                } else {
+                    async.eachSeries(subscriptions, function(subsId, taskCallback) {
+                        assert(hgetallSpy.calledWith(subsId));
+                    }, function () {
+                        assert.equal(err, null);
+                        assert.deepEqual(res, result);
+                    });
+                }
+
+                done();
+            });
+        };
+
+        it('should call the callback with error when db fails getting the subscriptions associated with the API key', function (done) {
+            testGetCBSubscriptions(true, false, true, null, done);
+        });
+
+        it('should call the callback with error when db fails getting subscription information', function (done) {
+            testGetCBSubscriptions(false, true, true, null, done);
+        });
+
+        it('should call the callback without error and return "null" when there is no subscriptions associated with the API key', function (done) {
+            testGetCBSubscriptions(false, false, false, null, done);
+        });
+
+        it('should call the callback without error and return the subscriptions information when there is no error', function (done) {
+            var result = {};
+            result[subscriptions[0]] = data.DEFAULT_SUBSCRIPTION_v1;
+            result[subscriptions[0]].subscriptionId = subscriptions[0];
+            result[subscriptions[1]] = data.DEFAULT_SUBSCRIPTION_v1;
+            result[subscriptions[1]].subscriptionId = subscriptions[1];
+
+            testGetCBSubscriptions(false, false, true, result, done);
         });
     });
 
@@ -1677,7 +1923,7 @@ describe('Testing REDIS database', function () {
         var value = {notificationUrl: notificationUrl};
 
         it('should call the callback with error when db fails updating the notification URL', function (done) {
-            var errorMsg = 'Error in database updating the notificationURL';
+            var errorMsg = 'Error in database updating the notificationURL.';
             testUpdateSubscription(method, subsId, args, value, errorMsg, done);
         });
 
@@ -1696,7 +1942,7 @@ describe('Testing REDIS database', function () {
         var value = {expires: expires};
 
         it('should call the callback with error when db fails updating the expiration date', function (done) {
-            var errorMsg = 'Error in database updating the expiration date';
+            var errorMsg = 'Error in database updating the expiration date.';
 
             testUpdateSubscription(method, subsId, args, value, errorMsg, done);
         });

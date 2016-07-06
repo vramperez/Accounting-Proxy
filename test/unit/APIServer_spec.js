@@ -21,7 +21,8 @@ var mocker = function(implementations, callback) {
             winston: implementations.logger ? implementations.logger : {},
             './validation': implementations.validation ? implementations.validation : {},
             './notifier': implementations.notifier ? implementations.notifier : {},
-            'crypto': implementations.crypto ? implementations.crypto : {}
+            'crypto': implementations.crypto ? implementations.crypto : {},
+            './orion_context_broker/cbHandler': implementations.cbHandler ? implementations.cbHandler : {}
         });
 
         return callback(api_server, spies);
@@ -174,8 +175,6 @@ describe('Testing APIServer', function() {
             mocker(implementations, function (api, spies) {
 
                 api.checkURL(implementations.req, implementations.res);
-                
-                assert(spies.req.setEncoding.calledWith('utf-8'));
 
                 if (!body.url) {
 
@@ -299,12 +298,10 @@ describe('Testing APIServer', function() {
 
                 api.newBuy(implementations.req, implementations.res);
 
-                assert(spies.req.setEncoding.calledWith('utf-8'));
-
                 if (validateErr) {
 
-                    assert(spies.res.status.calledWith(400));
-                    assert(spies.res.json.calledWith({error: 'Invalid json. ' + validateErr}));
+                    assert(spies.res.status.calledWith(422));
+                    assert(spies.res.json.calledWith({error: 'Invalid json: ' + validateErr}));
 
                 } else {
                 
@@ -314,7 +311,7 @@ describe('Testing APIServer', function() {
 
                     if (newBuyErr) {
 
-                        assert(spies.res.status.calledWith(400));
+                        assert(spies.res.status.calledWith(500));
                         assert(spies.res.send.calledOnce);
 
                     } else {
@@ -329,11 +326,11 @@ describe('Testing APIServer', function() {
             });
         };
 
-        it('should return 400 when the JSON is not valid', function(done) {
+        it('should return 422 when the JSON is not valid', function(done) {
             testNewBuy(true, false, done);
         });
 
-        it('should return 400 when db fails adding the new buy', function(done) {
+        it('should return 500 when db fails adding the new buy', function(done) {
             testNewBuy(false, true, done);
         });
 
@@ -341,7 +338,238 @@ describe('Testing APIServer', function() {
             testNewBuy(false, false, done);
         });
     });
+    
+    describe('Function "deleteBuy"', function () {
 
+        var testCancelSubscriptions = function (getSubscriptionsErr, getSubscriptionErr, cancelSubsErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var body = data.DEFAULT_BUY_INFORMATION;
+            var subscriptions = [{subscriptionId: 'subs1'}, {subscriptionId: 'subs2'}];
+            var subscriptionsInfo = {};
+            subscriptionsInfo[subscriptions[0].subscriptionId] = data.DEFAULT_SUBSCRIPTION_v1;
+            subscriptionsInfo[subscriptions[1].subscriptionId] = data.DEFAULT_SUBSCRIPTION_v1;
+
+            var implementations = {
+                config: {
+                    resources: {
+                        contextBroker: true
+                    }
+                },
+                req: {
+                    body: body
+                },
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    json: function (json) {},
+                    send: function () {}
+                },
+                validation: {
+                    validate: function (schema, json, callback) {
+                        return callback(null);
+                    }
+                },
+                notifier: {
+                    notifyUsage: function (apiKey, callback) {
+                        return callback(null);
+                    }
+                },
+                db: {
+                    deleteBuy: function (apiKey, callback) {
+                        return callback(null);
+                    },
+                    getCBSubscriptions: function (apiKey, callback) {
+                        return callback(getSubscriptionsErr, subscriptions);
+                    },
+                    getCBSubscription: function (subscriptionId, callback) {
+                        return callback(getSubscriptionErr, subscriptionsInfo[subscriptionId]);
+                    }
+                },
+                logger: {
+                    error: function (msg) {}
+                },
+                crypto: {
+                    createHash: function (type) {
+                        return this;
+                    },
+                    update: function (seed) {},
+                    digest: function (type) {
+                        return apiKey
+                    }
+                },
+                cbHandler: {
+                    cancelSubscription: function (subsInfo, callback) {
+                        return callback(cancelSubsErr);
+                    }
+                }
+            };
+
+            mocker(implementations, function (api, spies) {
+
+                api.deleteBuy(implementations.req, implementations.res);
+
+                setTimeout(function() {
+
+                    assert(spies.validation.validate.calledWith('deleteBuy', body));
+                    assert(spies.db.getCBSubscriptions.calledWith(apiKey));
+
+                    if (getSubscriptionsErr) {
+                        assert(spies.res.status.calledWith(500));
+                        assert(spies.res.send.calledOnce);
+
+                    } else {
+                        assert(spies.db.getCBSubscription.calledWith(subscriptions[0].subscriptionId));
+
+                        if (getSubscriptionErr) {
+                            assert(spies.res.status.calledWith(500));
+                            assert(spies.res.send.calledOnce);
+
+                        } else {
+                            async.eachSeries(subscriptions, function (subscription, taskCallback) {
+                                assert(spies.db.getCBSubscription.calledWith(subscription.subscriptionId));
+                                assert(spies.cbHandler.cancelSubscription.calledWith(subscriptionsInfo[subscription.subscriptionId]));
+                            });
+
+                            if (cancelSubsErr) {
+                                assert(spies.res.status.calledWith(500));
+                                assert(spies.res.send.calledOnce);
+
+                            }
+                        }
+                    }
+
+                    done();
+                }, 200);
+            });
+        };
+
+        it('should return 500 when there is an error getting all the subscriptions', function (done) {
+            testCancelSubscriptions(true, false, false, done);
+        });
+
+        it('should return 500 when there is an error getting the information of a subscription', function (done) {
+            testCancelSubscriptions(false, true, false, done);
+        });
+
+        it('should return 500 when there is an error cancelling the subscription', function (done) {
+            testCancelSubscriptions(false, false, true, done);
+        });
+
+        var testDeleteBuy = function (validateErr, notifyErr, deleteBuyErr, done) {
+
+            var apiKey = data.DEFAULT_API_KEYS[0];
+            var body = data.DEFAULT_BUY_INFORMATION;
+
+            var implementations = {
+                config: {
+                    resources: {
+                        contextBroker: false
+                    }
+                },
+                req: {
+                    body: body
+                },
+                res: {
+                    status: function (statusCode) {
+                        return this;
+                    },
+                    json: function (json) {},
+                    send: function () {}
+                },
+                validation: {
+                    validate: function (schema, json, callback) {
+                        return callback(validateErr);
+                    }
+                },
+                notifier: {
+                    notifyUsage: function (apiKey, callback) {
+                        return callback(notifyErr);
+                    }
+                },
+                db: {
+                    deleteBuy: function (apiKey, callback) {
+                        return callback(deleteBuyErr);
+                    }
+                },
+                logger: {
+                    error: function (msg) {}
+                },
+                crypto: {
+                    createHash: function (type) {
+                        return this;
+                    },
+                    update: function (seed) {},
+                    digest: function (type) {
+                        return apiKey
+                    }
+                }
+            };
+
+            mocker(implementations, function (api, spies) {
+
+                api.deleteBuy(implementations.req, implementations.res);
+
+                setTimeout(function () {
+                    assert(spies.validation.validate.calledWith('deleteBuy', implementations.req.body));
+
+                    if (validateErr) {
+                        assert(spies.res.status.calledWith(422));
+                        assert(spies.res.json.calledWith({error: 'Invalid json: ' + validateErr}));
+
+                    } else {
+
+                        assert(spies.crypto.createHash.calledWith('sha1'));
+                        assert(spies.crypto.update.calledWith(body.productId + body.orderId + body.customer));
+                        assert(spies.crypto.digest.calledWith('hex'));
+
+                        assert(spies.notifier.notifyUsage.calledWith(apiKey));
+
+                        if (notifyErr) {
+                            assert(spies.logger.error.calledWith(notifyErr));
+                            assert(spies.res.status.calledWith(500));
+                            assert(spies.res.send.calledOnce);
+
+                        } else {
+
+                            assert(spies.db.deleteBuy.calledWith(apiKey));
+
+                            if (deleteBuyErr) {
+                                assert(spies.logger.error.calledWith(deleteBuyErr));
+                                assert(spies.res.status.calledWith(500));
+                                assert(spies.res.send.calledOnce);
+
+                            } else {
+                                assert(spies.res.status.calledWith(204));
+                                assert(spies.res.send.calledOnce);
+
+                            }
+                        }
+                    }
+
+                    done();
+                }, 200);
+            });
+        };
+
+        it('should return 422 when the request body is not valid', function (done) {
+            testDeleteBuy(true, false, false, done);
+        });
+
+        it('should return 500 when there is an error notifying the usage to Usage Management API', function (done) {
+            testDeleteBuy(false, true, false, done);
+        });
+
+        it('should return 500 when db fails deleting the buy', function (done) {
+            testDeleteBuy(false, false, true, done);
+        });
+
+        it('should return 204 when there is no error deleting the buy', function (done) {
+            testDeleteBuy(false, false, false, done);
+        });
+    });
+    
     describe('Function "isJSON"', function() {
 
         var testCheckIsJSON = function (isJSON, done) {

@@ -46,7 +46,7 @@ exports.init = function (callback) {
             db.init(callback);
         },
         function (callback) {
-            loadAccountingModules(callback)
+            loadAccountingModules(callback);
         },
         function (callback) {
             notifier.notifyAllUsage(callback);

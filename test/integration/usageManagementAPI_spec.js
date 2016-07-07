@@ -225,7 +225,7 @@ describe('Testing the usage notifier', function () {
                                     done(err);
                                 } else {
                                     assert.equal(href, 'http://localhost:9040/usageSpecification/2');
-                                    db.getNotificationInfo(function (err, notificationInfo) {
+                                    db.getAllNotificationInfo(function (err, notificationInfo) {
                                         if (err) {
                                             done(err);
                                         } else {

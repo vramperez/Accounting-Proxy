@@ -49,11 +49,11 @@ var subscribeContext = function (req, res) {
 };
 
 var unsubscribeContext = function (req, res) {
-    res.status(200).json(data.cancelSubscriptionResp)
+    res.status(200).json(data.cancelSubscriptionResp);
 };
 
 var unsubscribeContextDelete = function (req, res) {
-    res.status(200).json(data.cancelSubscriptionResp)
+    res.status(200).json(data.cancelSubscriptionResp);
 };
 
 var updateContextSubscription = function (req, res) {

@@ -2,15 +2,19 @@ var request = require('supertest'),
     assert = require('assert'),
     proxyquire = require('proxyquire'),
     test_config = require('../config_tests').integration,
+    testEndpoint = require('./test_endpoint'),
     util = require('../util'),
     async = require('async'),
     redis = require('redis'),
+    testConfig = require('../config_tests').integration,
     data = require('../data');
+
+var request = request('http://localhost:' + testConfig.accounting_proxy_port);
 
 var server, db;
 var databaseName = 'testDB_administration.sqlite';
 
-var configMock = util.getConfigMock(false);
+var configMock = util.getConfigMock(true);
 
 var userProfile = data.DEFAULT_USER_PROFILE;
 userProfile.token = data.DEFAULT_TOKEN;
@@ -19,7 +23,7 @@ var FIWAREStrategyMock = util.getStrategyMock(userProfile);
 
 var mocker = function (database, done) {
 
-    var authentication, apiServer;
+    var authentication, apiServer, notifier, cbHandler;
 
     if (database === 'sql') {
 
@@ -37,15 +41,32 @@ var mocker = function (database, done) {
             './db': db
         });
 
+        notifier = proxyquire('../../notifier', {
+            './config': configMock,
+            'winston': util.logMock,
+            './db': db
+        });
+
+        cbHandler = proxyquire('../../orion_context_broker/cbHandler', {
+            '../config': configMock
+        });
+
         apiServer = proxyquire('../../APIServer', {
             './config': configMock,
-            './db': db
+            'winston': util.logMock,
+            './db': db,
+            './notifier': notifier
         });
 
         server = proxyquire('../../server', {
             './config': configMock,
+            './db': db,
             './APIServer': apiServer,
-            './OAuth2_authentication': authentication
+            './OAuth2_authentication': authentication,
+            './notifier': notifier,
+            'winston': util.logMock, // Not display logger messages while testing
+            'express-winston': util.expressWinstonMock,
+            './orion_context_broker/cbHandler': cbHandler
         });
     } else {
 
@@ -72,26 +93,55 @@ var mocker = function (database, done) {
                 './db_Redis': db
             });
 
+            notifier = proxyquire('../../notifier', {
+                './config': configMock,
+                'winston': util.logMock,
+                './db': db
+            });
+
             apiServer = proxyquire('../../APIServer', {
                 './config': configMock,
-                './db_Redis': db
+                'winston': util.logMock,
+                './db_Redis': db,
+                './notifier': notifier
+            });
+
+            cbHandler = proxyquire('../../orion_context_broker/cbHandler', {
+                '../config': configMock
             });
 
             server = proxyquire('../../server', {
                 './config': configMock,
+                './db_Redis': db,
                 './APIServer': apiServer,
-                './OAuth2_authentication': authentication
+                './OAuth2_authentication': authentication,
+                './notifier': notifier,
+                'winston': util.logMock, // Not display logger messages while testing
+                'express-winston': util.expressWinstonMock,
+                './orion_context_broker/cbHandler': cbHandler
             });
         }
     }
 
-    db.init(done);
-}
+    server.init(done);
+};
+
+// Start the enpoint for testing
+before(function () {
+    testEndpoint.run();
+});
 
 // Delete testing database
 after(function (done) {
     this.timeout(5000);
-    util.removeDatabase(databaseName, done);
+
+    testEndpoint.stop(function (err) {
+        if (err) {
+            done(err);
+        } else {
+            util.removeDatabase(databaseName, done);
+        }
+    });
 });
 
 describe('Testing the administration API', function (done) {
@@ -100,13 +150,13 @@ describe('Testing the administration API', function (done) {
 
         if (!token) {
 
-            request(server.app)
+            request
                 [method](configMock.api.administration_paths[path])
                 .expect(statusCode, response, done);
 
         } else {
 
-            request(server.app)
+            request
                 [method](configMock.api.administration_paths[path])
                 .set('authorization', token)
                 .expect(statusCode, response, done);
@@ -114,12 +164,34 @@ describe('Testing the administration API', function (done) {
     };
 
     var testBody = function (path, contentType, body, statusCode, response, done) {
-        request(server.app)
+        request
             .post(configMock.api.administration_paths[path])
             .set('content-type', contentType)
             .set('authorization', 'bearer ' + userProfile.token)
             .send(body)
             .expect(statusCode, response, done);
+    };
+
+    var checkAccountingInfo = function (apiKey, accountingInfo, done) {
+        db.getAccountingInfo(apiKey, function (err, res) {
+            if (err) {
+                done(err);
+            } else {
+                assert.deepEqual(res, accountingInfo);    
+                done();
+            }
+        });
+    };
+
+    var checkDeletedSubscriptions = function (apiKey, subscriptions, done) {
+        db.getCBSubscriptions(apiKey, function (err, result) {
+            if (err) {
+                done(err);
+            } else {
+                assert.deepEqual(result, subscriptions);
+                done();
+            }
+        });
     };
 
     async.eachSeries(test_config.databases, function (database, taskCallback) {
@@ -139,21 +211,26 @@ describe('Testing the administration API', function (done) {
                 });
             });
 
+            // Stop the Accounting Proxy
+            afterEach(function (done) {
+                server.stop(done);
+            });
+
             after(function () {
                 taskCallback();
             });
 
 
-            describe('[GET:' + configMock.api.administration_paths.units + '] accounting units request', function () {
+            describe('[GET: ' + configMock.api.administration_paths.units + '] accounting units request', function () {
 
                 it('should return all the accounting units (200) when the request is correct', function (done) {
-                    request(server.app)
+                    request
                         .get(configMock.api.administration_paths.units)
                         .expect(200, {units: configMock.modules.accounting}, done);
                 });
             });
 
-            describe('[GET:' +  configMock.api.administration_paths.keys + '] user api-keys request', function () {
+            describe('[GET: ' +  configMock.api.administration_paths.keys + '] user api-keys request', function () {
 
                 var path = 'keys';
 
@@ -192,7 +269,7 @@ describe('Testing the administration API', function (done) {
                             done(err);
                         } else {
 
-                            request(server.app)
+                            request
                                 .get('/accounting_proxy/keys')
                                 .set('authorization', 'bearer ' + userProfile.token)
                                 .expect(200)
@@ -220,7 +297,7 @@ describe('Testing the administration API', function (done) {
                 });
             });
 
-            describe('[POST:' + configMock.api.administration_paths.checkURL +'] checkURL request', function () {
+            describe('[POST: ' + configMock.api.administration_paths.checkURL +'] checkURL request', function () {
 
                 var path = 'checkURL';
 
@@ -270,7 +347,7 @@ describe('Testing the administration API', function (done) {
                             done(err);
                         } else {
 
-                            request(server.app)
+                            request
                                 .post(configMock.api.administration_paths.checkURL)
                                 .set('content-type', 'application/json')
                                 .set('authorization', 'bearer ' + userProfile.token)
@@ -296,7 +373,7 @@ describe('Testing the administration API', function (done) {
                 });
             });
 
-            describe('[POST:' + configMock.api.administration_paths.newBuy +'] new buy request', function () {
+            describe('[POST: ' + configMock.api.administration_paths.newBuy +'] new buy request', function () {
 
                 var path = 'newBuy';
 
@@ -306,10 +383,10 @@ describe('Testing the administration API', function (done) {
                     testBody(path, 'text/html', '', 415, expectedResp, done);
                 });
 
-                it('should return 400 when the JSON format is not valid', function (done) {
-                    var expectedResp = {error: 'Invalid json. "orderId" is required'};
+                it('should return 422 when the JSON format is not valid', function (done) {
+                    var expectedResp = {error: 'Invalid json: "orderId" is required'};
 
-                    testBody(path, 'application/json', {}, 400, expectedResp, done);
+                    testBody(path, 'application/json', {}, 422, expectedResp, done);
                 });
 
                 it('should save the buy information when the request is correct', function (done) {
@@ -332,7 +409,7 @@ describe('Testing the administration API', function (done) {
                             done(err);
                         } else {
 
-                            request(server.app)
+                            request
                                 .post(configMock.api.administration_paths.newBuy)
                                 .set('content-type', 'application/json')
                                 .send(buy)
@@ -341,16 +418,129 @@ describe('Testing the administration API', function (done) {
                                     if (err) {
                                         done(err);
                                     } else {
-                                        db.getAccountingInfo(expectedApiKey, function (err, res) {
-                                            assert.equal(err, null);
-                                            assert.deepEqual(res, { unit: buy.productSpecification.unit,
-                                            url: service.url});
-                                            done();
-                                        });
+
+                                        var accountingInfo = { 
+                                            unit: buy.productSpecification.unit,
+                                            url: service.url
+                                        } ;
+
+                                        checkAccountingInfo(expectedApiKey, accountingInfo, done);
                                     }
                                 });
                         }
                     });
+                });
+            });
+
+            describe('[POST: ' + configMock.api.administration_paths.deleteBuy + '] delete buy request', function () {
+
+                var path = 'deleteBuy';
+
+                it('should return 415 when the content-type is not "application/json"', function (done) {
+                    var expectedResp = {error: 'Content-Type must be "application/json"'};
+
+                    testBody(path, 'text/html', '', 415, expectedResp, done);
+                });
+
+                it('should return 422 when the JSON format is not valid', function (done) {
+                    var expectedResp = {error: 'Invalid json: "orderId" is required'};
+
+                    testBody(path, 'application/json', {}, 422, expectedResp, done);
+                });
+
+                var testDeleteBuy = function (notification, subscription, done) {
+
+                    var apiKey = '829d47524220aa859d5e8c683a22035df1bc44ea';
+                    var buyInfo = data.DEFAULT_BUY_INFORMATION[0];
+                    buyInfo.apiKey = apiKey;
+                    var deleteBuy = data.DEFAULT_DELETE_BUY_INFORMATION[0];
+                    var token = data.DEFAULT_TOKEN;
+                    var service = service = data.DEFAULT_SERVICES_LIST[0];
+                    var subscriptions = [];
+                    var accounting = [];
+                    var units = ['call', 'megabyte'];
+                    var hrefs = ['http://localhost:9040/usageSpecification/1',
+                                 'http://localhost:9040/usageSpecification/2'];
+
+                    configMock.modules = {
+                        accounting: units
+                    };
+
+                    if (subscription) {
+                        var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
+                        var methods = data.DEFAULT_HTTP_METHODS_LIST;
+                        var url = 'http://localhost:' + testConfig.test_endpoint_port;
+                        service = {publicPath: publicPath, url: url, appId: userProfile.appId, isCBService: data.DEFAULT_IS_CB_SERVICE, methods: methods};
+
+                        if (subscription === 'v1') {
+                            subscriptions[0] = data.DEFAULT_SUBSCRIPTION_v1;
+                            subscriptions[0].apiKey = apiKey;
+                        } else {
+                            subscriptions[0] = data.DEFAULT_SUBSCRIPTION_v2;
+                            subscriptions[0].apiKey = apiKey;
+                        }
+
+                    } 
+
+                    if (notification) {
+                        accounting[0] = {
+                            apiKey: apiKey,
+                            value: 2
+                        };
+                    }
+
+                    util.addToDatabase(db, [service], [buyInfo], subscriptions, [], accounting, [], token, function (err) {
+                        if (err) {
+                            done(err);
+                        } else {
+                            request
+                                .post(configMock.api.administration_paths.deleteBuy)
+                                .set('content-type', 'application/json')
+                                .send(deleteBuy)
+                                .expect(204)
+                                .end(function (err, res) {
+                                    if (err) {
+                                        done(err);
+                                    } else {
+                                        async.series([
+                                            function (callback) { // Check notified specifications
+                                                if (notification) {
+                                                    util.checkUsageSpecifications(db, units, hrefs, callback);
+                                                } else {
+                                                    callback(null);
+                                                }
+                                            },
+                                            function (callback) { // Check deleted subscriptions
+                                                if (subscription) {
+                                                    checkDeletedSubscriptions(apiKey, null, callback);
+                                                } else {
+                                                    callback(null);
+                                                }
+                                            },
+                                            function (callback) { // Check deleted accounting info
+                                                checkAccountingInfo(apiKey, null, callback);
+                                            }
+                                        ], done);
+                                    }
+                                });
+                        }
+                    });
+                };
+
+                it('should delete the buy when the accounting value is 0 and there are no subscriptions associated with the service', function (done) {
+                    testDeleteBuy(false, null, done);
+                });
+
+                it('should delete the buy and notify the usage specifications and the accounting value when the accounting value is not 0 and the specifications have not been notified', function (done) {
+                    testDeleteBuy(true, false, done);
+                });
+
+                it('should delete the buy, notify the accounting and cancel subscriptions (v1) when the accounting value is not 0 and there are subscriptions associated with the service', function (done) {
+                    testDeleteBuy(true, 'v1', done);
+                });
+
+                it('should delete the buy, notify the accounting and cancel subscriptions (v2) when the accounting value is not 0 and there are subscriptions associated with the service', function (done) {
+                    testDeleteBuy(true, 'v2', done);
                 });
             });
         });

@@ -130,7 +130,7 @@ var cancelSubscriptions = function (apiKey, callback) {
                         cbHandler.cancelSubscription(subsInfo, callback);
                     }
                 })
-            });
+            }, callback);
         }
     });
 };

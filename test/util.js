@@ -1,4 +1,5 @@
 var async = require('async'),
+    assert = require('assert'),
 	sinon = require('sinon'),
 	redis = require('redis'),
     testConfig = require('./config_tests').integration,
@@ -69,7 +70,7 @@ exports.getConfigMock = function (enableCB) {
         usageAPI: {
             schedule: '00 00 * * *',
             host: 'localhost',
-            port: testConfig.usageAPI_port,
+            port: testConfig.test_endpoint_port,
             path: ''
         }
     };
@@ -121,7 +122,7 @@ var loadBuys = function (buys, callback) {
 var loadSubscriptions = function (subscriptions, callback) {
     if (subscriptions.length != 0) {
         async.each(subscriptions, function (subs, taskCallback) {
-            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, subs.expires, taskCallback);
+            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, subs.expires, subs.version, taskCallback);
         }, callback);
     } else {
         return callback();
@@ -207,23 +208,34 @@ exports.addToDatabase = function (db, services, buys, subscriptions, admins, acc
     });
 };
 
-// Returns the accounting value for specified apiKey
-exports.getAccountingValue = function (db, apiKey, callback) {
-    db.getNotificationInfo(function (err, allAccountingInfo) {
+exports.checkAccounting = function (db, apiKey, amount, compareFunction, callback) {
+    db.getNotificationInfo(apiKey, function (err, accountingInfo) {
         if (err) {
             return callback(err);
         } else {
 
-            async.eachSeries(allAccountingInfo, function (accountingInfo, taskCallback) {
+            if (!accountingInfo) {
+                assert[compareFunction](accountingInfo, amount);
+            } else {
+                assert[compareFunction](accountingInfo.value, amount);
+            }
 
-                if (accountingInfo.apiKey === apiKey) {
-                    return callback(null, accountingInfo.value);
-                } else {
-                    taskCallback();
-                }
-            }, callback);
+            return callback(null);
         }
     });
+};
+
+exports.checkUsageSpecifications = function (db, units, hrefs, callback) {
+    async.eachOf(units, function (unit, i, taskCallback) {
+        db.getHref(unit, function (err, href) {
+                if (err) {
+                    taskCallback(err);
+                } else {
+                    assert.equal(href, hrefs[i]);
+                    taskCallback(null);
+                }
+        })
+    }, callback);
 };
 
 // Flush the database specified

@@ -102,7 +102,7 @@ var mocker = function (database, done) {
     }
 
     server.init(done);
-}
+};
 
 // Start the enpoint for testing
 before(function () {
@@ -291,13 +291,11 @@ describe('Testing the accounting API. Generic REST use', function () {
                     testRequestHandler(undefined, undefined, 'get', 'wrongUnit', 500, {}, done);
                 });
 
-                var checkAssertions = function (apiKey, compareFunction, accountingValue, response, callback) {
-                    util.getAccountingValue(db, apiKey, function (err, accValue) {
+                var checkAssertions = function (apiKey, accountingValue, compareFunction, response, callback) {
+                    util.checkAccounting(db, apiKey, compareFunction, accountingValue, function (err) {
                         if (err) {
-                            return callback(err);
+                            callback(err);
                         } else {
-
-                            assert[compareFunction](accValue, accountingValue);
 
                             fs.readFile('./test/integration/ejemplo.html', function (err, html) {
 

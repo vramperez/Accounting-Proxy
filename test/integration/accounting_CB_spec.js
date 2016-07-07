@@ -169,20 +169,7 @@ after(function (done) {
 
 describe('Testing the accounting API. Orion Context-Broker requests', function () {
 
-    var checkAccounting = function (apiKey, amount, compareFunction, callback) {
-
-        util.getAccountingValue(db, apiKey, function (err, accValue) {
-            if (err) {
-                return callback(err);
-            } else {
-                assert[compareFunction](accValue, amount);
-                return callback();
-            }
-        });
-    };
-
     var checkCBSubscription = function (subsId, subsInfo, callback) {
-
         db.getCBSubscription(subsId, function (err, res) {
             if (err) {
                 return callback(err);
@@ -212,7 +199,10 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             apiKey: buyInfo.apiKey,
             notificationUrl: notificationUrl,
             unit: buyInfo.unit,
-            expires: expires
+            expires: expires,
+            version: version,
+            url: service.url,
+            subscriptionId: data.DEFAULT_SUBS_ID
         };
 
         util.addToDatabase(db, [service], [buyInfo], [], [], [], [], null, function (err) {
@@ -238,7 +228,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                                 if (err) {
                                     done(err);
                                 } else if (unit === 'millisecond') {
-                                    checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                    util.checkAccounting(db, buyInfo.apiKey, amount, compareFunction, done);
                                 } else {
                                     done();
                                 }
@@ -301,7 +291,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
 
                             if (version === 'v1') {
                                 assert.deepEqual(res.body, expectedResp);
-                                checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                util.checkAccounting(db, buyInfo.apiKey, amount, compareFunction, done);
 
                             } else {
                                 if (expirationDateBefore === null) {
@@ -311,7 +301,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                                         if (err) {
                                             done(err);
                                         } else {
-                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, done);
+                                            util.checkAccounting(db, buyInfo.apiKey, amount, compareFunction, done);
                                         }
                                     });
                                 }
@@ -448,7 +438,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                                         if (err) {
                                             done(err);
                                         } else {
-                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
+                                            util.checkAccounting(db, buyInfo.apiKey, amount, compareFunction, function (err) {
                                                 if (err) {
                                                     done(err);
                                                 } else {
@@ -470,7 +460,7 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                                         if (err) {
                                             done(err);
                                         } else {
-                                            checkAccounting(buyInfo.apiKey, amount, compareFunction, function (err) {
+                                            util.checkAccounting(db, buyInfo.apiKey, amount, compareFunction, function (err) {
                                                 if (err) {
                                                     done(err);
                                                 } else {
@@ -539,11 +529,11 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 describe('Update subscriptions requests', function () {
 
                     it('should update the subscriptions when the update subscriptoin request is valid (call unit)', function (done) {
-                        testUpdateSubscription(VERSION, 'call', null, null, null, 'equal', undefined, done);
+                        testUpdateSubscription(VERSION, 'call', null, null, null, 'equal', null, done);
                     });
 
                     it('should update the subscriptions when the update subscription request is valid (megabyte unit)', function (done) {
-                        testUpdateSubscription(VERSION, 'megabyte', null, null, null, 'equal', undefined, done);
+                        testUpdateSubscription(VERSION, 'megabyte', null, null, null, 'equal', null, done);
                     });
 
                     it('should update the subscriptions when the update subscription request is valid (millisecond unit)', function (done) {
@@ -644,60 +634,50 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
                 describe('Update subscriptions requests', function () {
 
                     it('should return 204 and update the notification URL when the update subscription request is correct', function (done) {
-                        var subsInfo = {
-                            apiKey: data.DEFAULT_API_KEYS[0],
-                            expires: data.DEFAULT_EXPIRES,
-                            notificationUrl: data.updateNotificationUrl.notification.http.url,
-                            unit: data.DEFAULT_UNIT
-                        };
+                        var subsInfo = data.DEFAULT_SUBSCRIPTION_v2;
+                        subsInfo.notificationUrl = data.updateNotificationUrl.notification.http.url;
+                        subsInfo.url = 'http://localhost:' + testConfig.test_endpoint_port;
 
                         testUpdateSubscription(VERSION, subsInfo.unit, true, null, subsInfo, 'equal', undefined, done);
                     });
 
                     it('should return 204 and update the expiration time when the update request is correct (call unit)', function (done) {
                         var unit = 'call';
-                        var subsInfo = {
-                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
-                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
-                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
-                            unit: unit
-                        };
+                        var subsInfo = data.DEFAULT_SUBSCRIPTION_v2;
+                        subsInfo.notificationUrl = data.updateNotificationUrl.notification.http.url;
+                        subsInfo.url = 'http://localhost:' + testConfig.test_endpoint_port;
+                        subsInfo.unit = unit;
 
                         testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
                     });
 
                     it('should return 204 and update the expiration time when the update request is correct (megabyte unit)', function (done) {
                         var unit = 'megabyte';
-                        var subsInfo = {
-                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
-                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
-                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
-                            unit: unit
-                        };
+                        var subsInfo = data.DEFAULT_SUBSCRIPTION_v2;
+                        subsInfo.notificationUrl = data.updateNotificationUrl.notification.http.url;
+                        subsInfo.url = 'http://localhost:' + testConfig.test_endpoint_port;
+                        subsInfo.unit = unit;
 
                         testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
                     });
 
                     it('should return 204 and not update the expiration time when the new expiration date is before the old expiration date (millisecond unit)', function (done) {
                         var unit = 'millisecond';
-                        var subsInfo = {
-                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
-                            expires: data.DEFAULT_SUBSCRIPTION_v2.expires,
-                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
-                            unit: unit
-                        };
+                        var subsInfo = data.DEFAULT_SUBSCRIPTION_v2;
+                        subsInfo.notificationUrl = data.updateNotificationUrl.notification.http.url;
+                        subsInfo.url = 'http://localhost:' + testConfig.test_endpoint_port;
+                        subsInfo.unit = unit;
 
                         testUpdateSubscription(VERSION, unit, false, true, subsInfo, 'equal', undefined, done);
                     });
 
                     it('should return 204, update the expiration time and make the accounting when the new expiration date is after the old expiration date (millisecond unit)', function (done) {
                         var unit = 'millisecond';
-                        var subsInfo = {
-                            apiKey: data.DEFAULT_SUBSCRIPTION_v2.apiKey,
-                            expires: data.updateExpirationDateAfter.expires,
-                            notificationUrl: data.DEFAULT_SUBSCRIPTION_v2.notificationUrl,
-                            unit: unit
-                        };
+                        var subsInfo = data.DEFAULT_SUBSCRIPTION_v2;
+                        subsInfo.notificationUrl = data.updateNotificationUrl.notification.http.url;
+                        subsInfo.url = 'http://localhost:' + testConfig.test_endpoint_port;
+                        subsInfo.unit = unit;
+                        subsInfo.expires = data.updateExpirationDateAfter.expires;
 
                         testUpdateSubscription(VERSION, unit, false, false, subsInfo, 'notEqual', 0, done);
                     });

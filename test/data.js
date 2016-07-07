@@ -2,7 +2,7 @@ var data = {
 
     DEFAULT_TOKEN: 'token',
     DEFAULT_UNIT: 'megabyte',
-    DEFAULT_HREF: 'http://example:8080/api',
+    DEFAULT_HREFS: ['http://localhost:9040/usageSpecification/1', 'http://localhost:9040/usageSpecification/2'],
     DEFAULT_PUBLIC_PATHS: ['/public1', '/public2'],
     DEFAULT_APP_IDS: ['appId1', 'appId2'],
     DEFAULT_URLS: ['http://example:8080/path1', 'http://example:8080/path2'],
@@ -13,7 +13,6 @@ var data = {
     DEFAULT_NOTIFICATION_URL: 'http://notification/url',
     DEFAULT_ORDER_IDS: ['orderId1', 'orderId2'],
     DEFAULT_PRODUCT_IDS: ['productId1', 'productId2'],
-    DEFAULT_HREF: 'http://localhost/DSUsageManagement/1',
     DEFAULT_USER_ID: 'userId',
     DEFAULT_REQ_PATH: '/public/service',
     DEFAULT_PORT: 9000,

@@ -292,7 +292,7 @@ describe('Testing SQLITE database', function () {
     describe('Function "addSpecificationRef"', function() {
 
         var unit = data.DEFAULT_UNIT;
-        var href = data.DEFAULT_HREF;
+        var href = data.DEFAULT_HREFS[0];
 
         var sentence = 'INSERT OR REPLACE INTO units             VALUES ($unit, $href)';
         var params = { '$unit': unit, '$href': href};
@@ -316,7 +316,7 @@ describe('Testing SQLITE database', function () {
         var sentence = 'SELECT href             FROM units             WHERE $unit=unit';
         var unit = data.DEFAULT_UNIT;
         var params = {'$unit': unit};
-        var href = data.DEFAULT_HREF;
+        var href = data.DEFAULT_HREFS[0];
 
         var method = 'getHref';
         var args = [unit];

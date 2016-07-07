@@ -459,8 +459,7 @@ describe('Testing the administration API', function (done) {
                     var subscriptions = [];
                     var accounting = [];
                     var units = ['call', 'megabyte'];
-                    var hrefs = ['http://localhost:9040/usageSpecification/1',
-                                 'http://localhost:9040/usageSpecification/2'];
+                    var hrefs = data.DEFAULT_HREFS;
 
                     configMock.modules = {
                         accounting: units

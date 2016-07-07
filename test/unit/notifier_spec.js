@@ -269,7 +269,7 @@ describe('Testing Notifier', function () {
                     }
 
                     if (addHrefResult) {
-                        assert(spies.db.addSpecificationRef.calledWith(unit, data.DEFAULT_HREF));
+                        assert(spies.db.addSpecificationRef.calledWith(unit, data.DEFAULT_HREFS[0]));
                     }
 
                     done();
@@ -312,7 +312,7 @@ describe('Testing Notifier', function () {
                     statusCode: 201,
                 },
                 body: {
-                    href: data.DEFAULT_HREF
+                    href: data.DEFAULT_HREFS[0]
                 }
             };
             var errMsg = 'Error';
@@ -327,7 +327,7 @@ describe('Testing Notifier', function () {
                     statusCode: 201,
                 },
                 body: {
-                    href: data.DEFAULT_HREF
+                    href: data.DEFAULT_HREFS[0]
                 }
             };
 
@@ -348,10 +348,10 @@ describe('Testing Notifier', function () {
                 },
                 getHref: function (unit, callback) {
                     if (getHrefCallCount !== 0) {
-                        return callback(getHrefErr, data.DEFAULT_HREF);
+                        return callback(getHrefErr, data.DEFAULT_HREFS[0]);
                     } else {
                         getHrefCallCount ++;
-                        return callback(null, data.DEFAULT_HREF);
+                        return callback(null, data.DEFAULT_HREFS[0]);
                     }
                 },
                 resetAccounting: function (apiKey, callback) {

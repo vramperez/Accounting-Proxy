@@ -138,6 +138,7 @@ describe('Testing the usage notifier', function () {
             it('should not send notifications when there is no API Key for notifications available', function (done) {
 
                 var units = ['call', 'megabyte'];
+                var hrefs = [null, null];
 
                 configMock.modules = {
                     accounting: units
@@ -197,12 +198,13 @@ describe('Testing the usage notifier', function () {
 
             it('should notify the usage specifications and the usage when they have not been notified and there is an available token', function (done) {
 
-                var unit = data.DEFAULT_UNIT;
                 var token = data.DEFAULT_TOKEN;
                 var apiKey = data.DEFAULT_API_KEYS[0];
+                var units = [data.DEFAULT_UNIT];
+                var hrefs = [data.DEFAULT_HREFS[1]];
 
                 configMock.modules = {
-                    accounting: [unit]
+                    accounting: units
                 };
 
                 var service = data.DEFAULT_SERVICES_LIST[0];
@@ -220,21 +222,21 @@ describe('Testing the usage notifier', function () {
                         server.init(function (err) {
                             assert.equal(err, null);
 
-                            db.getHref(unit, function (err, href) {
-                                if (err) {
-                                    done(err);
-                                } else {
-                                    assert.equal(href, 'http://localhost:9040/usageSpecification/2');
+                            async.series([
+                                function (callback) {
+                                    util.checkUsageSpecifications(db, units, hrefs, callback);
+                                },
+                                function (callback) {
                                     db.getAllNotificationInfo(function (err, notificationInfo) {
                                         if (err) {
-                                            done(err);
+                                            callback(err);
                                         } else {
                                             assert.equal(notificationInfo, null);
-                                            done();
+                                            callback();
                                         }
                                     });
                                 }
-                            });
+                            ], done);
                         });
                     }
                 });

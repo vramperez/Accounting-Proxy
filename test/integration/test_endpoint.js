@@ -83,10 +83,10 @@ var updateSubscription = function (req, res) {
 
 var usageSpecificationHandler = function (req, res) {
     if (req.body.name === 'call') {
-        req.body['href'] = 'http://localhost:9040/usageSpecification/1';
+        req.body['href'] = data.DEFAULT_HREFS[0];
         res.status(201).json(req.body);
     } else {
-        req.body['href'] = 'http://localhost:9040/usageSpecification/2';
+        req.body['href'] = data.DEFAULT_HREFS[1];
         res.status(201).json(req.body);
     }
 };

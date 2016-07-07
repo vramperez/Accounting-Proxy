@@ -187,15 +187,15 @@ describe('Testing REDIS database', function () {
 
             var db = getDb(implementations);
 
-            db.addSpecificationRef(data.DEFAULT_UNIT, data.DEFAULT_HREF, function (err) {
+            db.addSpecificationRef(data.DEFAULT_UNIT, data.DEFAULT_HREFS[0], function (err) {
 
                 var toAdd = {};
-                toAdd[data.DEFAULT_UNIT.toString()] = data.DEFAULT_HREF;
+                toAdd[data.DEFAULT_UNIT.toString()] = data.DEFAULT_HREFS[0];
 
                 assert(hmsetSpy.calledWith('units', toAdd));
 
                 if (error) {
-                    assert.equal(err, 'Error adding the href specification: "' + data.DEFAULT_HREF + '" to unit "' + data.DEFAULT_UNIT + '" .');
+                    assert.equal(err, 'Error adding the href specification: "' + data.DEFAULT_HREFS[0] + '" to unit "' + data.DEFAULT_UNIT + '" .');
                 } else {
                     assert.equal(err, null);
                 }
@@ -224,7 +224,7 @@ describe('Testing REDIS database', function () {
         });
 
         it('should call the callback without error when db gets the usage specification href', function (done) {
-            testGet(method, hash, key, key, null, data.DEFAULT_HREF, data.DEFAULT_HREF, done); 
+            testGet(method, hash, key, key, null, data.DEFAULT_HREFS[0], data.DEFAULT_HREFS[0], done); 
         });
     });
 

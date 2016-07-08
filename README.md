@@ -201,7 +201,7 @@ Proxy's api is in port **9000** by default and root path **/accounting_proxy/..*
 
 ### POST .../newBuy
 
-Use by the store to notify a new buy:
+Used by the store to notify a new buy:
 ```json
 {
  "orderId": "...",
@@ -223,7 +223,7 @@ Use by the store to notify a new buy:
 
 ### POST .../deleteBuy
 
-Use by the store to notify a deleted buy:
+Used by the store to notify a deleted buy:
 ```json
 {
  "orderId": "...",
@@ -237,7 +237,7 @@ Use by the store to notify a deleted buy:
 
 ### POST .../urls
 
-Use by the store to check if an URL is valid. This requests require the "authorization" header with a valid access token from the IdM and the user must be an administrator of the service.
+Used by the store to check if an URL is valid. This requests require the "authorization" header with a valid access token from the IdM and the user must be an administrator of the service.
 ```json
 {
  "url": "..."

@@ -27,7 +27,7 @@ var expressWinstonMock = {
 };
 
 var notifierMock = {
-    notifyUsage: function (callback) {
+    notifyAllUsage: function (callback) {
         return callback(null);
     }
 };

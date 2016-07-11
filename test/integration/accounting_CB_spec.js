@@ -26,7 +26,7 @@ var configMock = util.getConfigMock(true);
 
 var mocker = function (database,done) {
 
-    var authenticationMock, accounterMock, cbHandlerMock, orionModuleV1Mock;
+    var authenticationMock, accounterMock, cbHandlerMock, orionModuleV1Mock, orionModuleV2Mock;
 
     if (database === 'sql') {
 
@@ -137,10 +137,10 @@ var mocker = function (database,done) {
                 './config': configMock,
                 './db_Redis': db,
                 'winston': util.logMock, // Not display logger messages while testing
-                './orion_context_broker/cbHandler': cbHandlerMock,
                 'express-winston': util.expressWinstonMock,
-                './OAuth2_authentication': authenticationMock,
                 './accounter': accounterMock,
+                './orion_context_broker/cbHandler': cbHandlerMock,
+                './OAuth2_authentication': authenticationMock,
                 './notifier': util.notifierMock
             });
         }

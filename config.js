@@ -94,6 +94,9 @@ config.resources = {
 // Configures the administration paths for the administration API used by the WStore.
 config.api = {
 
+    // Enable the verification of certificates for administration requests (newBuy, deleteBuy and checkURL).
+    verifyCert: true,
+
     administration_paths: {
         keys: '/accounting_proxy/keys',
         units: '/accounting_proxy/units',

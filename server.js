@@ -328,24 +328,6 @@ var handler = function (req, res) {
     });
 };
 
-/**
- * Read the data stream and store in the body property of the request.
- *
- * @param  {Object}   req  Incoming request.
- * @param  {Object}   res  Outgoing response.
- */
-var getBody = function (req, res, next) {
-    req.body = '';
-
-    req.on('data', function (chunk) {
-        req.body += chunk;
-    });
-
-    req.on('end', function () {
-        next();
-    });
-};
-
 app.use(expressWinston.logger({
     transports: [
         new logger.transports.File({
@@ -364,6 +346,6 @@ app.post(admin_paths.deleteBuy, util.validateCert, api.checkIsJSON, bodyParser.j
 app.get(admin_paths.units, api.getUnits);
 app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 
-app.use('/', oauth2.headerAuthentication, getBody, handler);
+app.use('/', oauth2.headerAuthentication, util.getBody, handler);
 
 module.exports.app = app;

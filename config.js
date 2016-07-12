@@ -100,7 +100,11 @@ config.api = {
         newBuy: '/accounting_proxy/newBuy',
         checkURL: '/accounting_proxy/urls',
         deleteBuy: '/accounting_proxy/deleteBuy'
-    }
+    },
+
+    certFile: 'ssl/server1.pem',
+    certKeyFile: 'ssl/server1.key',
+    cas: ['ssl/fake_ca.pem']
 };
 
 // OAuth2 configuration.

@@ -11,7 +11,10 @@ var express = require('express'),
     cron = require('node-schedule'),
     oauth2 = require('./OAuth2_authentication'),
     notifier = require('./notifier'),
-    expressWinston = require('express-winston');
+    expressWinston = require('express-winston'),
+    https = require('https'),
+    fs = require('fs'),
+    util = require('./util');
 
 "use strict";
 
@@ -69,9 +72,29 @@ exports.init = function (callback) {
                 });
             });
 
-            server = app.listen(app.get('port'));
+            var cas = [];
 
-            return callback(null);
+            async.each(config.api.cas, function (ca, taskCallback) {
+                cas.push(fs.readFileSync(ca));
+                taskCallback();
+            }, function (err) {
+                if (err) {
+                    return callback(err);
+                } else {
+
+                    var opts = {
+                        key: fs.readFileSync(config.api.certKeyFile),
+                        cert: fs.readFileSync(config.api.certFile),
+                        ca: cas,
+                        requestCert: true,
+                        rejectUnauthorized: false
+                    };
+
+                    server = https.createServer(opts, app).listen(app.get('port'));
+
+                    return callback(null);
+                }
+            });
         }
     });
 };
@@ -335,9 +358,9 @@ app.use(expressWinston.logger({
 
 app.set('port', config.accounting_proxy.port);
 
-app.post(admin_paths.checkURL, oauth2.headerAuthentication, api.checkIsJSON, bodyParser.json(), api.checkURL);
-app.post(admin_paths.newBuy, api.checkIsJSON, bodyParser.json(), api.newBuy);
-app.post(admin_paths.deleteBuy, api.checkIsJSON, bodyParser.json(), api.deleteBuy);
+app.post(admin_paths.checkURL, util.validateCert, oauth2.headerAuthentication, api.checkIsJSON, bodyParser.json(), api.checkURL);
+app.post(admin_paths.newBuy, util.validateCert, api.checkIsJSON, bodyParser.json(), api.newBuy);
+app.post(admin_paths.deleteBuy, util.validateCert, api.checkIsJSON, bodyParser.json(), api.deleteBuy);
 app.get(admin_paths.units, api.getUnits);
 app.get(admin_paths.keys, oauth2.headerAuthentication, api.getApiKeys);
 

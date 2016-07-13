@@ -28,7 +28,9 @@ var mocker = function (implementations, callback) {
         var config = implementations.config ? implementations.config : DEFAULT_CONFIG;
         if (implementations.config) {
             for (var key in DEFAULT_CONFIG) {
-                config[key] = DEFAULT_CONFIG[key]
+                if (config[key] === undefined) {
+                    config[key] = DEFAULT_CONFIG[key]
+                }
             };
         }
 
@@ -41,6 +43,15 @@ var mocker = function (implementations, callback) {
         var logger = implementations.logger ? implementations.logger : {};
         logger.transports = {
             File: function (options) {}
+        };
+
+        var utilMock = {
+            getBody: function (req, res, callback) {
+                return callback();
+            },
+            validateCert: function (req, res, callback) {
+                return callback();
+            }
         };
 
         var server = proxyquire('../../server', {
@@ -59,7 +70,10 @@ var mocker = function (implementations, callback) {
             'express-winston': {logger: function (transports) {} },
             './orion_context_broker/cbHandler': implementations.contextBroker ? implementations.contextBroker : {},
             './accounter': implementations.accounter ? implementations.accounter : {},
-            './OAuth2_authentication': implementations.authenticator ? implementations.authenticator : {}
+            './OAuth2_authentication': implementations.authenticator ? implementations.authenticator : {},
+            'https': implementations.https ? implementations.https : {},
+            'fs': implementations.fs ? implementations.fs : {},
+            './util': utilMock
         });
 
         return callback(server, spies);
@@ -99,6 +113,12 @@ describe('Testing Server', function () {
                     },
                     usageAPI: {
                         schedule: '00 00 * * *'
+                    },
+                    api: {
+                        certFile: 'cert.pem',
+                        certKeyFile: 'cert.key',
+                        cas: ['ca.pem'],
+                        administration_paths: DEFAULT_CONFIG.api.administration_paths
                     }
                 },
                 cron: {
@@ -122,11 +142,29 @@ describe('Testing Server', function () {
                     close: function (callback) {
                         return callback(stopErr);
                     }
+                },
+                https: {
+                    createServer: function (opts, app) {
+                        return app;
+                    }
+                },
+                fs: {
+                    readFileSync: function (file) {
+                        return 'file content';
+                    }
                 }
             };
 
             implementations.app.listen = function (port) {
                 return implementations.server;
+            };
+
+            var options = {
+                cert: 'file content',
+                key: 'file content',
+                ca: ['file content'],
+                requestCert: true,
+                rejectUnauthorized: false
             };
 
             mocker(implementations, function (server, spies) {
@@ -149,6 +187,10 @@ describe('Testing Server', function () {
                         assert(spies.cron.scheduleJob.calledWith(implementations.config.usageAPI.schedule));
                         assert(spies.notifier.notifyAllUsage.calledTwice);
                         assert(spies.logger.error.calledWith('Error while notifying the accounting: ' + notifyErrCron));
+                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.certFile));
+                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.certKeyFile));
+                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.cas[0]));
+                        assert(spies.https.createServer.calledWith(options));
                         assert(spies.app.get.calledWith('port'));
                         assert(spies.app.listen.calledWith(port));
 
@@ -253,7 +295,7 @@ describe('Testing Server', function () {
                     log: function (level, msg) {}
                 },
                 app: {
-                    use: function (path, middleqare1, middleware2, handler) {
+                    use: function (path, middleware1, middleware2, handler) {
                         if (path === '/') {
                             middleware2(implementations.req, implementations.res, function () {});
                             handler(implementations.req, implementations.res);

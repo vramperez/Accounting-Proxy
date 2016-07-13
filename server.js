@@ -77,23 +77,19 @@ exports.init = function (callback) {
             async.each(config.api.cas, function (ca, taskCallback) {
                 cas.push(fs.readFileSync(ca));
                 taskCallback();
-            }, function (err) {
-                if (err) {
-                    return callback(err);
-                } else {
+            }, function () {
 
-                    var opts = {
-                        key: fs.readFileSync(config.api.certKeyFile),
-                        cert: fs.readFileSync(config.api.certFile),
-                        ca: cas,
-                        requestCert: true,
-                        rejectUnauthorized: false
-                    };
+                var opts = {
+                    key: fs.readFileSync(config.api.certKeyFile),
+                    cert: fs.readFileSync(config.api.certFile),
+                    ca: cas,
+                    requestCert: true,
+                    rejectUnauthorized: false
+                };
 
-                    server = https.createServer(opts, app).listen(app.get('port'));
+                server = https.createServer(opts, app).listen(app.get('port'));
 
-                    return callback(null);
-                }
+                return callback(null);
             });
         }
     });

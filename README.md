@@ -213,7 +213,7 @@ Proxy's api is in port **9000** by default and root path **/accounting_proxy/..*
 
 ### POST .../newBuy
 
-Used by the store to notify a new buy. If the accounting proxy has been started over HTTPS, this requests should be signed with the Store cert; otherwise, they will be rejected.
+Used by the store to notify a new buy. If the accounting proxy has been started over HTTPS, these requests should be signed with the Store cert; otherwise, they will be rejected.
 ```json
 {
  "orderId": "...",
@@ -235,7 +235,7 @@ Used by the store to notify a new buy. If the accounting proxy has been started 
 
 ### POST .../deleteBuy
 
-Used by the store to notify a deleted buy. If the accounting proxy has been started over HTTPS, this requests should be signed with the Store cert; otherwise, they will be rejected.
+Used by the store to notify a deleted buy. If the accounting proxy has been started over HTTPS, these requests should be signed with the Store cert; otherwise, they will be rejected.
 ```json
 {
  "orderId": "...",
@@ -249,7 +249,7 @@ Used by the store to notify a deleted buy. If the accounting proxy has been star
 
 ### POST .../urls
 
-Used by the store to check if an URL is valid. This requests require the "authorization" header with a valid access token from the IdM and the user must be an administrator of the service. If the accounting proxy has been started over HTTPS, this requests should be signed with the Store cert; otherwise, they will be rejected.
+Used by the store to check if an URL is valid. This requests require the "authorization" header with a valid access token from the IdM and the user must be an administrator of the service. If the accounting proxy has been started over HTTPS, these requests should be signed with the Store cert; otherwise, they will be rejected.
 ```json
 {
  "url": "..."

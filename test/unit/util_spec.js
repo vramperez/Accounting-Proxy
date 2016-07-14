@@ -65,14 +65,14 @@ describe('Testing util', function () {
 
 	describe('Function validCert', function () {
 
-		var testValidateCert = function (verifyCert, authorized, done) {
+		var testValidateCert = function (enableHttps, authorized, done) {
 
 			var configMock = {
-				api: {
-					verifyCert: verifyCert
+				accounting_proxy: {
+					https: enableHttps ? {enabled: true} : {}
 				}
 			};
-
+			console.log(configMock)
 			var req = {
 				client: {
 					authorized: authorized,
@@ -97,7 +97,7 @@ describe('Testing util', function () {
 
 			util.validateCert(req, res, next);
 
-			if (verifyCert && !authorized) {
+			if (enableHttps && !authorized) {
 				assert(statusSpy.calledWith(401));
 				assert(jsonSpy.calledWith({error: 'Unauthorized: Client certificate required ' + req.client.authorizationError}));
 			} else {
@@ -107,11 +107,11 @@ describe('Testing util', function () {
 			done();
 		};
 
-		it('should call the callback when the verifyCert is disabled', function (done) {
+		it('should call the callback when the https is disabled', function (done) {
 			testValidateCert(false, true, done);
 		});
 
-		it('should return 401 when the request cert is not valid and verifyCert is enabled', function (done) {
+		it('should return 401 when the request cert is not valid and https is enabled', function (done) {
 			testValidateCert(true, false, done);
 		});
 	});

@@ -22,7 +22,7 @@ var FIWAREStrategyMock = util.getStrategyMock(userProfile);
 var DEFAULT_URL = 'http://localhost:' + testConfig.test_endpoint_port;
 var DEFAULT_TYPE = data.DEFAULT_IS_NOT_CB_SERVICE;
 
-var configMock = util.getConfigMock(false);
+var configMock = util.getConfigMock(false, false);
 
 var mocker = function (database, done) {
 

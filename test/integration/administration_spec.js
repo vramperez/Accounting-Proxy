@@ -3,7 +3,7 @@ var request = require('supertest'),
     proxyquire = require('proxyquire'),
     test_config = require('../config_tests').integration,
     testEndpoint = require('./test_endpoint'),
-    util = require('../util'),
+    testUtil = require('../util'),
     async = require('async'),
     redis = require('redis'),
     testConfig = require('../config_tests').integration,
@@ -14,16 +14,16 @@ var request = request('http://localhost:' + testConfig.accounting_proxy_port);
 var server, db;
 var databaseName = 'testDB_administration.sqlite';
 
-var configMock = util.getConfigMock(true);
+var configMock = testUtil.getConfigMock(true, false);
 
 var userProfile = data.DEFAULT_USER_PROFILE;
 userProfile.token = data.DEFAULT_TOKEN;
 
-var FIWAREStrategyMock = util.getStrategyMock(userProfile);
+var FIWAREStrategyMock = testUtil.getStrategyMock(userProfile);
 
 var mocker = function (database, done) {
 
-    var authentication, apiServer, notifier, cbHandler;
+    var authentication, apiServer, notifier, cbHandler, util;
 
     if (database === 'sql') {
 
@@ -37,13 +37,13 @@ var mocker = function (database, done) {
         authentication = proxyquire('../../OAuth2_authentication', {
             'passport-fiware-oauth': FIWAREStrategyMock,
             './config': configMock,
-            'winston': util.logMock,
+            'winston': testUtil.logMock,
             './db': db
         });
 
         notifier = proxyquire('../../notifier', {
             './config': configMock,
-            'winston': util.logMock,
+            'winston': testUtil.logMock,
             './db': db
         });
 
@@ -53,9 +53,13 @@ var mocker = function (database, done) {
 
         apiServer = proxyquire('../../APIServer', {
             './config': configMock,
-            'winston': util.logMock,
+            'winston': testUtil.logMock,
             './db': db,
             './notifier': notifier
+        });
+
+        util = proxyquire('../../util', {
+            './config': configMock
         });
 
         server = proxyquire('../../server', {
@@ -64,9 +68,10 @@ var mocker = function (database, done) {
             './APIServer': apiServer,
             './OAuth2_authentication': authentication,
             './notifier': notifier,
-            'winston': util.logMock, // Not display logger messages while testing
-            'express-winston': util.expressWinstonMock,
-            './orion_context_broker/cbHandler': cbHandler
+            'winston': testUtil.logMock, // Not display logger messages while testing
+            'express-winston': testUtil.expressWinstonMock,
+            './orion_context_broker/cbHandler': cbHandler,
+            './util': util
         });
     } else {
 
@@ -89,19 +94,19 @@ var mocker = function (database, done) {
             authentication = proxyquire('../../OAuth2_authentication', {
                 'passport-fiware-oauth': FIWAREStrategyMock,
                 './config': configMock,
-                'winston': util.logMock,
+                'winston': testUtil.logMock,
                 './db_Redis': db
             });
 
             notifier = proxyquire('../../notifier', {
                 './config': configMock,
-                'winston': util.logMock,
+                'winston': testUtil.logMock,
                 './db': db
             });
 
             apiServer = proxyquire('../../APIServer', {
                 './config': configMock,
-                'winston': util.logMock,
+                'winston': testUtil.logMock,
                 './db_Redis': db,
                 './notifier': notifier
             });
@@ -110,15 +115,20 @@ var mocker = function (database, done) {
                 '../config': configMock
             });
 
+            util = proxyquire('../../util', {
+                './config': configMock
+            });
+
             server = proxyquire('../../server', {
                 './config': configMock,
                 './db_Redis': db,
                 './APIServer': apiServer,
                 './OAuth2_authentication': authentication,
                 './notifier': notifier,
-                'winston': util.logMock, // Not display logger messages while testing
-                'express-winston': util.expressWinstonMock,
-                './orion_context_broker/cbHandler': cbHandler
+                'winston': testUtil.logMock, // Not display logger messages while testing
+                'express-winston': testUtil.expressWinstonMock,
+                './orion_context_broker/cbHandler': cbHandler,
+                './util': util
             });
         }
     }
@@ -139,7 +149,7 @@ after(function (done) {
         if (err) {
             done(err);
         } else {
-            util.removeDatabase(databaseName, done);
+            testUtil.removeDatabase(databaseName, done);
         }
     });
 });
@@ -202,7 +212,7 @@ describe('Testing the administration API', function (done) {
             beforeEach(function (done) {
                 this.timeout(5000);
 
-                util.clearDatabase(database, databaseName, function (err) {
+                testUtil.clearDatabase(database, databaseName, function (err) {
                     if (err) {
                         done(err);
                     } else {
@@ -264,7 +274,7 @@ describe('Testing the administration API', function (done) {
                         buyInfos.push(data.DEFAULT_BUY_INFORMATION[1]);
                     }
 
-                    util.addToDatabase(db, services, buyInfos, [], [], [], [], [], function (err) {
+                    testUtil.addToDatabase(db, services, buyInfos, [], [], [], [], [], function (err) {
                         if (err) {
                             done(err);
                         } else {
@@ -342,7 +352,7 @@ describe('Testing the administration API', function (done) {
                     var admin = {idAdmin: userProfile.id, publicPath: service.publicPath};
                     var url = 'http://localhost' + service.publicPath;
 
-                    util.addToDatabase(db, [service], [], [], [admin], [], [], oldToken, function (err) {
+                    testUtil.addToDatabase(db, [service], [], [], [admin], [], [], oldToken, function (err) {
                         if (err) {
                             done(err);
                         } else {
@@ -404,7 +414,7 @@ describe('Testing the administration API', function (done) {
                         }
                     };
 
-                    util.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
+                    testUtil.addToDatabase(db, [service], [], [], [], [], [], null, function (err) {
                         if (err) {
                             done(err);
                         } else {
@@ -488,7 +498,7 @@ describe('Testing the administration API', function (done) {
                         };
                     }
 
-                    util.addToDatabase(db, [service], [buyInfo], subscriptions, [], accounting, [], token, function (err) {
+                    testUtil.addToDatabase(db, [service], [buyInfo], subscriptions, [], accounting, [], token, function (err) {
                         if (err) {
                             done(err);
                         } else {
@@ -504,7 +514,7 @@ describe('Testing the administration API', function (done) {
                                         async.series([
                                             function (callback) { // Check notified specifications
                                                 if (notification) {
-                                                    util.checkUsageSpecifications(db, units, hrefs, callback);
+                                                    testUtil.checkUsageSpecifications(db, units, hrefs, callback);
                                                 } else {
                                                     callback(null);
                                                 }

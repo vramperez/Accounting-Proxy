@@ -9,7 +9,7 @@ var assert = require('assert'),
 var server, db, notifierMock;
 var databaseName = 'testDB_usageAPI.sqlite';
 
-var configMock = util.getConfigMock(false);
+var configMock = util.getConfigMock(false, false);
 
 // Necessary in order to avoid ERRADDRINUSE when call listening more than once
 var appMock = {

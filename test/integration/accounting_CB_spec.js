@@ -316,6 +316,8 @@ describe('Testing the accounting API. Orion Context-Broker requests', function (
             
         describe('with database ' + database, function () {
 
+            this.timeout(4000);
+
             // Clear the database and mock dependencies
             beforeEach(function (done) {
                 this.timeout(5000);

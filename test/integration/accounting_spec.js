@@ -128,6 +128,8 @@ describe('Testing the accounting API. Generic REST use', function () {
 
         describe('with database ' + database, function () {
 
+            this.timeout(4000);
+
             // Clear the database and mock dependencies
             beforeEach(function (done) {
                 this.timeout(5000);

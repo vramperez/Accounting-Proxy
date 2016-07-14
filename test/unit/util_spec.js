@@ -72,7 +72,7 @@ describe('Testing util', function () {
 					https: enableHttps ? {enabled: true} : {}
 				}
 			};
-			console.log(configMock)
+
 			var req = {
 				client: {
 					authorized: authorized,

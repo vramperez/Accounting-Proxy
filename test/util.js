@@ -46,9 +46,18 @@ exports.getStrategyMock = function (userProfile) {
 };
 
 // Return a configuration mock for testing
-exports.getConfigMock = function (enableCB) {
-    return {
+exports.getConfigMock = function (enableCB, enableHttps) {
+
+    var httpsConfig = {
+        enabled: true,
+        certFile: 'ssl/server1.pem',
+        keyFile: 'ssl/server1.key',
+        caFile: 'ssl/fake_ca.pem'
+    };
+
+    return  {
         accounting_proxy: {
+            https: enableHttps ? httpsConfig : undefined, 
             port: testConfig.accounting_proxy_port
         },
         resources: {

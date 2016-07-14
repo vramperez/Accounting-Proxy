@@ -82,10 +82,15 @@ var mocker = function (implementations, callback) {
 
 describe('Testing Server', function () {
 
-    var testInitAndStop = function (initErr, unit, notifyErr, notifyErrCron, stopErr, getAccModules, done) {
+    var testInitAndStop = function (initErr, unit, notifyErr, notifyErrCron, stopErr, getAccModules, enableHttps, done) {
 
             var port = data.DEFAULT_PORT;
             var notifyCallCount = 0;
+            var mockConfig = util.getConfigMock(true, enableHttps);
+            mockConfig.database.type = './db';
+            mockConfig.modules = {
+                accounting: [unit]
+            };
 
             var implementations = {
                 db: {
@@ -104,23 +109,7 @@ describe('Testing Server', function () {
                         }
                     }
                 },
-                config: {
-                    resources: {
-                        contextBroker: true
-                    },
-                    modules: {
-                        accounting: [unit]
-                    },
-                    usageAPI: {
-                        schedule: '00 00 * * *'
-                    },
-                    api: {
-                        certFile: 'cert.pem',
-                        certKeyFile: 'cert.key',
-                        cas: ['ca.pem'],
-                        administration_paths: DEFAULT_CONFIG.api.administration_paths
-                    }
-                },
+                config: mockConfig,
                 cron: {
                     scheduleJob: function (schedule, callback) {
                         return callback(true)
@@ -162,7 +151,7 @@ describe('Testing Server', function () {
             var options = {
                 cert: 'file content',
                 key: 'file content',
-                ca: ['file content'],
+                ca: 'file content',
                 requestCert: true,
                 rejectUnauthorized: false
             };
@@ -187,10 +176,14 @@ describe('Testing Server', function () {
                         assert(spies.cron.scheduleJob.calledWith(implementations.config.usageAPI.schedule));
                         assert(spies.notifier.notifyAllUsage.calledTwice);
                         assert(spies.logger.error.calledWith('Error while notifying the accounting: ' + notifyErrCron));
-                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.certFile));
-                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.certKeyFile));
-                        assert(spies.fs.readFileSync.calledWith(implementations.config.api.cas[0]));
-                        assert(spies.https.createServer.calledWith(options));
+
+                        if (enableHttps) {
+                            assert(spies.fs.readFileSync.calledWith(implementations.config.accounting_proxy.https.certFile));
+                            assert(spies.fs.readFileSync.calledWith(implementations.config.accounting_proxy.https.keyFile));
+                            assert(spies.fs.readFileSync.calledWith(implementations.config.accounting_proxy.https.caFile));
+                            assert(spies.https.createServer.calledWith(options));
+                        }
+
                         assert(spies.app.get.calledWith('port'));
                         assert(spies.app.listen.calledWith(port));
 
@@ -218,37 +211,41 @@ describe('Testing Server', function () {
     describe('Function "initialize"', function () {
 
         it('should call the callback with error when db fails initializing', function (done) {
-            testInitAndStop(true, null, false, false, undefined, false, done);
+            testInitAndStop(true, null, false, false, undefined, false, false, done);
         });
 
         it('should call the callback with error when there is no accounting module for an accounting unit', function (done) {
-            testInitAndStop(false, 'wrong', false, false, undefined, false, done);
+            testInitAndStop(false, 'wrong', false, false, undefined, false, false, done);
         });
 
         it('should call the callback with error when there is an error notifying the usage', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, true, false, undefined, false, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, true, false, undefined, false, false, done);
         });
 
-        it('should call the callback without error and initialize the proxy when there is no error initializing', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, false, done);
+        it('should call the callback without error and initialize the proxy when there is no error initializing over http', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, false, false, done);
+        });
+
+        it('should call the callback without error and initialize the proxy when there is no error initializing over https', function (done) {
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, false, true, done);
         });
     });
 
     describe('Function "stop"', function () {
 
         it('should call the callback with error when there is an error stopping the server', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, 'Error', false, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, 'Error', false, false, done);
         });
 
         it('should call the callback without error when there is no error stopping the server', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, null, false, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, null, false, false, done);
         });
     });
 
     describe('Function "getAccountingModules"', function () {
 
         it('should return the accounting modules when they have been loaded', function (done) {
-            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, true, done);
+            testInitAndStop(false, data.DEFAULT_UNIT, false, true, undefined, true, false, done);
         });
     });
 

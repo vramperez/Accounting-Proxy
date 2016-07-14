@@ -24,6 +24,8 @@ var admin_paths = config.api.administration_paths;
 var accountingModules = {};
 var server;
 
+config.accounting_proxy.https = config.accounting_proxy.https || {};
+
 /**
  * Load all the accounting modules for the supported accounting units.
  */
@@ -72,25 +74,23 @@ exports.init = function (callback) {
                 });
             });
 
-            var cas = [];
+            if (config.accounting_proxy.https.enabled) {
 
-            async.each(config.api.cas, function (ca, taskCallback) {
-                cas.push(fs.readFileSync(ca));
-                taskCallback();
-            }, function () {
-
-                var opts = {
-                    key: fs.readFileSync(config.api.certKeyFile),
-                    cert: fs.readFileSync(config.api.certFile),
-                    ca: cas,
+                var options = {
+                    key: fs.readFileSync(config.accounting_proxy.https.keyFile),
+                    cert: fs.readFileSync(config.accounting_proxy.https.certFile),
+                    ca: fs.readFileSync(config.accounting_proxy.https.caFile),
                     requestCert: true,
                     rejectUnauthorized: false
                 };
 
-                server = https.createServer(opts, app).listen(app.get('port'));
+                server = https.createServer(options, app).listen(app.get('port'));
 
-                return callback(null);
-            });
+            } else {
+                server = app.listen(app.get('port'));
+            }
+
+            return callback(null);
         }
     });
 };

@@ -5,6 +5,14 @@ var config = {};
 // Configures the address and ports for the accounting proxy.
 config.accounting_proxy = {
 
+    // Set this var to undefined if you don't want the server to listen on HTTPS
+    https: {
+        enabled: true,
+        certFile: 'ssl/server1.pem',
+        keyFile: 'ssl/server1.key',
+        caFile: 'ssl/fake_ca.pem'
+    },
+
     /**
      * Port where the accounting proxy server is listening.
      */
@@ -94,20 +102,13 @@ config.resources = {
 // Configures the administration paths for the administration API used by the WStore.
 config.api = {
 
-    // Enable the verification of certificates for administration requests (newBuy, deleteBuy and checkURL).
-    verifyCert: true,
-
     administration_paths: {
         keys: '/accounting_proxy/keys',
         units: '/accounting_proxy/units',
         newBuy: '/accounting_proxy/newBuy',
         checkURL: '/accounting_proxy/urls',
         deleteBuy: '/accounting_proxy/deleteBuy'
-    },
-
-    certFile: 'ssl/server1.pem',
-    certKeyFile: 'ssl/server1.key',
-    cas: ['ssl/fake_ca.pem']
+    }
 };
 
 // OAuth2 configuration.

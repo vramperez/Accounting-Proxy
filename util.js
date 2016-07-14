@@ -43,7 +43,7 @@ exports.getBody = function (req, res, next) {
  * @param      {Object}    res     Outgoing response.
  */
 exports.validateCert = function (req, res, next) {
-    if (config.api.verifyCert && !req.client.authorized) {
+    if (config.accounting_proxy.https.enabled && !req.client.authorized) {
         res.status(401).json({error: 'Unauthorized: Client certificate required ' + req.client.authorizationError});
     } else {
         next();

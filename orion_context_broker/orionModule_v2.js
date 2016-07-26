@@ -2,38 +2,9 @@ var request = require('request'),
     config = require('../config'),
     accounter = require('../accounter'),
     async = require('async'),
-    moment = require('moment'),
     url = require('url');
 
 var db = require('../' + config.database.type);
-
-/**
- * Return the duration in ISO8601 format between the two dates passed as argument.
- *
- * @param  {String} date1 Date in ISO8601 format
- * @param  {String} date2 Date in ISO8601 format
- */
-var getDuration = function (date1, date2) {
-
-    var moment1 = moment(date1);
-    var moment2 = moment(date2);
-
-    return moment2.diff(moment1);
-};
-
-/**
- * Return true if newDate is after oldDate.
- * 
- * @param  {String} oldDate Date in ISO8601 format
- * @param  {[type]} newDate Date in ISO8601 format
- */
-var extendSubscription = function (oldDate, newDate) {
-
-    var now = moment(oldDate);
-    var then = moment(newDate);
-
-    return then.isAfter(now);
-};
 
 /**
  * Return the notification URL contained in the notification object.
@@ -55,8 +26,6 @@ var getNotificationUrl = function (notification) {
 
 /**
  * Save the subscription in the db and redirect the response to the user.
- * If the accounting unit is millisecond, extract the subscription duration
- * and make the accounting.
  *
  * @param  {Object}     req          Incoming request.
  * @param  {Object}     res          Outgoing response.
@@ -96,8 +65,6 @@ exports.subscribe = function (req, res, unit, options, callback) {
 
             var location = resp.headers['location'];
             var subscriptionId = location.substr(location.lastIndexOf('/') + 1);
-            var expires = subscription.expires;
-            var duration = expires ? getDuration(moment(), expires) : null; // TODO: null --> unlimited duration
             var notificationUrl = getNotificationUrl(subscription.notification);
 
             response.status = resp.statusCode;
@@ -111,19 +78,12 @@ exports.subscribe = function (req, res, unit, options, callback) {
                 var apiKey = req.get("X-API-KEY");
 
                 // Store the endpoint information of the subscriber to be notified
-                db.addCBSubscription(apiKey, subscriptionId, notificationUrl, expires, 'v2', function (err) {
+                db.addCBSubscription(apiKey, subscriptionId, notificationUrl, 'v2', function (err) {
 
                     if (err) {
                         return callback(err, response);
                     } else {
-
-                        accounter.count(apiKey, unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
-                            if (err && err.code !== 'invalidFunction') {
-                                return callback(err.msg, response);
-                            } else {
-                                return callback(null, response);
-                            }
-                        });
+                        return callback(null, response);
                     }
                 });
             });
@@ -215,6 +175,7 @@ exports.updateSubscription = function (req, res, options, callback) {
 
             response.status = resp.statusCode;
             response.body = body;
+            var error = null;
 
             async.forEachOf(resp.headers, function (header, key, taskCallback) {
                 res.setHeader(key, header);
@@ -222,62 +183,14 @@ exports.updateSubscription = function (req, res, options, callback) {
             }, function () {
 
                 var notificationUrl = update.notification ? getNotificationUrl(update.notification) : undefined;
-                var expires = update.expires
 
-                db.getCBSubscription(subscriptionId, function (err, subscriptionInfo) {
+                if (notificationUrl) {
+                    db.updateNotificationUrl(subscriptionId, notificationUrl, function (err) {
+                        error = err;
+                    });
+                }
 
-                    if (err) {
-                        return callback(err, response);
-                    } else if (!subscriptionInfo) {
-                        return callback('Subscription "' + subscriptionId + '" not in database.', response);
-                    } else {
-
-                        async.series([
-                            function (callback) {
-
-                                // Save new notification URL
-                                if (notificationUrl) {
-                                    db.updateNotificationUrl(subscriptionId, notificationUrl, callback);
-                                } else {
-                                    callback(null);
-                                }
-                            },
-                            function (callback) {
-
-                                // Make the accounting if the subscription time is increased and save the new expiration date
-                                if (expires && extendSubscription(subscriptionInfo.expires, expires)) {
-
-                                    db.updateExpirationDate(subscriptionId, expires, function (err) {
-                                        if (err) {
-                                            callback(err);
-                                        } else {
-
-                                            var apiKey = req.get('X-API-KEY');
-                                            var duration = getDuration(subscriptionInfo.expires, expires);
-
-                                            accounter.count(apiKey, subscriptionInfo.unit, {request: { duration: duration}}, 'subscriptionCount', function (err) {
-                                                if (err && err.code !== 'invalidFunction') {
-                                                    callback(err.msg);
-                                                } else {
-                                                    callback(null);
-                                                }
-                                            });
-                                        }
-                                    });
-
-                                } else {
-                                    callback(null);
-                                }
-                            }
-                        ], function (err) {
-                            response = {
-                                status: resp.statusCode,
-                                body: body,
-                            }
-                            return callback(err, response);
-                        });
-                    }
-                });
+                return callback(error, response);
             });
         }
     });

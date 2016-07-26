@@ -63,15 +63,7 @@ var specification = {
 };
 
 var count = function (countInfo, callback) {
-    if (countInfo.request.time === undefined || countInfo.response.time === undefined) {
-        return callback(null, 0);
-    } else {
-        return callback(null, countInfo.response.time - countInfo.request.time);
-    }
-};
-
-var subscriptionCount = function (countInfo, callback) {
-    return callback(null, moment.duration(countInfo.request.duration).asMilliseconds());
+    return callback(null, countInfo.response.elapsedTime);
 };
 
 var getSpecification = function () {
@@ -80,4 +72,3 @@ var getSpecification = function () {
 
 exports.count = count;
 exports.getSpecification = getSpecification;
-exports.subscriptionCount = subscriptionCount;

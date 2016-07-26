@@ -84,8 +84,7 @@ exports.cancelSubscription = function (subscriptionInfo, callback) {
  */
 var notificationHandler = function (req, res) {
     var countInfo = {
-        request: req,
-        response: {}
+        request: req
     };
     var body = req.body;
     var subscriptionId = body.subscriptionId;
@@ -96,30 +95,32 @@ var notificationHandler = function (req, res) {
             logger.error('An error ocurred while making the accounting: Invalid subscriptionId');
         } else {
 
-            // Make accounting
-            accounter.count(subscription.apiKey, subscription.unit, countInfo, 'count', function (err) {
+            var options = {
+                url: subscription.notificationUrl,
+                method: req.method,
+                headers: req.headers,
+                json: true,
+                body: body,
+                time: true
+            };
 
-                if (err) {
-                    logger.error('An error ocurred while making the accounting');
+            req.headers['content-length'] = undefined;
+
+            request(options, function (error, resp, body) {
+
+                if (error) {
+                    logger.error('An error ocurred notifying the user, url: ' + options.url);
+                    res.status(504).send();
                 } else {
+                    res.status(resp.statusCode).send();
 
-                    req.headers['content-length'] = undefined;
+                    countInfo.response = resp;
 
-                    var options = {
-                        url: subscription.notificationUrl,
-                        method: req.method,
-                        headers: req.headers,
-                        json: true,
-                        body: body
-                    };
+                    // Make accounting
+                    accounter.count(subscription.apiKey, subscription.unit, countInfo, 'count', function (err) {
 
-                    request(options, function (error, resp, body) {
-
-                        if (error) {
-                            logger.error('An error ocurred notifying the user, url: ' + options.url);
-                            res.status(504).send();
-                        } else {
-                            res.status(resp.statusCode).send();
+                        if (err) {
+                            logger.error('An error ocurred while making the accounting');
                         }
                     });
                 }

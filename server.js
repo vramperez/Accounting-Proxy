@@ -146,7 +146,6 @@ var requestHandler = function (options, res, apiKey, unit) {
 
     // Save request Info
     requestInfo.request = JSON.parse(JSON.stringify(options));
-    requestInfo.request.time = new Date().getTime();
 
     request(options, function (error, resp, body) {
 
@@ -156,7 +155,6 @@ var requestHandler = function (options, res, apiKey, unit) {
 
         } else {
             requestInfo.response = resp; // Save response info
-            requestInfo.response.time = new Date().getTime();
 
             for (var header in resp.headers) {
                 res.setHeader(header, resp.headers[header]);
@@ -227,7 +225,8 @@ var prepareRequest = function (req, res, endpointUrl, apiKey, unit) {
     var options = {
         url: endpointUrl,
         method: req.method,
-        headers: req.headers
+        headers: req.headers,
+        time: true
     };
 
     if (createMehtods.indexOf(req.method) > -1 && isJSON) {

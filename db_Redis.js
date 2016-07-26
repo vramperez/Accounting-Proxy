@@ -735,16 +735,14 @@ exports.resetAccounting = function (apiKey, callback) {
  * @param {string} apiKey           Identifies the product.
  * @param {string} subscriptionId   Identifies the subscription.
  * @param {string} notificationUrl  Url for notifies the user when receive new notifications.
- * @param {string} expires          Subscription expiration date (ISO8601).
  */
-exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, expires, version, callback) {
+exports.addCBSubscription = function (apiKey, subscriptionId, notificationUrl, version, callback) {
     var multi = db.multi();
 
     multi.sadd([apiKey + 'subs', subscriptionId]);
     multi.hmset(subscriptionId, {
         apiKey: apiKey,
         notificationUrl: notificationUrl,
-        expires: expires,
         version: version
     });
     multi.exec(function (err) {
@@ -779,7 +777,6 @@ exports.getCBSubscription = function (subscriptionId, callback) {
                             return callback(null, {
                                 apiKey: subscriptionInfo.apiKey,
                                 notificationUrl: subscriptionInfo.notificationUrl,
-                                expires: subscriptionInfo.expires,
                                 unit: accounting.unit,
                                 subscriptionId: subscriptionId,
                                 version: subscriptionInfo.version,
@@ -842,24 +839,6 @@ exports.updateNotificationUrl = function (subscriptionId, notificationUrl, callb
     }, function (err) {
         if (err) {
             return callback('Error in database updating the notificationURL.');
-        } else {
-            return callback(null);
-        }
-    });
-};
-
-/**
- * Replace the expiration date with the new expiration date passed as argument.
- *
- * @param  {String}   subscriptionId  Subscription identifier.
- * @param  {String}   expires         New expiration date (ISO8601).
- */
-exports.updateExpirationDate = function (subscriptionId, expires, callback) {
-    db.hmset(subscriptionId, {
-        expires: expires
-    }, function (err) {
-        if (err) {
-            return callback('Error in database updating the expiration date.');
         } else {
             return callback(null);
         }

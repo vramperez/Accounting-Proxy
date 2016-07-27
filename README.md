@@ -171,9 +171,9 @@ If the user is an administrator of the service, the administrator request must o
 
 ## <a name="accounting"/> Accounting
 The accounting proxy supports accounting based on different units and there is a module for each accounting unit. Developers can implement their own accounting modules (see section [Development](#development)). By default, all Accounting Proxy instances have three accounting modules:
-* `call`: accounting value incremented in one for each call to the service.
-* `megabyte`: accounting value incremented based on the amount of data retrieved from the service (in megabytes).
-* `millisecond`: accounting value incremented based on the request time (in milliseconds).
+* `call`: accounting value incremented in one for each call to the service. If the Context Broker option is enabled, the accounting value will be incremented in one for each Context Broker notification.
+* `megabyte`: accounting value incremented based on the amount of data (in megabytes) retrieved from the service (in megabytes). If Context Broker option is enabled, the accounting value will be incremented based on the amount of data (in megabytes) sended by each Context Broker notification.
+* `millisecond`: accounting value incremented based on the request time (in milliseconds). If Context Broker option is enabled, the accounting value will be incremented based on the notification time (in milliseconds).
 
 ## <a name="running"/> Running
 After [installation](#installation), just execute:
@@ -300,13 +300,6 @@ var count = function (countInfo, callback) {
     return callback(error, amount);
 }
 
-// This funciton is optional and only used whith the Context Broker
-var subscriptionCount = function (countInfo, callback) {
-	// Code to do the Context Broker subscription accounting
-
-	return callback(error, amount);
-}
-
 var getSpecification = function () {
 	return specification;
 }
@@ -323,7 +316,6 @@ The function `count` receives two parameters:
         body: {
         
         },
-        time: ,
         ...
     
     },
@@ -334,7 +326,7 @@ The function `count` receives two parameters:
         body: {
         
         },
-        time: ,
+        elapsedTime: , // Response time
         ...
     }
 }
@@ -342,8 +334,6 @@ The function `count` receives two parameters:
 - `callback`: function, which is use to retrieve the accounting value or the error message. The function has 2 parameters:
   + `error`: string with a description of the error if there is one. Otherwise, `null`.
   + `ammount`: number with the amount to add to the accounting.
-
-The function `subscriptionCount` is an optional count function that only will be called when the proxy receives a valid Context Broker subscription. The arguments are the same as in the `count` function, but in this case the field `time` will be `undefined` in the `countInfo` argument.
 
 The function `getSpecification` should return a javascript object with the usage specification for the accounting unit according to the TMF635 usage management API ([TMF635 usage Management API](https://www.tmforum.org/resources/standard/tmf635-usage-management-api-rest-specification-r14-5-0/)).
 

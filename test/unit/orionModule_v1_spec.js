@@ -32,7 +32,7 @@ describe('Testing orionModule_v1', function () {
 
 	describe('Function "subscribe"', function () {
 
-		var testSubscribe = function (requestErr, subsRes, addCBSubsErr, subscriptionCount, countErr, done) {
+		var testSubscribe = function (requestErr, subsRes, addCBSubsErr, done) {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
             var options = {};
@@ -44,7 +44,6 @@ describe('Testing orionModule_v1', function () {
                 }
             };
             var unit = data.DEFAULT_UNIT;
-            var duration = data.DEFAULT_DURATION;
 
             var implementations = {
                 req: {
@@ -68,22 +67,8 @@ describe('Testing orionModule_v1', function () {
                     }
                 },
                 db: {
-                    addCBSubscription: function (apiKey, subsId, ref, expires, version, callback) {
+                    addCBSubscription: function (apiKey, subsId, ref, version, callback) {
                         return callback(addCBSubsErr);
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, accountingInfo, countFunction, callback) {
-                        var err = null;
-
-                        if (countErr) {
-                            err = {
-                                code: 'invalidUnit',
-                                msg: countErr
-                            }
-                        }
-
-                        return callback(err);
                     }
                 }
             };
@@ -110,19 +95,10 @@ describe('Testing orionModule_v1', function () {
                             assert(spies.res.setHeader.calledWith(header, resp.headers[header]));
                         }
                         assert(spies.req.get.calledWith('X-API-KEY'));
-                        assert(spies.db.addCBSubscription.calledWith(apiKey, subsRes.subscribeResponse.subscriptionId, url, '', 'v1'));
+                        assert(spies.db.addCBSubscription.calledWith(apiKey, subsRes.subscribeResponse.subscriptionId, url, 'v1'));
 
                         if (addCBSubsErr) {
                             assert.equal(err, addCBSubsErr);
-                        } else if (subscriptionCount) {
-
-                            assert(spies.accounter.count.calledWith(apiKey, unit, {request: {duration: duration}}, 'subscriptionCount'));
-
-                            if (countErr) {
-                                assert.equal(err, countErr);
-                            } else {
-                                assert.equal(err, null);
-                            }
                         } else {
                             assert.equal(err, null);
                         }
@@ -134,27 +110,19 @@ describe('Testing orionModule_v1', function () {
         };
 
         it('should call the callback with error when sending the request to CB fails', function (done) {
-            testSubscribe(true, null, false, null, false, done);
+            testSubscribe(true, null, false, done);
         });
 
         it('should redirect the CB response and call the callback without error when the subscription is not valid', function (done) {
-            testSubscribe(false, {}, false, undefined, false, done);
+            testSubscribe(false, {}, false, done);
         });
 
         it('should call the callback with error when db fails adding the subscription', function (done) {
-            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, 'Error', null, false, done);
-        });
-
-        it('should call the callback without error when there is no accounting function for subscriptions', function (done) {
-            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, undefined, false, done);
-        });
-
-        it('should call the callback without error when the accounting module fails making the accounting for subscriptions', function (done) {
-            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, {}, true, done);
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, 'Error', done);
         });
 
         it('should call the callback without error when there is no error making the accounting for subscription', function (done) {
-            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, {}, false, done);
+            testSubscribe(false, data.DEFAULT_SUBS_RESPONSE, false, done);
         });
 	});
 
@@ -250,7 +218,7 @@ describe('Testing orionModule_v1', function () {
 
 	describe('Function "updateSubscription"', function () {
 
-		var testUpdateSubscription = function (requestErr, getCBSubsErr, subsInfo, updateResp, subscriptionCount, countErr, done) {
+		var testUpdateSubscription = function (requestErr, done) {
 
             var subsId = data.DEFAULT_SUBS_ID;
             var options = {};
@@ -282,19 +250,9 @@ describe('Testing orionModule_v1', function () {
                     send: function (body) {},
                     setHeader: function (header, value) {}
                 },
-                db: {
-                    getCBSubscription: function (subsId, callback) {
-                        return callback(getCBSubsErr, subsInfo);
-                    }
-                },
                 requester: {
                     request: function (options, callback) {
                         return callback(requestErr, resp, updateResp)
-                    }
-                },
-                accounter: {
-                    count: function (apiKey, unit, accountingInfo, countFunction, callback) {
-                        return callback(countErr);
                     }
                 }
             };
@@ -309,39 +267,12 @@ describe('Testing orionModule_v1', function () {
                         assert.equal(err, 'Error sending the subscription to the CB');
                         assert.deepEqual(response, {status: 504, body: ''});
 
-                	} else if (!updateResp.subscribeResponse) {
+                	} else {
                         assert.equal(err, null);
                         assert.deepEqual(response, {status: resp.statusCode, body: updateResp});
-
-                	} else {
-
-                        assert.deepEqual(response, {status: resp.statusCode, body: updateResp});
-                		for (var key in resp.headers) {
-                			assert(spies.res.setHeader.calledWith(key, resp.headers[key]));
-                		};
-                		assert(spies.req.get.calledWith('X-API-KEY'));
-                		assert(spies.db.getCBSubscription.calledWith(subsId));
-
-	                    if (getCBSubsErr) {
-	                        assert.equal(err, getCBSubsErr);
-
-	                    } else if (!subsInfo) {
-	                        assert.equal(err, 'Subscription "' + subsId + '" not in database.');
-
-	                    } else {
-
-	                		if (!subscriptionCount) {
-
-	                			assert.equal(err, null);
-
-	                		} else {
-
-	                			assert(spies.accounter.count.calledWith(subsInfo.apiKey, subsInfo.unit, {request: {duration: updateResp.subscribeResponse.duration}}, 'subscriptionCount'));
-	                			countErr ? assert.equal(err, countErr) : assert.equal(err, null);
-
-	                		}
-	                	}
                     }
+
+                    assert(spies.res.setHeader.calledWith('header1', resp.headers.header1));
 
                     done();
                 });
@@ -349,31 +280,11 @@ describe('Testing orionModule_v1', function () {
         };
 
         it('should call the callback with error when there is an error making the request to CB', function (done) {
-            testUpdateSubscription(true, false, null, null, null, false, done);
+            testUpdateSubscription(true, done);
         });
 
-        it('should call the callback with error when db fails getting the subscription information', function (done) {
-            testUpdateSubscription(false, true, false, true, null, false, done);
-        });
-
-        it('should call the callback with error when there is no subscription to update', function (done) {
-            testUpdateSubscription(false, false, false, true, null, false, done);
-        });
-
-        it('should call the callback without error and redirect the response when the update is rejected by the CB', function (done) {
-            testUpdateSubscription(false, false, true, false, null, false, done);
-        });
-
-        it('should call the callback without error when there is no accounting function for subscriptions updates', function (done) {
-            testUpdateSubscription(false, false, true, true, false, false, done);
-        });
-
-        it('should call the callback with error when there is an error making the accounting of the subscription update', function (done) {
-            testUpdateSubscription(false, false, true, true, true, true, done);
-        });
-
-        it('should call the callback without error when subscription update is correct', function (done) {
-            testUpdateSubscription(false, false, true, true, true, false, done);
+        it('should call the callback without error when there is no error updating the subscription', function (done) {
+            testUpdateSubscription(false, done);
         });
 	});
 

@@ -138,7 +138,6 @@ describe('Testing SQLITE database', function () {
                     subscriptionId      TEXT, \
                     apiKey              TEXT, \
                     notificationUrl     TEXT, \
-                    expires             TEXT, \
                     version             TEXT, \
                     PRIMARY KEY (subscriptionId), \
                     FOREIGN KEY (apiKey) REFERENCES accounting (apiKey) ON DELETE CASCADE            )',
@@ -1199,21 +1198,19 @@ describe('Testing SQLITE database', function () {
         var apiKey = data.DEFAULT_API_KEYS[0];
         var subsId = data.DEFAULT_SUBSCRIPTION_ID;
         var notificationUrl = data.DEFAULT_NOTIFICATION_URL;
-        var expires = data.DEFAULT_EXPIRES;
         var version = 'v1';
 
         var sentence = 'INSERT OR REPLACE INTO subscriptions \
-        VALUES ($subscriptionId, $apiKey, $notificationUrl, $expires, $version)';
+        VALUES ($subscriptionId, $apiKey, $notificationUrl, $version)';
         var params = {
             '$subscriptionId': subsId,
             '$apiKey': apiKey,
             '$notificationUrl': notificationUrl,
-            '$expires': expires,
             '$version': version
         };
 
         var method = 'addCBSubscription';
-        var args = [apiKey, subsId, notificationUrl, expires, version];
+        var args = [apiKey, subsId, notificationUrl, version];
 
         it('should call the callback with error when db fails adding the new CB subscription', function (done) {
             var errorMsg = 'Error in database adding the subscription "' + subsId + '" .';
@@ -1230,7 +1227,7 @@ describe('Testing SQLITE database', function () {
 
         var subsId = data.DEFAULT_SUBSCRIPTION_ID;
 
-        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, subscriptions.expires, \
+        var sentence = 'SELECT subscriptions.apiKey, subscriptions.notificationUrl, \
                 subscriptions.subscriptionId, subscriptions.version, accounting.unit, services.url\
             FROM subscriptions , accounting, services\
             WHERE subscriptions.apiKey=accounting.apiKey AND subscriptionId=$subscriptionId \
@@ -1322,33 +1319,6 @@ describe('Testing SQLITE database', function () {
 
         it('should call the callback with error when db fails updating the notification URL', function (done) {
             var errorMsg = 'Error in database updating the notificationURL';
-
-            runTest(sentence, params, method, args, errorMsg, done);
-        });
-
-        it('should call the callback without error when there is no error updating the notification URL', function (done) {
-            runTest(sentence, params, method, args, null, done);
-        });
-    });
-
-    describe('Function "updateExpirationDate"', function () {
-
-        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
-        var expires = data.DEFAULT_EXPIRES;
-
-        var sentence = 'UPDATE subscriptions \
-            SET expires=$expires \
-            WHERE subscriptionId=$subscriptionId';
-        var params = {
-            '$subscriptionId': subsId,
-            '$expires': expires
-        };
-
-        var method = 'updateExpirationDate';
-        var args = [subsId, expires];
-
-        it('should call the callback with error when db fails updating the notification URL', function (done) {
-            var errorMsg = 'Error in database updating the expiration date';
 
             runTest(sentence, params, method, args, errorMsg, done);
         });

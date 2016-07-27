@@ -423,7 +423,8 @@ describe('Testing Server', function () {
                 method: method,
                 headers: {'content-length': undefined},
                 json: true,
-                body: {}
+                body: {},
+                time: true
             };
 
             var implementations = {
@@ -552,7 +553,8 @@ describe('Testing Server', function () {
                 url: url + restURL,
                 method: method,
                 headers: {},
-                body: {}
+                body: {},
+                time: true
             };
 
             var implementations = {

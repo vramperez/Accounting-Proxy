@@ -242,6 +242,10 @@ describe('Testing ContextBroker Handler', function () {
             var requestStatus = 200;
             var subscription = data.DEFAULT_SUBSCRIPTION_v1;
             var method = 'POST';
+            var resp = {
+                statusCode: requestStatus,
+                elapsedTime: data.DEFAULT_ELAPSED_TIME
+            };
 
             var implementations = {
                 req: {
@@ -276,7 +280,7 @@ describe('Testing ContextBroker Handler', function () {
                 },
                 requester: {
                     request: function (options, callback) {
-                        return callback(requestErr, {statusCode: requestStatus});
+                        return callback(requestErr, resp);
                     }
                 },
                 logger: {
@@ -292,30 +296,31 @@ describe('Testing ContextBroker Handler', function () {
                     assert(spies.logger.error.calledWith('An error ocurred while making the accounting: Invalid subscriptionId'));
                 } else {
 
-                    assert(spies.accounter.count.calledWith(subscription.apiKey, subscription.unit, {request: implementations.req, response: {}}, 'count'));
+                    var options = {
+                        url: subscription.notificationUrl,
+                        method: method,
+                        headers: implementations.req.headers,
+                        json: true,
+                        body: implementations.req.body,
+                        time: true
+                    };
 
-                    if (countErr) {
-                        assert(spies.logger.error.calledWith('An error ocurred while making the accounting'));
+                    assert(spies.requester.request.calledWith(options));
+
+                    if (requestErr) {
+                        assert(spies.logger.error.calledWith('An error ocurred notifying the user, url: ' + options.url));
+                        assert(spies.res.status.calledWith(504));
+                        assert(spies.res.send.calledOnce);
                     } else {
 
-                        var options = {
-                            url: subscription.notificationUrl,
-                            method: method,
-                            headers: implementations.req.headers,
-                            json: true,
-                            body: implementations.req.body
-                        };
+                        assert(spies.accounter.count.calledWith(subscription.apiKey, subscription.unit, {request: implementations.req, response: resp}, 'count'));
 
-                        assert(spies.requester.request.calledWith(options));
-
-                        if (requestErr) {
-                            assert(spies.logger.error.calledWith('An error ocurred notifying the user, url: ' + options.url));
-                            assert(spies.res.status.calledWith(504));
-                            assert(spies.res.send.calledOnce);
-                        } else {
-                            assert(spies.res.status.calledWith(requestStatus));
-                            assert(spies.res.send.calledOnce);
+                        if (countErr) {
+                            assert(spies.logger.error.calledWith('An error ocurred while making the accounting'));
                         }
+
+                        assert(spies.res.status.calledWith(requestStatus));
+                        assert(spies.res.send.calledOnce);
                     }
                 }
 
@@ -328,15 +333,15 @@ describe('Testing ContextBroker Handler', function () {
         });
 
         it('should log the error when db fails making the accounting', function (done) {
-         testNotificationHandler(false, true, false, done); 
+            testNotificationHandler(false, true, false, done); 
         });
 
         it('should return 504 when the notification fails', function (done) {
-         testNotificationHandler(false, false, true, done);
+            testNotificationHandler(false, false, true, done);
         });
 
         it('should return 200 when the notification success', function (done) {
-         testNotificationHandler(false, false, false, done); 
+            testNotificationHandler(false, false, false, done); 
         });
     });
 });

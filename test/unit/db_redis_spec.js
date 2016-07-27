@@ -1650,7 +1650,6 @@ describe('Testing REDIS database', function () {
             var apiKey = data.DEFAULT_API_KEYS[0];
             var subsId = data.DEFAULT_SUBSCRIPTION_ID;
             var url = data.DEFAULT_NOTIFICATION_URL;
-            var expires = data.DEFAULT_EXPIRES;
             var version = 'v1';
 
             var sadd = sinon.stub();
@@ -1671,14 +1670,13 @@ describe('Testing REDIS database', function () {
 
             var db = getDb({multi: multi});
 
-            db.addCBSubscription(apiKey, subsId, url, expires, version, function (err) {
+            db.addCBSubscription(apiKey, subsId, url, version, function (err) {
 
                 assert(multi.calledOnce);
                 assert(sadd.calledWith([apiKey + 'subs', subsId]));
                 assert(hmset.calledWith(subsId, {
                     apiKey: apiKey,
                     notificationUrl: url,
-                    expires: expires,
                     version: version
                 }));
                 assert(execSpy.calledOnce);
@@ -1708,7 +1706,6 @@ describe('Testing REDIS database', function () {
         var subscriptionInfo = {
             apiKey: apiKey,
             notificationUrl: data.DEFAULT_NOTIFICATION_URL,
-            expires: data.DEFAULT_EXPIRES,
             unit: data.DEFAULT_UNIT,
             subscriptionId: data.DEFAULT_SUBSCRIPTION_ID,
             version: 'v1',
@@ -1928,26 +1925,6 @@ describe('Testing REDIS database', function () {
         });
 
         it('should call the callback withou error when there is no error updating the notification URL', function (done) {
-            testUpdateSubscription(method, subsId, args, value, null, done);
-        });
-    });
-
-    describe('Function "updateExpirationDate"', function () {
-
-        var subsId = data.DEFAULT_SUBSCRIPTION_ID;
-        var expires = data.DEFAULT_EXPIRES;
-
-        var method = 'updateExpirationDate';
-        var args = [subsId, expires];
-        var value = {expires: expires};
-
-        it('should call the callback with error when db fails updating the expiration date', function (done) {
-            var errorMsg = 'Error in database updating the expiration date.';
-
-            testUpdateSubscription(method, subsId, args, value, errorMsg, done);
-        });
-
-        it('should call the callback without error when there is no error updating the expiration date', function (done) {
             testUpdateSubscription(method, subsId, args, value, null, done);
         });
     });

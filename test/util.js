@@ -131,7 +131,7 @@ var loadBuys = function (buys, callback) {
 var loadSubscriptions = function (subscriptions, callback) {
     if (subscriptions.length != 0) {
         async.each(subscriptions, function (subs, taskCallback) {
-            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, subs.expires, subs.version, taskCallback);
+            dbMock.addCBSubscription(subs.apiKey, subs.subscriptionId, subs.notificationUrl, subs.version, taskCallback);
         }, callback);
     } else {
         return callback();

@@ -41,7 +41,6 @@ data.DEFAULT_SUBSCRIPTION_v1 = {
     subscriptionId: data.DEFAULT_SUBS_ID,
     unit: data.DEFAULT_UNIT,
     notificationUrl: data.DEFAULT_URLS[0],
-    expires: null,
     version: 'v1'
 };
 
@@ -50,7 +49,6 @@ data.DEFAULT_SUBSCRIPTION_v2 = {
     subscriptionId: data.DEFAULT_SUBS_ID,
     unit: data.DEFAULT_UNIT,
     notificationUrl: data.DEFAULT_URLS[0],
-    expires: data.DEFAULT_EXPIRES,
     version: 'v2'
 };
 

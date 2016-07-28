@@ -101,7 +101,7 @@ var mocker = function (database, done) {
             notifier = proxyquire('../../notifier', {
                 './config': configMock,
                 'winston': testUtil.logMock,
-                './db': db
+                './db_Redis': db
             });
 
             apiServer = proxyquire('../../APIServer', {

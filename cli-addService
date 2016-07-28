@@ -43,6 +43,7 @@ if (program.args.length < 4) {
     var isContextBroker = program.contextBroker !== undefined ? true : false;
     var publicPath = isContextBroker ? program.args[program.args.length-1] : program.args[0];
     var url = isContextBroker ? program.args[0] : program.args[1];
+    url = url.replace(/\/$/, ""); // remove trailing slash
     var appId = isContextBroker ? program.args[1] : program.args[2];
     var methods = isContextBroker ? program.args.slice(2, program.args.length-1) : program.args.slice(3);
 

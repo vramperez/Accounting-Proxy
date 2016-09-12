@@ -403,7 +403,7 @@ describe('Testing the administration API', function (done) {
 
                 it('should save the buy information when the request is correct', function (done) {
 
-                    var expectedApiKey = '829d47524220aa859d5e8c683a22035df1bc44ea';
+                    var expectedApiKey = '8e96f1b1815e127ea645209830cbb40c72923408';
                     var service = data.DEFAULT_SERVICES_LIST[0];
                     var buy = {
                         orderId: data.DEFAULT_ORDER_IDS[0],
@@ -462,7 +462,7 @@ describe('Testing the administration API', function (done) {
 
                 var testDeleteBuy = function (notification, subscription, done) {
 
-                    var apiKey = '829d47524220aa859d5e8c683a22035df1bc44ea';
+                    var apiKey = '94c6e052c59756df3bafbb03284592e52e610edc';
                     var buyInfo = data.DEFAULT_BUY_INFORMATION[0];
                     buyInfo.apiKey = apiKey;
                     var deleteBuy = data.DEFAULT_DELETE_BUY_INFORMATION[0];

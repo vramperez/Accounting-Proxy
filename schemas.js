@@ -20,7 +20,10 @@ schemas.newBuy = {
 schemas.deleteBuy = {
     orderId: Joi.string().min(1).required(),
     productId: Joi.string().min(1).required(),
-    customer: Joi.string().min(1).required()
+    customer: Joi.string().min(1).required(),
+    productSpecification: Joi.object().keys({
+        url: Joi.string().min(1).required()
+    })
 };
 
 module.exports = schemas;

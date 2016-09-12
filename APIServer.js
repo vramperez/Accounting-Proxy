@@ -89,11 +89,12 @@ exports.newBuy = function (req, res) {
             res.status(422).json({error: 'Invalid json: ' + err});
         } else {
 
-            var apiKey = generateApiKey(body.productId, body.orderId, body.customer);
+            var publicPath = url.parse(body.productSpecification.url).path;
+            var apiKey = generateApiKey(body.productId, body.orderId, body.customer, publicPath);
 
             db.newBuy({
                 apiKey: apiKey,
-                publicPath: url.parse(body.productSpecification.url).path,
+                publicPath: publicPath,
                 orderId: body.orderId,
                 productId: body.productId,
                 customer: body.customer,
@@ -150,7 +151,8 @@ exports.deleteBuy = function (req, res) {
             res.status(422).json({error: 'Invalid json: ' + err});
         } else {
 
-            var apiKey = generateApiKey(body.productId, body.orderId, body.customer);
+            var publicPath = url.parse(body.productSpecification.url).path;
+            var apiKey = generateApiKey(body.productId, body.orderId, body.customer, publicPath);
 
             async.series([
                 function (callback) {
@@ -212,11 +214,12 @@ exports.getUnits = function (req, res) {
  * @param  {string} productId   product identifier.
  * @param  {string} orderId     order identifier.
  * @param  {string} customer    user identifier.
+ * @param  {string} publicPath  service public path.
  */
-var generateApiKey = function (productId, orderId, customer) {
+var generateApiKey = function (productId, orderId, customer, publicPath) {
     var sha1 = crypto.createHash('sha1');
 
-    sha1.update(productId + orderId + customer);
+    sha1.update(productId + orderId + customer + publicPath);
     return sha1.digest('hex');
 };
 

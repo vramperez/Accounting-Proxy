@@ -344,7 +344,7 @@ describe('Testing APIServer', function() {
         var testCancelSubscriptions = function (getSubscriptionsErr, getSubscriptionErr, cancelSubsErr, done) {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
-            var body = data.DEFAULT_BUY_INFORMATION;
+            var body = data.DEFAULT_DELETE_BUY_INFORMATION[0];
             var subscriptions = [{subscriptionId: 'subs1'}, {subscriptionId: 'subs2'}];
             var subscriptionsInfo = {};
             subscriptionsInfo[subscriptions[0].subscriptionId] = data.DEFAULT_SUBSCRIPTION_v1;
@@ -403,6 +403,13 @@ describe('Testing APIServer', function() {
                     cancelSubscription: function (subsInfo, callback) {
                         return callback(cancelSubsErr);
                     }
+                },
+                url: {
+                    parse: function(url) {
+                        return {
+                            path: data.DEFAULT_PUBLIC_PATHS[0]
+                        }
+                    }
                 }
             };
 
@@ -412,6 +419,7 @@ describe('Testing APIServer', function() {
 
                 setTimeout(function() {
 
+                    assert(spies.url.parse.calledWith(body.productSpecification.url));
                     assert(spies.validation.validate.calledWith('deleteBuy', body));
                     assert(spies.db.getCBSubscriptions.calledWith(apiKey));
 
@@ -460,7 +468,8 @@ describe('Testing APIServer', function() {
         var testDeleteBuy = function (validateErr, notifyErr, deleteBuyErr, done) {
 
             var apiKey = data.DEFAULT_API_KEYS[0];
-            var body = data.DEFAULT_BUY_INFORMATION;
+            var body = data.DEFAULT_DELETE_BUY_INFORMATION[0];
+            var publicPath = data.DEFAULT_PUBLIC_PATHS[0];
 
             var implementations = {
                 config: {
@@ -504,6 +513,13 @@ describe('Testing APIServer', function() {
                     digest: function (type) {
                         return apiKey
                     }
+                },
+                url: {
+                    parse: function(url) {
+                        return {
+                            path: publicPath
+                        }
+                    }
                 }
             };
 
@@ -520,8 +536,9 @@ describe('Testing APIServer', function() {
 
                     } else {
 
+                        assert(spies.url.parse.calledWith(body.productSpecification.url));
                         assert(spies.crypto.createHash.calledWith('sha1'));
-                        assert(spies.crypto.update.calledWith(body.productId + body.orderId + body.customer));
+                        assert(spies.crypto.update.calledWith(body.productId + body.orderId + body.customer + publicPath));
                         assert(spies.crypto.digest.calledWith('hex'));
 
                         assert(spies.notifier.notifyUsage.calledWith(apiKey));

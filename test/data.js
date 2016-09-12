@@ -139,11 +139,17 @@ data.DEFAULT_BUY_INFORMATION = [{
 data.DEFAULT_DELETE_BUY_INFORMATION = [{
     orderId: data.DEFAULT_ORDER_IDS[0],
     productId: data.DEFAULT_PRODUCT_IDS[0],
-    customer: data.DEFAULT_USER_ID
+    customer: data.DEFAULT_USER_ID,
+    productSpecification: {
+        url: data.DEFAULT_URLS[0]
+    }
 }, {
     orderId: data.DEFAULT_ORDER_IDS[1],
     productId: data.DEFAULT_PRODUCT_IDS[1],
-    customer: data.DEFAULT_USER_ID
+    customer: data.DEFAULT_USER_ID,
+    productSpecification: {
+        url: data.DEFAULT_URLS[1]
+    }
 }];
 
 data.room1 = {

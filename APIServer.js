@@ -188,12 +188,29 @@ exports.deleteBuy = function (req, res) {
  */
 exports.getApiKeys = function (req, res) {
     var user = req.user.id;
+    var result = [];
 
     db.getApiKeys(user, function (err, apiKeysInfo) {
         if (err) {
             res.status(500).send();
         } else {
-            res.status(200).json(apiKeysInfo);
+
+            var protocol = config.accounting_proxy.https.enabled ? 'https' : 'http';
+            var baseUrl = protocol + '://' + req.hostname + ':' + config.accounting_proxy.port;
+
+            async.each(apiKeysInfo, function(apiKeyInfo, taskCallback) {
+
+                result.push({
+                    apiKey: apiKeyInfo.apiKey,
+                    orderId: apiKeyInfo.orderId,
+                    productId: apiKeyInfo.productId,
+                    url: baseUrl + apiKeyInfo.publicPath
+                });
+
+                taskCallback(null);
+            }, function() {
+                res.status(200).json(result);
+            });
         }
     });
 };

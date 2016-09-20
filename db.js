@@ -509,7 +509,7 @@ exports.deleteBuy = function (apiKey, callback) {
  * @param  {string}   user     Customer identifier.
  */
 exports.getApiKeys = function (user, callback) {
-    db.all('SELECT apiKey, productId, orderId \
+    db.all('SELECT apiKey, productId, orderId, publicPath \
             FROM accounting \
             WHERE customer=$user',
             {

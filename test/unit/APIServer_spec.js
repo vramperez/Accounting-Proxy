@@ -65,7 +65,10 @@ describe('Testing APIServer', function() {
 
     describe('Function "getApiKeys"', function() {
 
-        var testGetApiKeys = function (error, apiKeysInfo, done) {
+        var hostName = 'localhost';
+        var port = 9000;
+
+        var testGetApiKeys = function (error, apiKeysInfo, result, done) {
 
             var user = data.DEFAULT_USER_ID;
 
@@ -73,7 +76,8 @@ describe('Testing APIServer', function() {
                 req: {
                     user: {
                         id: user
-                    }
+                    },
+                    hostname: hostName
                 },
                 res: {
                     status: function(code) {
@@ -85,6 +89,14 @@ describe('Testing APIServer', function() {
                 db: {
                     getApiKeys: function (user, callback) {
                         return callback(error, apiKeysInfo);
+                    }
+                },
+                config: {
+                    accounting_proxy: {
+                        https: {
+                            enabled: true
+                        },
+                        port: port
                     }
                 }
             };
@@ -103,7 +115,7 @@ describe('Testing APIServer', function() {
                 } else {
 
                     assert(spies.res.status.calledWith(200));
-                    assert(spies.res.json.calledWith(apiKeysInfo));
+                    assert(spies.res.json.calledWith(result));
 
                 }
 
@@ -112,15 +124,29 @@ describe('Testing APIServer', function() {
         };
 
         it('should return 500 when db fails getting the API keys', function(done) {
-            testGetApiKeys(true, null, done);
+            testGetApiKeys(true, null, null, done);
         });
 
         it('should return 404 when there is not API keys for the user specified', function(done) {
-            testGetApiKeys(false, [], done);
+            testGetApiKeys(false, [], [], done);
         });
 
         it('should return 200 when the response contains the user API keys', function(done) {
-            testGetApiKeys(false, {}, done);
+            var apiKeysInfo = [{
+                apiKey: data.DEFAULT_API_KEYS[0],
+                productId: data.DEFAULT_PRODUCT_IDS[0],
+                orderId: data.DEFAULT_ORDER_IDS[0],
+                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
+            }];
+
+            var result = [{
+                apiKey: data.DEFAULT_API_KEYS[0],
+                productId: data.DEFAULT_PRODUCT_IDS[0],
+                orderId: data.DEFAULT_ORDER_IDS[0],
+                url: 'https://' + hostName + ':' + port + data.DEFAULT_PUBLIC_PATHS[0]
+            }];
+
+            testGetApiKeys(false, apiKeysInfo, result, done);
         });
     });
 

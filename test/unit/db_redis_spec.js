@@ -1134,8 +1134,8 @@ describe('Testing REDIS database', function () {
     describe('Function "getApiKeys"', function (done) {
 
         var apiKeysInfo = {};
-        apiKeysInfo[data.DEFAULT_API_KEYS[0]] = {productId: data.DEFAULT_PRODUCT_IDS[0], orderId: data.DEFAULT_ORDER_IDS[0]};
-        apiKeysInfo[data.DEFAULT_API_KEYS[1]] = {productId: data.DEFAULT_PRODUCT_IDS[1], orderId: data.DEFAULT_ORDER_IDS[1]};
+        apiKeysInfo[data.DEFAULT_API_KEYS[0]] = {productId: data.DEFAULT_PRODUCT_IDS[0], orderId: data.DEFAULT_ORDER_IDS[0], publicPath: data.DEFAULT_PUBLIC_PATHS[0]};
+        apiKeysInfo[data.DEFAULT_API_KEYS[1]] = {productId: data.DEFAULT_PRODUCT_IDS[1], orderId: data.DEFAULT_ORDER_IDS[1], publicPath: data.DEFAULT_PUBLIC_PATHS[1]};
 
         var testGetApiKeys = function (smembersErr, apiKeys, hgetallErr, resultExpected, done) {
 
@@ -1209,10 +1209,12 @@ describe('Testing REDIS database', function () {
                 apiKey : data.DEFAULT_API_KEYS[0],
                 productId: data.DEFAULT_PRODUCT_IDS[0],
                 orderId: data.DEFAULT_ORDER_IDS[0],
+                publicPath: data.DEFAULT_PUBLIC_PATHS[0]
             }, {
                 apiKey : data.DEFAULT_API_KEYS[1],
                 productId: data.DEFAULT_PRODUCT_IDS[1],
                 orderId: data.DEFAULT_ORDER_IDS[1],
+                publicPath: data.DEFAULT_PUBLIC_PATHS[1]
             }];
 
            testGetApiKeys(false, data.DEFAULT_API_KEYS, false, resultExpected, done); 

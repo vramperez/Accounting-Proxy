@@ -542,7 +542,8 @@ exports.getApiKeys = function (user, callback) {
                         toReturn.push({
                             apiKey: apiKey,
                             productId: accountingInfo.productId,
-                            orderId: accountingInfo.orderId
+                            orderId: accountingInfo.orderId,
+                            publicPath: accountingInfo.publicPath
                         });
                         taskCallback(null);
                     }

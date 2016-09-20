@@ -289,9 +289,12 @@ describe('Testing the administration API', function (done) {
                                     if (err) {
                                         done(err);
                                     } else {
-                                        assert.deepEqual(res.body[0], { apiKey: buyInfos[0].apiKey, productId: buyInfos[0].productId, orderId: buyInfos[0].orderId });
+
+                                        var protocol = configMock.accounting_proxy.https.enabled ? 'https' : 'http';
+                                        var baseUrl = protocol + '://' + 'localhost:' + configMock.accounting_proxy.port;
+                                        assert.deepEqual(res.body[0], { apiKey: buyInfos[0].apiKey, productId: buyInfos[0].productId, orderId: buyInfos[0].orderId, url:  baseUrl + buyInfos[0].publicPath});
                                         if (numApiKeys === 2) {
-                                            assert.deepEqual(res.body[1], { apiKey: buyInfos[1].apiKey, productId: buyInfos[1].productId, orderId: buyInfos[1].orderId });
+                                            assert.deepEqual(res.body[1], { apiKey: buyInfos[1].apiKey, productId: buyInfos[1].productId, orderId: buyInfos[1].orderId, url:  baseUrl + buyInfos[1].publicPath});
                                         }
                                         done();
                                     }

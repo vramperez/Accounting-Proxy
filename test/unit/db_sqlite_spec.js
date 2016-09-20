@@ -791,7 +791,7 @@ describe('Testing SQLITE database', function () {
 
     describe('Function "getApiKeys"', function () {
 
-        var sentence = 'SELECT apiKey, productId, orderId \
+        var sentence = 'SELECT apiKey, productId, orderId, publicPath \
             FROM accounting \
             WHERE customer=$user';
         var params = {'$user': data.DEFAULT_USER_ID};

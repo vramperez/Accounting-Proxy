@@ -249,15 +249,22 @@ exports.checkUsageSpecifications = function (db, units, hrefs, callback) {
 
 // Flush the database specified
 exports.clearDatabase = function (database, name, callback) {
+    console.log("[DEBUG] Cleanning database");
     if (database === 'sql') {
+        console.log("[DEBUG] Database type: SQL");
         fs.access('./' + name, fs.F_OK, function (err) {
+            console.log("[DEBUG] After checking if database file exists. Err: ");
+            console.log(err);
             if (!err) {
+                console.log("[DEBUG] Deleting the file...");
                 fs.unlink('./' + name, callback);
             } else {
+                console.log("[DEBUG] The file does not exist");
                 return callback(null); // not exists
             }
         });
     } else {
+        console.log("[DEBUG] Database type: Redis");
         var client = redis.createClient({
             host: testConfig.redis_host,
             port: testConfig.redis_port

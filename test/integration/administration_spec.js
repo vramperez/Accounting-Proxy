@@ -208,13 +208,13 @@ describe('Testing the administration API', function (done) {
 
         describe('with database: ' + database, function () {
 
-            this.timeout(4000);
-
             // Clear the database and mock dependencies
             beforeEach(function (done) {
                 this.timeout(5000);
 
                 testUtil.clearDatabase(database, databaseName, function (err) {
+                    console.log("[DEBUG] clearDatabase returns: ");
+                    console.log(err);
                     if (err) {
                         done(err);
                     } else {
